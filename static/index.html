@@ -40,28 +40,52 @@
                 </div>
                 
                 <div class="nav-section">
-                    <h3 class="nav-section-title">Organization</h3>
-                    <a href="#" class="nav-item" data-page="brands">
-                        <div class="nav-content">
-                            <span class="nav-icon">🏷️</span>
-                            Brands
+                    <div class="nav-dropdown">
+                        <button class="nav-dropdown-toggle" id="organizersToggle">
+                            <div class="nav-content">
+                                <span class="nav-icon">📂</span>
+                                Organizers
+                            </div>
+                            <span class="dropdown-arrow">▼</span>
+                        </button>
+                        <div class="nav-dropdown-content" id="organizersDropdown">
+                            <a href="#" class="nav-item" data-page="brands">
+                                <div class="nav-content">
+                                    <span class="nav-icon">🏷️</span>
+                                    Brand
+                                </div>
+                                <span class="nav-count" id="brandCount">0</span>
+                            </a>
+                            <a href="#" class="nav-item" data-page="sizes">
+                                <div class="nav-content">
+                                    <span class="nav-icon">📏</span>
+                                    Size
+                                </div>
+                                <span class="nav-count" id="sizeCount">0</span>
+                            </a>
+                            <a href="#" class="nav-item" data-page="origins">
+                                <div class="nav-content">
+                                    <span class="nav-icon">🌍</span>
+                                    Origin
+                                </div>
+                                <span class="nav-count" id="originCount">0</span>
+                            </a>
+                            <a href="#" class="nav-item" data-page="strength">
+                                <div class="nav-content">
+                                    <span class="nav-icon">💪</span>
+                                    Strength
+                                </div>
+                                <span class="nav-count" id="strengthCount">0</span>
+                            </a>
+                            <a href="#" class="nav-item" data-page="ring-gauge">
+                                <div class="nav-content">
+                                    <span class="nav-icon">⭕</span>
+                                    Ring Gauge
+                                </div>
+                                <span class="nav-count" id="ringGaugeCount">0</span>
+                            </a>
                         </div>
-                        <span class="nav-count" id="brandCount">0</span>
-                    </a>
-                    <a href="#" class="nav-item" data-page="sizes">
-                        <div class="nav-content">
-                            <span class="nav-icon">📏</span>
-                            Sizes
-                        </div>
-                        <span class="nav-count" id="sizeCount">0</span>
-                    </a>
-                    <a href="#" class="nav-item" data-page="origins">
-                        <div class="nav-content">
-                            <span class="nav-icon">🌍</span>
-                            Origins
-                        </div>
-                        <span class="nav-count" id="originCount">0</span>
-                    </a>
+                    </div>
                 </div>
                 
                 <!-- Settings at bottom -->
@@ -121,14 +145,6 @@
 
                     <!-- Cigars Grid -->
                     <div class="cigars-section">
-                        <div class="section-header">
-                            <h2>Your Collection</h2>
-                            <div class="view-toggle">
-                                <button class="view-btn active" data-view="grid">Grid</button>
-                                <button class="view-btn" data-view="list">List</button>
-                            </div>
-                        </div>
-                        
                         <div class="loading" id="loading">
                             <div class="spinner"></div>
                             <p>Loading cigars...</p>
@@ -139,9 +155,169 @@
                         <div class="empty-state" id="emptyState" style="display: none;">
                             <div class="empty-icon">📦</div>
                             <h3>No cigars found</h3>
-                            <p>Start building your collection by adding your first cigar!</p>
-                            <button class="add-btn" onclick="openCigarModal()">Add Your First Cigar</button>
+                            <p>Add cigars to your humidor to see them here!</p>
+                            <button class="add-btn" onclick="openCigarModal()">Add Cigar</button>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Brands Section -->
+                <div class="organizer-section" id="brandsSection" style="display: none;">
+                    <div class="section-header">
+                        <h2>Brand Management</h2>
+                        <button class="add-btn" id="addBrandBtn">
+                            <span class="add-icon">+</span>
+                            Add Brand
+                        </button>
+                    </div>
+                    
+                    <div class="search-section">
+                        <div class="search-bar">
+                            <input type="text" id="brandSearchInput" placeholder="Search brands..." class="search-input">
+                            <button class="search-btn" id="brandSearchBtn">🔍</button>
+                        </div>
+                    </div>
+
+                    <div class="loading" id="brandsLoading" style="display: none;">
+                        <div class="spinner"></div>
+                        <p>Loading brands...</p>
+                    </div>
+                    
+                    <div class="organizers-grid" id="brandsGrid"></div>
+                    
+                    <div class="empty-state" id="brandsEmptyState" style="display: none;">
+                        <div class="empty-icon">🏷️</div>
+                        <h3>No brands found</h3>
+                        <p>Create brand entries to organize your cigar collection!</p>
+                        <button class="add-btn" onclick="openBrandModal()">Add First Brand</button>
+                    </div>
+                </div>
+
+                <!-- Sizes Section -->
+                <div class="organizer-section" id="sizesSection" style="display: none;">
+                    <div class="section-header">
+                        <h2>Size Management</h2>
+                        <button class="add-btn" id="addSizeBtn">
+                            <span class="add-icon">+</span>
+                            Add Size
+                        </button>
+                    </div>
+                    
+                    <div class="search-section">
+                        <div class="search-bar">
+                            <input type="text" id="sizeSearchInput" placeholder="Search sizes..." class="search-input">
+                            <button class="search-btn" id="sizeSearchBtn">🔍</button>
+                        </div>
+                    </div>
+
+                    <div class="loading" id="sizesLoading" style="display: none;">
+                        <div class="spinner"></div>
+                        <p>Loading sizes...</p>
+                    </div>
+                    
+                    <div class="organizers-grid" id="sizesGrid"></div>
+                    
+                    <div class="empty-state" id="sizesEmptyState" style="display: none;">
+                        <div class="empty-icon">📏</div>
+                        <h3>No sizes found</h3>
+                        <p>Create size entries to organize your cigar collection!</p>
+                        <button class="add-btn" onclick="openSizeModal()">Add First Size</button>
+                    </div>
+                </div>
+
+                <!-- Origins Section -->
+                <div class="organizer-section" id="originsSection" style="display: none;">
+                    <div class="section-header">
+                        <h2>Origin Management</h2>
+                        <button class="add-btn" id="addOriginBtn">
+                            <span class="add-icon">+</span>
+                            Add Origin
+                        </button>
+                    </div>
+                    
+                    <div class="search-section">
+                        <div class="search-bar">
+                            <input type="text" id="originSearchInput" placeholder="Search origins..." class="search-input">
+                            <button class="search-btn" id="originSearchBtn">🔍</button>
+                        </div>
+                    </div>
+
+                    <div class="loading" id="originsLoading" style="display: none;">
+                        <div class="spinner"></div>
+                        <p>Loading origins...</p>
+                    </div>
+                    
+                    <div class="organizers-grid" id="originsGrid"></div>
+                    
+                    <div class="empty-state" id="originsEmptyState" style="display: none;">
+                        <div class="empty-icon">🌍</div>
+                        <h3>No origins found</h3>
+                        <p>Create origin entries to organize your cigar collection!</p>
+                        <button class="add-btn" onclick="openOriginModal()">Add First Origin</button>
+                    </div>
+                </div>
+
+                <!-- Strengths Section -->
+                <div class="organizer-section" id="strengthSection" style="display: none;">
+                    <div class="section-header">
+                        <h2>Strength Management</h2>
+                        <button class="add-btn" id="addStrengthBtn">
+                            <span class="add-icon">+</span>
+                            Add Strength
+                        </button>
+                    </div>
+                    
+                    <div class="search-section">
+                        <div class="search-bar">
+                            <input type="text" id="strengthSearchInput" placeholder="Search strengths..." class="search-input">
+                            <button class="search-btn" id="strengthSearchBtn">🔍</button>
+                        </div>
+                    </div>
+
+                    <div class="loading" id="strengthsLoading" style="display: none;">
+                        <div class="spinner"></div>
+                        <p>Loading strengths...</p>
+                    </div>
+                    
+                    <div class="organizers-grid" id="strengthsGrid"></div>
+                    
+                    <div class="empty-state" id="strengthsEmptyState" style="display: none;">
+                        <div class="empty-icon">💪</div>
+                        <h3>No strengths found</h3>
+                        <p>Create strength entries to organize your cigar collection!</p>
+                        <button class="add-btn" onclick="openStrengthModal()">Add First Strength</button>
+                    </div>
+                </div>
+
+                <!-- Ring Gauge Section -->
+                <div class="organizer-section" id="ringGaugeSection" style="display: none;">
+                    <div class="section-header">
+                        <h2>Ring Gauge Management</h2>
+                        <button class="add-btn" id="addRingGaugeBtn">
+                            <span class="add-icon">+</span>
+                            Add Ring Gauge
+                        </button>
+                    </div>
+                    
+                    <div class="search-section">
+                        <div class="search-bar">
+                            <input type="text" id="ringGaugeSearchInput" placeholder="Search ring gauges..." class="search-input">
+                            <button class="search-btn" id="ringGaugeSearchBtn">🔍</button>
+                        </div>
+                    </div>
+
+                    <div class="loading" id="ringGaugesLoading" style="display: none;">
+                        <div class="spinner"></div>
+                        <p>Loading ring gauges...</p>
+                    </div>
+                    
+                    <div class="organizers-grid" id="ringGaugesGrid"></div>
+                    
+                    <div class="empty-state" id="ringGaugesEmptyState" style="display: none;">
+                        <div class="empty-icon">⭕</div>
+                        <h3>No ring gauges found</h3>
+                        <p>Create ring gauge entries to organize your cigar collection!</p>
+                        <button class="add-btn" onclick="openRingGaugeModal()">Add First Ring Gauge</button>
                     </div>
                 </div>
 
@@ -234,6 +410,188 @@
                 <div class="form-actions">
                     <button type="button" class="btn-secondary" id="cancelBtn">Cancel</button>
                     <button type="submit" class="btn-primary" id="saveBtn">Save Cigar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Brand Modal -->
+    <div class="modal" id="brandModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="brandModalTitle">Add New Brand</h2>
+                <button class="close-btn" id="closeBrandModal">&times;</button>
+            </div>
+            
+            <form id="brandForm" class="organizer-form">
+                <div class="form-group">
+                    <label for="brandName">Name *</label>
+                    <input type="text" id="brandName" name="name" required placeholder="e.g., Montecristo, Cohiba">
+                </div>
+                
+                <div class="form-group">
+                    <label for="brandCountry">Country</label>
+                    <input type="text" id="brandCountry" name="country" placeholder="e.g., Cuba, Dominican Republic">
+                </div>
+                
+                <div class="form-group">
+                    <label for="brandWebsite">Website</label>
+                    <input type="url" id="brandWebsite" name="website" placeholder="https://...">
+                </div>
+                
+                <div class="form-group full-width">
+                    <label for="brandDescription">Description</label>
+                    <textarea id="brandDescription" name="description" rows="3" placeholder="Brand history, characteristics, etc."></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" id="cancelBrandBtn">Cancel</button>
+                    <button type="submit" class="btn-primary" id="saveBrandBtn">Save Brand</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Size Modal -->
+    <div class="modal" id="sizeModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="sizeModalTitle">Add New Size</h2>
+                <button class="close-btn" id="closeSizeModal">&times;</button>
+            </div>
+            
+            <form id="sizeForm" class="organizer-form">
+                <div class="form-group">
+                    <label for="sizeName">Name *</label>
+                    <input type="text" id="sizeName" name="name" required placeholder="e.g., Robusto, Churchill">
+                </div>
+                
+                <div class="form-group">
+                    <label for="sizeLength">Length (inches)</label>
+                    <input type="number" id="sizeLength" name="length_inches" step="0.1" min="0" placeholder="5.5">
+                </div>
+                
+                <div class="form-group">
+                    <label for="sizeRingGauge">Ring Gauge</label>
+                    <input type="number" id="sizeRingGauge" name="ring_gauge" min="30" max="70" placeholder="50">
+                </div>
+                
+                <div class="form-group full-width">
+                    <label for="sizeDescription">Description</label>
+                    <textarea id="sizeDescription" name="description" rows="3" placeholder="Size characteristics, smoking time, etc."></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" id="cancelSizeBtn">Cancel</button>
+                    <button type="submit" class="btn-primary" id="saveSizeBtn">Save Size</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Origin Modal -->
+    <div class="modal" id="originModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="originModalTitle">Add New Origin</h2>
+                <button class="close-btn" id="closeOriginModal">&times;</button>
+            </div>
+            
+            <form id="originForm" class="organizer-form">
+                <div class="form-group">
+                    <label for="originName">Name *</label>
+                    <input type="text" id="originName" name="name" required placeholder="e.g., Vuelta Abajo, Esteli">
+                </div>
+                
+                <div class="form-group">
+                    <label for="originCountry">Country *</label>
+                    <input type="text" id="originCountry" name="country" required placeholder="e.g., Cuba, Nicaragua">
+                </div>
+                
+                <div class="form-group">
+                    <label for="originRegion">Region</label>
+                    <input type="text" id="originRegion" name="region" placeholder="e.g., Pinar del Rio">
+                </div>
+                
+                <div class="form-group full-width">
+                    <label for="originDescription">Description</label>
+                    <textarea id="originDescription" name="description" rows="3" placeholder="Climate, soil, tobacco characteristics, etc."></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" id="cancelOriginBtn">Cancel</button>
+                    <button type="submit" class="btn-primary" id="saveOriginBtn">Save Origin</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Strength Modal -->
+    <div class="modal" id="strengthModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="strengthModalTitle">Add New Strength</h2>
+                <button class="close-btn" id="closeStrengthModal">&times;</button>
+            </div>
+            
+            <form id="strengthForm" class="organizer-form">
+                <div class="form-group">
+                    <label for="strengthName">Name *</label>
+                    <input type="text" id="strengthName" name="name" required placeholder="e.g., Mild, Medium-Full">
+                </div>
+                
+                <div class="form-group">
+                    <label for="strengthLevel">Level (1-5) *</label>
+                    <select id="strengthLevel" name="level" required>
+                        <option value="">Select Level</option>
+                        <option value="1">1 - Mild</option>
+                        <option value="2">2 - Medium-Mild</option>
+                        <option value="3">3 - Medium</option>
+                        <option value="4">4 - Medium-Full</option>
+                        <option value="5">5 - Full</option>
+                    </select>
+                </div>
+                
+                <div class="form-group full-width">
+                    <label for="strengthDescription">Description</label>
+                    <textarea id="strengthDescription" name="description" rows="3" placeholder="Strength characteristics, flavor profile, etc."></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" id="cancelStrengthBtn">Cancel</button>
+                    <button type="submit" class="btn-primary" id="saveStrengthBtn">Save Strength</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Ring Gauge Modal -->
+    <div class="modal" id="ringGaugeModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="ringGaugeModalTitle">Add New Ring Gauge</h2>
+                <button class="close-btn" id="closeRingGaugeModal">&times;</button>
+            </div>
+            
+            <form id="ringGaugeForm" class="organizer-form">
+                <div class="form-group">
+                    <label for="ringGaugeGauge">Gauge (30-70) *</label>
+                    <input type="number" id="ringGaugeGauge" name="gauge" required min="30" max="70" placeholder="50">
+                </div>
+                
+                <div class="form-group">
+                    <label for="ringGaugeCommonNames">Common Names</label>
+                    <input type="text" id="ringGaugeCommonNames" name="common_names" placeholder="Robusto, Toro (comma-separated)">
+                </div>
+                
+                <div class="form-group full-width">
+                    <label for="ringGaugeDescription">Description</label>
+                    <textarea id="ringGaugeDescription" name="description" rows="3" placeholder="Ring gauge characteristics, typical length, etc."></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" id="cancelRingGaugeBtn">Cancel</button>
+                    <button type="submit" class="btn-primary" id="saveRingGaugeBtn">Save Ring Gauge</button>
                 </div>
             </form>
         </div>
