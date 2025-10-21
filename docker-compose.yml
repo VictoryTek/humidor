@@ -1,0 +1,31 @@
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: humidor_db
+      POSTGRES_USER: humidor_user
+      POSTGRES_PASSWORD: humidor_pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U humidor_user -d humidor_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://humidor_user:humidor_pass@db:5432/humidor_db
+      RUST_LOG: info
+      PORT: 9898
+    ports:
+      - "9898:9898"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

@@ -1,0 +1,7 @@
+# Docker ignore file
+target/
+Dockerfile
+.dockerignore
+README.md
+.git/
+.vscode/

@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Humidor - Premium Cigar Collection Management</title>
+    <link rel="stylesheet" href="static/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <aside class="sidebar">
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <h3 class="nav-section-title">Collections</h3>
+                    <a href="#" class="nav-item" data-page="humidors">
+                        <div class="nav-content">
+                            <span class="nav-icon">�️</span>
+                            Humidors
+                        </div>
+                        <span class="nav-count" id="humidorCount">0</span>
+                    </a>
+                    <a href="#" class="nav-item active" data-page="all-cigars">
+                        <div class="nav-content">
+                            <span class="nav-icon">📦</span>
+                            All Cigars
+                        </div>
+                        <span class="nav-count" id="cigarCount">0</span>
+                    </a>
+                    <a href="#" class="nav-item" data-page="favorites">
+                        <div class="nav-content">
+                            <span class="nav-icon">❤️</span>
+                            Favorites
+                        </div>
+                        <span class="nav-count" id="favoriteCount">0</span>
+                    </a>
+                </div>
+                
+                <div class="nav-section">
+                    <h3 class="nav-section-title">Organization</h3>
+                    <a href="#" class="nav-item" data-page="brands">
+                        <div class="nav-content">
+                            <span class="nav-icon">🏷️</span>
+                            Brands
+                        </div>
+                        <span class="nav-count" id="brandCount">0</span>
+                    </a>
+                    <a href="#" class="nav-item" data-page="sizes">
+                        <div class="nav-content">
+                            <span class="nav-icon">📏</span>
+                            Sizes
+                        </div>
+                        <span class="nav-count" id="sizeCount">0</span>
+                    </a>
+                    <a href="#" class="nav-item" data-page="origins">
+                        <div class="nav-content">
+                            <span class="nav-icon">🌍</span>
+                            Origins
+                        </div>
+                        <span class="nav-count" id="originCount">0</span>
+                    </a>
+                </div>
+                
+                <!-- Settings at bottom -->
+                <div class="nav-section nav-section-bottom">
+                    <a href="#" class="nav-item" data-page="settings">
+                        <div class="nav-content">
+                            <span class="nav-icon">⚙️</span>
+                            Settings
+                        </div>
+                    </a>
+                </div>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <button class="add-btn-sidebar" id="addCigarBtn">
+                    <span class="add-icon">+</span>
+                    Add Cigar
+                </button>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="page-header">
+                <div class="header-left">
+                    <div class="app-logo">
+                        <img src="/static/logo.png" alt="" class="logo-icon">
+                        <span class="logo-text">Humidor</span>
+                    </div>
+                </div>
+            </header>
+
+            <div class="page-content">
+                <!-- All Cigars Section -->
+                <div class="all-cigars-section" id="allCigarsSection">
+                    <!-- Search and Filters -->
+                    <div class="search-section">
+                        <div class="search-bar">
+                            <input type="text" id="searchInput" placeholder="Search cigars..." class="search-input">
+                            <button class="search-btn" id="searchBtn">🔍</button>
+                        </div>
+                        
+                        <div class="filters" id="filtersSection">
+                            <select id="brandFilter" class="filter-select">
+                                <option value="">All Brands</option>
+                            </select>
+                            <select id="strengthFilter" class="filter-select">
+                                <option value="">All Strengths</option>
+                                <option value="Mild">Mild</option>
+                                <option value="Medium">Medium</option>
+                                <option value="Full">Full</option>
+                            </select>
+                            <select id="originFilter" class="filter-select">
+                                <option value="">All Origins</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Cigars Grid -->
+                    <div class="cigars-section">
+                        <div class="section-header">
+                            <h2>Your Collection</h2>
+                            <div class="view-toggle">
+                                <button class="view-btn active" data-view="grid">Grid</button>
+                                <button class="view-btn" data-view="list">List</button>
+                            </div>
+                        </div>
+                        
+                        <div class="loading" id="loading">
+                            <div class="spinner"></div>
+                            <p>Loading cigars...</p>
+                        </div>
+                        
+                        <div class="cigars-grid" id="cigarsGrid"></div>
+                        
+                        <div class="empty-state" id="emptyState" style="display: none;">
+                            <div class="empty-icon">📦</div>
+                            <h3>No cigars found</h3>
+                            <p>Start building your collection by adding your first cigar!</p>
+                            <button class="add-btn" onclick="openCigarModal()">Add Your First Cigar</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Other sections will be added here for brands, humidors, etc. -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Add/Edit Cigar Modal -->
+    <div class="modal" id="cigarModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Add New Cigar</h2>
+                <button class="close-btn" id="closeModal">&times;</button>
+            </div>
+            
+            <form id="cigarForm" class="cigar-form">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="brand">Brand *</label>
+                        <input type="text" id="brand" name="brand" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="name">Name *</label>
+                        <input type="text" id="name" name="name" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="size">Size *</label>
+                        <input type="text" id="size" name="size" placeholder="e.g., Robusto, Churchill" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="strength">Strength *</label>
+                        <select id="strength" name="strength" required>
+                            <option value="">Select strength</option>
+                            <option value="Mild">Mild</option>
+                            <option value="Medium">Medium</option>
+                            <option value="Full">Full</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="origin">Origin *</label>
+                        <input type="text" id="origin" name="origin" placeholder="e.g., Dominican Republic" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="wrapper">Wrapper</label>
+                        <input type="text" id="wrapper" name="wrapper" placeholder="e.g., Connecticut">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="binder">Binder</label>
+                        <input type="text" id="binder" name="binder">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="filler">Filler</label>
+                        <input type="text" id="filler" name="filler">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="price">Price</label>
+                        <input type="number" id="price" name="price" step="0.01" min="0" placeholder="0.00">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="quantity">Quantity *</label>
+                        <input type="number" id="quantity" name="quantity" min="1" value="1" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="humidor_location">Humidor Location</label>
+                        <input type="text" id="humidor_location" name="humidor_location" placeholder="e.g., Top shelf, Drawer 2">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="purchase_date">Purchase Date</label>
+                        <input type="date" id="purchase_date" name="purchase_date">
+                    </div>
+                </div>
+                
+                <div class="form-group full-width">
+                    <label for="notes">Notes</label>
+                    <textarea id="notes" name="notes" rows="3" placeholder="Tasting notes, pairing suggestions, etc."></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" id="cancelBtn">Cancel</button>
+                    <button type="submit" class="btn-primary" id="saveBtn">Save Cigar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="static/app.js"></script>
+</body>
+</html>
