@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Humidor - Premium Cigar Collection Management</title>
+    <link rel="icon" type="image/png" href="static/logo.png">
+    <link rel="shortcut icon" type="image/png" href="static/logo.png">
+    <link rel="apple-touch-icon" href="static/logo.png">
     <link rel="stylesheet" href="static/styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,19 +19,12 @@
             <nav class="sidebar-nav">
                 <div class="nav-section">
                     <h3 class="nav-section-title">Collections</h3>
-                    <a href="#" class="nav-item" data-page="humidors">
+                    <a href="#" class="nav-item active" data-page="humidors">
                         <div class="nav-content">
-                            <span class="nav-icon">�️</span>
+                            <span class="nav-icon">🏠</span>
                             Humidors
                         </div>
                         <span class="nav-count" id="humidorCount">0</span>
-                    </a>
-                    <a href="#" class="nav-item active" data-page="all-cigars">
-                        <div class="nav-content">
-                            <span class="nav-icon">📦</span>
-                            All Cigars
-                        </div>
-                        <span class="nav-count" id="cigarCount">0</span>
                     </a>
                     <a href="#" class="nav-item" data-page="favorites">
                         <div class="nav-content">
@@ -100,9 +96,9 @@
             </nav>
             
             <div class="sidebar-footer">
-                <button class="add-btn-sidebar" id="addCigarBtn">
+                <button class="add-btn-sidebar" id="addHumidorBtnSidebar">
                     <span class="add-icon">+</span>
-                    Add Cigar
+                    Add Humidor
                 </button>
             </div>
         </aside>
@@ -115,48 +111,54 @@
                         <span class="logo-text">Humidor</span>
                     </div>
                 </div>
+                <div class="header-right">
+                    <div class="user-info" id="userInfo" style="display: none;">
+                        <span class="welcome-text">Welcome back, </span>
+                        <span class="user-name" id="userName"></span>
+                        <button class="logout-btn" id="logoutBtn" type="button">Logout</button>
+                    </div>
+                </div>
             </header>
 
             <div class="page-content">
-                <!-- All Cigars Section -->
-                <div class="all-cigars-section" id="allCigarsSection">
-                    <!-- Search and Filters -->
-                    <div class="search-section">
-                        <div class="search-bar">
-                            <input type="text" id="searchInput" placeholder="Search cigars..." class="search-input">
-                            <button class="search-btn" id="searchBtn">🔍</button>
-                        </div>
-                        
-                        <div class="filters" id="filtersSection">
-                            <select id="brandFilter" class="filter-select">
-                                <option value="">All Brands</option>
-                            </select>
-                            <select id="strengthFilter" class="filter-select">
-                                <option value="">All Strengths</option>
-                                <option value="Mild">Mild</option>
-                                <option value="Medium">Medium</option>
-                                <option value="Full">Full</option>
-                            </select>
-                            <select id="originFilter" class="filter-select">
-                                <option value="">All Origins</option>
-                            </select>
+                <!-- Humidors Section -->
+                <div class="humidors-section" id="humidorsSection">
+                    <!-- Welcome Message for First Time Users -->
+                    <div class="welcome-section" id="welcomeSection">
+                        <div class="welcome-card">
+                            <div class="welcome-icon">🏠</div>
+                            <h1>Welcome to Your Humidor Collection</h1>
+                            <p>Start by creating your first humidor to organize and track your cigars.</p>
+                            <button class="add-btn welcome-btn" id="createFirstHumidorBtn">
+                                <span class="add-icon">+</span>
+                                Create Your First Humidor
+                            </button>
                         </div>
                     </div>
 
-                    <!-- Cigars Grid -->
-                    <div class="cigars-section">
-                        <div class="loading" id="loading">
-                            <div class="spinner"></div>
-                            <p>Loading cigars...</p>
+                    <!-- Main Content (Hidden until humidors exist) -->
+                    <div class="main-content-section" id="mainContentSection" style="display: none;">
+                        <!-- Page Header with Actions -->
+                        <div class="page-actions-header">
+                            <div class="page-title">
+                                <h1>My Humidors</h1>
+                                <p id="collectionSummary">0 humidors • 0 cigars</p>
+                            </div>
+                            <div class="header-actions">
+                                <button class="add-btn" id="addHumidorBtn">
+                                    <span class="add-icon">+</span>
+                                    Add Humidor
+                                </button>
+                                <button class="add-btn btn-secondary" id="addCigarBtn">
+                                    <span class="add-icon">+</span>
+                                    Add Cigar
+                                </button>
+                            </div>
                         </div>
-                        
-                        <div class="cigars-grid" id="cigarsGrid"></div>
-                        
-                        <div class="empty-state" id="emptyState" style="display: none;">
-                            <div class="empty-icon">📦</div>
-                            <h3>No cigars found</h3>
-                            <p>Add cigars to your humidor to see them here!</p>
-                            <button class="add-btn" onclick="openCigarModal()">Add Cigar</button>
+
+                        <!-- Humidors with Cigars -->
+                        <div class="humidors-container" id="humidorsContainer">
+                            <!-- Humidor sections will be dynamically generated here -->
                         </div>
                     </div>
                 </div>
@@ -592,6 +594,148 @@
                 <div class="form-actions">
                     <button type="button" class="btn-secondary" id="cancelRingGaugeBtn">Cancel</button>
                     <button type="submit" class="btn-primary" id="saveRingGaugeBtn">Save Ring Gauge</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add/Edit Cigar Modal -->
+    <div class="modal" id="cigarModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="cigarModalTitle">Add New Cigar</h2>
+                <button class="close-btn" id="closeCigarModal">&times;</button>
+            </div>
+            
+            <form id="cigarForm" class="cigar-form">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="cigarHumidor">Humidor *</label>
+                        <select id="cigarHumidor" name="humidor_id" required>
+                            <option value="">Select Humidor</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="cigarBrand">Brand *</label>
+                        <input type="text" id="cigarBrand" name="brand" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="cigarName">Name *</label>
+                        <input type="text" id="cigarName" name="name" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="cigarSize">Size *</label>
+                        <input type="text" id="cigarSize" name="size" placeholder="e.g., Robusto, Churchill" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="cigarStrength">Strength *</label>
+                        <select id="cigarStrength" name="strength" required>
+                            <option value="">Select strength</option>
+                            <option value="Mild">Mild</option>
+                            <option value="Medium">Medium</option>
+                            <option value="Full">Full</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="cigarOrigin">Origin *</label>
+                        <input type="text" id="cigarOrigin" name="origin" placeholder="e.g., Dominican Republic" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="cigarWrapper">Wrapper</label>
+                        <input type="text" id="cigarWrapper" name="wrapper" placeholder="e.g., Connecticut">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="cigarPrice">Price</label>
+                        <input type="number" id="cigarPrice" name="price" step="0.01" min="0" placeholder="0.00">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="cigarQuantity">Quantity *</label>
+                        <input type="number" id="cigarQuantity" name="quantity" min="1" value="1" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="cigarPurchaseDate">Purchase Date</label>
+                        <input type="date" id="cigarPurchaseDate" name="purchase_date">
+                    </div>
+                </div>
+                
+                <div class="form-group full-width">
+                    <label for="cigarNotes">Notes</label>
+                    <textarea id="cigarNotes" name="notes" rows="3" placeholder="Tasting notes, pairing suggestions, etc."></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" id="cancelCigarBtn">Cancel</button>
+                    <button type="submit" class="btn-primary" id="saveCigarBtn">Save Cigar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Humidor Modal -->
+    <div class="modal" id="humidorModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="humidorModalTitle">Add New Humidor</h2>
+                <button class="close-btn" id="closeHumidorModal">&times;</button>
+            </div>
+            
+            <form id="humidorForm" class="organizer-form">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="humidorName">Name *</label>
+                        <input type="text" id="humidorName" name="name" required placeholder="e.g., Desktop Humidor, Travel Case">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="humidorType">Type *</label>
+                        <select id="humidorType" name="type" required>
+                            <option value="">Select Type</option>
+                            <option value="Desktop">Desktop Humidor</option>
+                            <option value="Cabinet">Cabinet Humidor</option>
+                            <option value="Travel">Travel Humidor</option>
+                            <option value="Cooler">Coolerdor</option>
+                            <option value="Tupperware">Tupperdor</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="humidorCapacity">Capacity (cigars) *</label>
+                        <input type="number" id="humidorCapacity" name="capacity" required min="1" placeholder="50">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="humidorLocation">Location</label>
+                        <input type="text" id="humidorLocation" name="location" placeholder="e.g., Office, Living Room">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="humidorHumidity">Target Humidity (%)</label>
+                        <input type="number" id="humidorHumidity" name="target_humidity" min="60" max="75" placeholder="69">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="humidorTemperature">Target Temperature (°F)</label>
+                        <input type="number" id="humidorTemperature" name="target_temperature" min="65" max="75" placeholder="70">
+                    </div>
+                </div>
+                
+                <div class="form-group full-width">
+                    <label for="humidorDescription">Description</label>
+                    <textarea id="humidorDescription" name="description" rows="3" placeholder="Brand, model, special features, etc."></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" id="cancelHumidorBtn">Cancel</button>
+                    <button type="submit" class="btn-primary" id="saveHumidorBtn">Save Humidor</button>
                 </div>
             </form>
         </div>

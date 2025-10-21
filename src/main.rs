@@ -1,10 +1,14 @@
+#![recursion_limit = "256"]
+
 mod handlers;
 mod models;
+mod middleware;
 
 use std::{env, sync::Arc};
 use tokio_postgres::{NoTls, Client};
 use warp::{Filter, Reply};
 use tracing_subscriber;
+use middleware::{with_current_user, handle_rejection};
 
 type DbPool = Arc<Client>;
 
@@ -30,10 +34,44 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    // Run a simple migration
+    // Run database migrations
+    // Create users table
+    client.execute(
+        "CREATE TABLE IF NOT EXISTS users (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            username VARCHAR(50) UNIQUE NOT NULL,
+            email VARCHAR(255) UNIQUE NOT NULL,
+            full_name VARCHAR(255) NOT NULL,
+            password_hash VARCHAR(255) NOT NULL,
+            is_admin BOOLEAN NOT NULL DEFAULT false,
+            is_active BOOLEAN NOT NULL DEFAULT true,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )",
+        &[],
+    ).await?;
+
+    // Create humidors table
+    client.execute(
+        "CREATE TABLE IF NOT EXISTS humidors (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            name VARCHAR(255) NOT NULL,
+            description TEXT,
+            capacity INTEGER,
+            target_humidity INTEGER,
+            location VARCHAR(255),
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )",
+        &[],
+    ).await?;
+
+    // Create cigars table (updated with humidor_id)
     client.execute(
         "CREATE TABLE IF NOT EXISTS cigars (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            humidor_id UUID REFERENCES humidors(id) ON DELETE SET NULL,
             brand VARCHAR NOT NULL,
             name VARCHAR NOT NULL,
             size VARCHAR NOT NULL,
@@ -46,7 +84,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             purchase_date TIMESTAMPTZ,
             notes TEXT,
             quantity INTEGER NOT NULL DEFAULT 1,
-            humidor_location VARCHAR,
+            ring_gauge INTEGER,
+            length DECIMAL(4,2),
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )",
@@ -279,6 +318,89 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and(with_db(db_pool.clone()))
         .and_then(handlers::delete_ring_gauge);
 
+    // Authentication and Setup routes
+    let get_setup_status = warp::path("api")
+        .and(warp::path("v1"))
+        .and(warp::path("setup"))
+        .and(warp::path("status"))
+        .and(warp::get())
+        .and(with_db(db_pool.clone()))
+        .and_then(handlers::get_setup_status);
+
+    let create_setup_user = warp::path("api")
+        .and(warp::path("v1"))
+        .and(warp::path("setup"))
+        .and(warp::path("user"))
+        .and(warp::post())
+        .and(warp::body::json())
+        .and(with_db(db_pool.clone()))
+        .and_then(handlers::create_setup_user);
+
+    let login_user = warp::path("api")
+        .and(warp::path("v1"))
+        .and(warp::path("auth"))
+        .and(warp::path("login"))
+        .and(warp::post())
+        .and(warp::body::json())
+        .and(with_db(db_pool.clone()))
+        .and_then(handlers::login_user);
+
+    // Humidor API routes (authenticated)
+    let get_humidors = warp::path("api")
+        .and(warp::path("v1"))
+        .and(warp::path("humidors"))
+        .and(warp::get())
+        .and(with_current_user(db_pool.clone()))
+        .and(with_db(db_pool.clone()))
+        .and_then(handlers::get_humidors);
+
+    let get_humidor = warp::path("api")
+        .and(warp::path("v1"))
+        .and(warp::path("humidors"))
+        .and(with_uuid())
+        .and(warp::get())
+        .and(with_current_user(db_pool.clone()))
+        .and(with_db(db_pool.clone()))
+        .and_then(handlers::get_humidor);
+
+    let create_humidor = warp::path("api")
+        .and(warp::path("v1"))
+        .and(warp::path("humidors"))
+        .and(warp::post())
+        .and(warp::body::json())
+        .and(with_current_user(db_pool.clone()))
+        .and(with_db(db_pool.clone()))
+        .and_then(handlers::create_humidor);
+
+    let update_humidor = warp::path("api")
+        .and(warp::path("v1"))
+        .and(warp::path("humidors"))
+        .and(with_uuid())
+        .and(warp::put())
+        .and(warp::body::json())
+        .and(with_current_user(db_pool.clone()))
+        .and(with_db(db_pool.clone()))
+        .and_then(handlers::update_humidor);
+
+    let delete_humidor = warp::path("api")
+        .and(warp::path("v1"))
+        .and(warp::path("humidors"))
+        .and(with_uuid())
+        .and(warp::delete())
+        .and(with_current_user(db_pool.clone()))
+        .and(with_db(db_pool.clone()))
+        .and_then(handlers::delete_humidor);
+
+    let get_humidor_cigars = warp::path("api")
+        .and(warp::path("v1"))
+        .and(warp::path("humidors"))
+        .and(with_uuid())
+        .and(warp::path("cigars"))
+        .and(warp::get())
+        .and(with_current_user(db_pool.clone()))
+        .and(with_db(db_pool.clone()))
+        .and_then(handlers::get_humidor_cigars);
+
     // Combine all API routes
     let api = get_cigars
         .or(create_cigar)
@@ -304,21 +426,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .or(get_ring_gauges)
         .or(create_ring_gauge)
         .or(update_ring_gauge)
-        .or(delete_ring_gauge);
+        .or(delete_ring_gauge)
+        .or(get_setup_status)
+        .or(create_setup_user)
+        .or(login_user)
+        .or(get_humidors)
+        .or(get_humidor)
+        .or(create_humidor)
+        .or(update_humidor)
+        .or(delete_humidor)
+        .or(get_humidor_cigars);
 
     // Root route
     let root = warp::path::end()
         .and(warp::get())
         .and_then(serve_index);
 
+    // Setup route
+    let setup = warp::path("setup.html")
+        .and(warp::get())
+        .and_then(serve_setup);
+
     let cors = warp::cors()
         .allow_any_origin()
-        .allow_headers(vec!["content-type"])
+        .allow_headers(vec!["content-type", "authorization"])
         .allow_methods(vec!["GET", "POST", "PUT", "DELETE"]);
 
     let routes = root
+        .or(setup)
         .or(static_files)
         .or(api)
+        .recover(handle_rejection)
         .with(cors);
 
     let port = env::var("PORT")
@@ -337,7 +475,68 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn serve_index() -> Result<impl Reply, warp::Rejection> {
     match tokio::fs::read_to_string("static/index.html").await {
-        Ok(content) => Ok(warp::reply::html(content)),
-        Err(_) => Ok(warp::reply::html("<h1>Humidor Inventory</h1><p>Welcome to your cigar inventory system!</p>".to_string())),
+        Ok(content) => {
+            // Inject setup check script into the HTML
+            let setup_script = r#"
+<script>
+// Check if setup is needed and redirect to setup page
+fetch('/api/v1/setup/status')
+    .then(response => response.json())
+    .then(data => {
+        if (data.needs_setup) {
+            // Only redirect if we're not already on the setup page
+            if (!window.location.pathname.includes('setup.html')) {
+                window.location.href = '/setup.html';
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Failed to check setup status:', error);
+    });
+</script>
+"#;
+            
+            // Insert the script before the closing </body> tag
+            let modified_content = content.replace("</body>", &format!("{}</body>", setup_script));
+            Ok(warp::reply::html(modified_content))
+        },
+        Err(_) => {
+            // Fallback content with setup check
+            let fallback_html = r#"
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Humidor Inventory</title>
+</head>
+<body>
+    <h1>Humidor Inventory</h1>
+    <p>Welcome to your cigar inventory system!</p>
+    <script>
+    fetch('/api/v1/setup/status')
+        .then(response => response.json())
+        .then(data => {
+            if (data.needs_setup) {
+                window.location.href = '/setup.html';
+            }
+        })
+        .catch(error => {
+            console.error('Failed to check setup status:', error);
+        });
+    </script>
+</body>
+</html>
+"#;
+            Ok(warp::reply::html(fallback_html.to_string()))
+        }
+    }
+}
+
+async fn serve_setup() -> Result<impl Reply, warp::Rejection> {
+    match tokio::fs::read_to_string("static/setup.html").await {
+        Ok(content) => Ok(warp::reply::html(content).into_response()),
+        Err(_) => Ok(warp::reply::with_status(
+            warp::reply::html("<h1>Setup Not Found</h1>".to_string()),
+            warp::http::StatusCode::NOT_FOUND,
+        ).into_response()),
     }
 }

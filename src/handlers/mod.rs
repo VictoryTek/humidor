@@ -1,4 +1,6 @@
+pub mod auth;
 pub mod cigars;
+pub mod humidors;
 pub mod brands;
 pub mod sizes;
 pub mod origins;
@@ -41,4 +43,21 @@ pub use ring_gauges::{
     create_ring_gauge, 
     update_ring_gauge, 
     delete_ring_gauge
+};
+
+pub use humidors::{
+    get_humidors,
+    get_humidor,
+    create_humidor,
+    update_humidor,
+    delete_humidor,
+    get_humidor_cigars
+};
+
+pub use auth::{
+    get_setup_status,
+    create_setup_user,
+    login_user,
+    create_humidor_for_setup,
+    verify_token
 };
