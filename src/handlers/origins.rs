@@ -1,10 +1,9 @@
 use chrono::Utc;
 use serde_json::json;
-use std::convert::Infallible;
 use uuid::Uuid;
 use warp::{Reply, Rejection};
 
-use crate::{DbPool, models::*};
+use crate::{DbPool, models::*, validation::Validate};
 
 pub async fn get_origins(db: DbPool) -> Result<impl Reply, Rejection> {
     match db.query(
@@ -35,6 +34,9 @@ pub async fn get_origins(db: DbPool) -> Result<impl Reply, Rejection> {
 }
 
 pub async fn create_origin(create_origin: CreateOrigin, db: DbPool) -> Result<impl Reply, Rejection> {
+    // Validate input
+    create_origin.validate().map_err(warp::reject::custom)?;
+    
     let id = Uuid::new_v4();
     let now = Utc::now();
     
@@ -64,6 +66,9 @@ pub async fn create_origin(create_origin: CreateOrigin, db: DbPool) -> Result<im
 }
 
 pub async fn update_origin(id: Uuid, update_origin: UpdateOrigin, db: DbPool) -> Result<impl Reply, Rejection> {
+    // Validate input
+    update_origin.validate().map_err(warp::reject::custom)?;
+    
     let now = Utc::now();
     
     match db.query_one(

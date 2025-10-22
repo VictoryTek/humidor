@@ -1,5 +1,6 @@
 use crate::middleware::AuthContext;
 use crate::models::{Humidor, CreateHumidorRequest, UpdateHumidorRequest};
+use crate::validation::Validate;
 use crate::DbPool;
 use serde_json::json;
 use std::convert::Infallible;
@@ -107,6 +108,14 @@ pub async fn create_humidor(
     auth: AuthContext,
     db: DbPool,
 ) -> Result<impl Reply, Infallible> {
+    // Validate input
+    if let Err(e) = request.validate() {
+        return Ok(reply::with_status(
+            reply::json(&json!({"error": e.to_string()})),
+            StatusCode::BAD_REQUEST,
+        ));
+    }
+    
     let user_id = auth.user_id;
     let humidor_id = Uuid::new_v4();
     let now = chrono::Utc::now();
@@ -169,6 +178,14 @@ pub async fn update_humidor(
     auth: AuthContext,
     db: DbPool,
 ) -> Result<impl Reply, Infallible> {
+    // Validate input
+    if let Err(e) = request.validate() {
+        return Ok(reply::with_status(
+            reply::json(&json!({"error": e.to_string()})),
+            StatusCode::BAD_REQUEST,
+        ));
+    }
+    
     let user_id = auth.user_id;
     let now = chrono::Utc::now();
 

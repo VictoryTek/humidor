@@ -51,10 +51,22 @@ function initializeUserDisplay() {
         // Update user info in header
         const userInfo = document.getElementById('userInfo');
         const userName = document.getElementById('userName');
+        const userAvatar = document.getElementById('userAvatar');
+        const userDropdownAvatar = document.getElementById('userDropdownAvatar');
+        const userDropdownName = document.getElementById('userDropdownName');
+        const userDropdownUsername = document.getElementById('userDropdownUsername');
         
         if (userInfo && userName) {
-            userName.textContent = currentUser.full_name || currentUser.username;
-            userInfo.style.display = 'flex';
+            const displayName = currentUser.full_name || currentUser.username;
+            const initials = getInitials(displayName);
+            
+            userName.textContent = displayName;
+            if (userAvatar) userAvatar.textContent = initials;
+            if (userDropdownAvatar) userDropdownAvatar.textContent = initials;
+            if (userDropdownName) userDropdownName.textContent = displayName;
+            if (userDropdownUsername) userDropdownUsername.textContent = `@${currentUser.username}`;
+            
+            userInfo.style.display = 'block';
         }
     } else {
         // Hide user info if no user
@@ -63,6 +75,16 @@ function initializeUserDisplay() {
             userInfo.style.display = 'none';
         }
     }
+}
+
+// Helper function to get user initials
+function getInitials(name) {
+    if (!name) return '?';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+        return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
 }
 
 // API Utility Functions
@@ -902,11 +924,30 @@ document.addEventListener('DOMContentLoaded', function() {
         elements.addCigarBtn.addEventListener('click', () => openCigarModal());
     }
     
+    // User dropdown menu toggle
+    const userMenuTrigger = document.getElementById('userMenuTrigger');
+    const userDropdownMenu = document.getElementById('userDropdownMenu');
+    
+    if (userMenuTrigger && userDropdownMenu) {
+        userMenuTrigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            userDropdownMenu.classList.toggle('active');
+        });
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!userDropdownMenu.contains(e.target) && !userMenuTrigger.contains(e.target)) {
+                userDropdownMenu.classList.remove('active');
+            }
+        });
+    }
+    
     // Logout button event
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
         logoutBtn.addEventListener('click', (e) => {
             e.preventDefault();
+            e.stopPropagation();
             logout();
         });
     }
@@ -1217,10 +1258,6 @@ function createHumidorSection(humidor, humidorCigars) {
                     </div>
                 </div>
                 <div class="humidor-actions">
-                    <button class="action-btn add-cigar-btn" onclick="openCigarModal('${humidor.id}')" title="Add Cigar">
-                        <span class="add-icon">+</span>
-                        Add Cigar
-                    </button>
                     <button class="action-btn edit-btn" onclick="editHumidor('${humidor.id}')" title="Edit Humidor">✏️</button>
                     <button class="action-btn delete-btn" onclick="deleteHumidor('${humidor.id}')" title="Delete Humidor">🗑️</button>
                 </div>
@@ -1229,7 +1266,7 @@ function createHumidorSection(humidor, humidorCigars) {
             <div class="cigars-grid" data-humidor-id="${humidor.id}">
                 ${humidorCigars.length > 0 
                     ? humidorCigars.map(cigar => createCigarCard(cigar)).join('') 
-                    : '<div class="empty-cigars-message">No cigars in this humidor yet. <button class="link-btn" onclick="openCigarModal(\'' + humidor.id + '\')">Add your first cigar</button></div>'
+                    : '<div class="empty-cigars-message">No cigars in this humidor yet.</div>'
                 }
             </div>
         </div>

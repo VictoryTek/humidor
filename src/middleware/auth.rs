@@ -1,19 +1,16 @@
-use crate::handlers::auth::{Claims, verify_token};
+use crate::handlers::auth::verify_token;
 use crate::models::UserResponse;
 use crate::DbPool;
+use crate::errors::AppError;
 use std::convert::Infallible;
-use warp::{Filter, Reply, Rejection, reject};
-use serde_json::json;
+use warp::{Filter, Rejection, reject};
 use uuid::Uuid;
-
-#[derive(Debug)]
-pub struct Unauthorized;
-impl reject::Reject for Unauthorized {}
 
 // Authentication context that gets passed to handlers
 #[derive(Debug, Clone)]
 pub struct AuthContext {
     pub user_id: Uuid,
+    #[allow(dead_code)]
     pub username: String,
     pub user: Option<UserResponse>,
 }
@@ -64,13 +61,13 @@ pub fn with_auth() -> impl Filter<Extract = (AuthContext,), Error = Rejection> +
     warp::header::headers_cloned()
         .and_then(|headers: warp::http::HeaderMap| async move {
             let token = extract_token_from_headers(&headers)
-                .ok_or_else(|| reject::custom(Unauthorized))?;
+                .ok_or_else(|| reject::custom(AppError::Unauthorized))?;
             
             let claims = verify_token(&token)
-                .map_err(|_| reject::custom(Unauthorized))?;
+                .map_err(|_| reject::custom(AppError::Unauthorized))?;
             
             let user_id = Uuid::parse_str(&claims.sub)
-                .map_err(|_| reject::custom(Unauthorized))?;
+                .map_err(|_| reject::custom(AppError::Unauthorized))?;
             
             Ok::<AuthContext, Rejection>(AuthContext::new(user_id, claims.username))
         })
@@ -105,16 +102,17 @@ pub fn with_current_user(
                     
                     Ok(auth_ctx.with_user(user))
                 }
-                Ok(None) => Err(reject::custom(Unauthorized)),
+                Ok(None) => Err(reject::custom(AppError::Unauthorized)),
                 Err(e) => {
                     eprintln!("Database error in auth middleware: {}", e);
-                    Err(reject::custom(Unauthorized))
+                    Err(reject::custom(AppError::Unauthorized))
                 }
             }
         })
 }
 
 // Optional auth that doesn't fail if no token is present
+#[allow(dead_code)]
 pub fn with_optional_auth() -> impl Filter<Extract = (Option<AuthContext>,), Error = Infallible> + Clone {
     warp::header::headers_cloned()
         .map(|headers: warp::http::HeaderMap| {
@@ -135,18 +133,3 @@ pub fn with_optional_auth() -> impl Filter<Extract = (Option<AuthContext>,), Err
         })
 }
 
-// Handle authentication rejection
-pub async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
-    if err.find::<Unauthorized>().is_some() {
-        let json = warp::reply::json(&json!({
-            "error": "Unauthorized",
-            "message": "Authentication required"
-        }));
-        Ok(warp::reply::with_status(json, warp::http::StatusCode::UNAUTHORIZED))
-    } else {
-        let json = warp::reply::json(&json!({
-            "error": "Internal Server Error"
-        }));
-        Ok(warp::reply::with_status(json, warp::http::StatusCode::INTERNAL_SERVER_ERROR))
-    }
-}

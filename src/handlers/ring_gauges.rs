@@ -1,10 +1,9 @@
 use chrono::Utc;
 use serde_json::json;
-use std::convert::Infallible;
 use uuid::Uuid;
 use warp::{Reply, Rejection};
 
-use crate::{DbPool, models::*};
+use crate::{DbPool, models::*, validation::Validate};
 
 pub async fn get_ring_gauges(db: DbPool) -> Result<impl Reply, Rejection> {
     match db.query(
@@ -34,6 +33,9 @@ pub async fn get_ring_gauges(db: DbPool) -> Result<impl Reply, Rejection> {
 }
 
 pub async fn create_ring_gauge(create_ring_gauge: CreateRingGauge, db: DbPool) -> Result<impl Reply, Rejection> {
+    // Validate input
+    create_ring_gauge.validate().map_err(warp::reject::custom)?;
+    
     let id = Uuid::new_v4();
     let now = Utc::now();
     
@@ -62,6 +64,9 @@ pub async fn create_ring_gauge(create_ring_gauge: CreateRingGauge, db: DbPool) -
 }
 
 pub async fn update_ring_gauge(id: Uuid, update_ring_gauge: UpdateRingGauge, db: DbPool) -> Result<impl Reply, Rejection> {
+    // Validate input
+    update_ring_gauge.validate().map_err(warp::reject::custom)?;
+    
     let now = Utc::now();
     
     match db.query_one(

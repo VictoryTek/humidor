@@ -94,13 +94,6 @@
                     </a>
                 </div>
             </nav>
-            
-            <div class="sidebar-footer">
-                <button class="add-btn-sidebar" id="addHumidorBtnSidebar">
-                    <span class="add-icon">+</span>
-                    Add Humidor
-                </button>
-            </div>
         </aside>
 
         <main class="main-content">
@@ -113,9 +106,29 @@
                 </div>
                 <div class="header-right">
                     <div class="user-info" id="userInfo" style="display: none;">
-                        <span class="welcome-text">Welcome back, </span>
-                        <span class="user-name" id="userName"></span>
-                        <button class="logout-btn" id="logoutBtn" type="button">Logout</button>
+                        <button class="user-menu-trigger" id="userMenuTrigger" type="button">
+                            <div class="user-avatar">
+                                <span class="user-avatar-text" id="userAvatar"></span>
+                            </div>
+                            <span class="user-name" id="userName"></span>
+                            <span class="user-dropdown-arrow">▼</span>
+                        </button>
+                        <div class="user-dropdown-menu" id="userDropdownMenu">
+                            <div class="user-dropdown-header">
+                                <div class="user-dropdown-avatar">
+                                    <span class="user-dropdown-avatar-text" id="userDropdownAvatar"></span>
+                                </div>
+                                <div class="user-dropdown-info">
+                                    <div class="user-dropdown-name" id="userDropdownName"></div>
+                                    <div class="user-dropdown-username" id="userDropdownUsername"></div>
+                                </div>
+                            </div>
+                            <div class="user-dropdown-divider"></div>
+                            <button class="user-dropdown-item logout-item" id="logoutBtn" type="button">
+                                <span class="dropdown-item-icon">🚪</span>
+                                <span>Logout</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </header>
@@ -145,13 +158,9 @@
                                 <p id="collectionSummary">0 humidors • 0 cigars</p>
                             </div>
                             <div class="header-actions">
-                                <button class="add-btn" id="addHumidorBtn">
+                                <button class="add-cigar-btn-primary" id="addCigarBtn">
                                     <span class="add-icon">+</span>
-                                    Add Humidor
-                                </button>
-                                <button class="add-btn btn-secondary" id="addCigarBtn">
-                                    <span class="add-icon">+</span>
-                                    Add Cigar
+                                    <span>Add Cigar</span>
                                 </button>
                             </div>
                         </div>

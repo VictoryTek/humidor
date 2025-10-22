@@ -1,11 +1,10 @@
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use chrono::Utc;
+use serde::Serialize;
 use serde_json::json;
-use std::convert::Infallible;
 use uuid::Uuid;
 use warp::{Reply, Rejection};
 
-use crate::{DbPool, models::*};
+use crate::{DbPool, models::*, validation::Validate};
 
 #[derive(Debug, Serialize)]
 pub struct CigarResponse {
@@ -55,6 +54,9 @@ pub async fn get_cigars(db: DbPool) -> Result<impl Reply, Rejection> {
 }
 
 pub async fn create_cigar(create_cigar: CreateCigar, db: DbPool) -> Result<impl Reply, Rejection> {
+    // Validate input
+    create_cigar.validate().map_err(warp::reject::custom)?;
+    
     let id = Uuid::new_v4();
     let now = Utc::now();
     
@@ -128,6 +130,9 @@ pub async fn get_cigar(id: Uuid, db: DbPool) -> Result<impl Reply, Rejection> {
 }
 
 pub async fn update_cigar(id: Uuid, update_cigar: UpdateCigar, db: DbPool) -> Result<impl Reply, Rejection> {
+    // Validate input
+    update_cigar.validate().map_err(warp::reject::custom)?;
+    
     let now = Utc::now();
     
     match db.query_one(

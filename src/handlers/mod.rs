@@ -57,7 +57,5 @@ pub use humidors::{
 pub use auth::{
     get_setup_status,
     create_setup_user,
-    login_user,
-    create_humidor_for_setup,
-    verify_token
+    login_user
 };

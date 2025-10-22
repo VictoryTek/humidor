@@ -1,7 +1,6 @@
-use crate::models::{User, CreateUserRequest, LoginRequest, LoginResponse, UserResponse, SetupStatusResponse, CreateHumidorRequest, Humidor, SetupRequest};
+use crate::models::{LoginRequest, LoginResponse, UserResponse, SetupStatusResponse, CreateHumidorRequest, Humidor, SetupRequest};
 use crate::DbPool;
 use warp::Reply;
-use std::collections::HashMap;
 use serde_json::json;
 use uuid::Uuid;
 use chrono::Utc;
@@ -285,6 +284,7 @@ pub async fn login_user(
 }
 
 // Humidor endpoints for setup
+#[allow(dead_code)]
 pub async fn create_humidor_for_setup(
     humidor_req: CreateHumidorRequest,
     user_id: String, // This would come from JWT auth middleware

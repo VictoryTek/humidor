@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use crate::validation::{Validate, ValidationResult, validate_length, validate_required};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Strength {
@@ -24,4 +25,50 @@ pub struct UpdateStrength {
     pub name: Option<String>,
     pub level: Option<i32>,
     pub description: Option<String>,
+}
+
+impl Validate for CreateStrength {
+    fn validate(&self) -> ValidationResult<()> {
+        validate_required(&self.name, "name")?;
+        validate_length(&self.name, "name", 1, 100)?;
+        
+        if self.level < 1 || self.level > 5 {
+            return Err(crate::errors::AppError::ValidationError(
+                "level must be between 1 and 5".to_string()
+            ));
+        }
+        
+        if let Some(desc) = &self.description {
+            if !desc.is_empty() {
+                validate_length(desc, "description", 1, 500)?;
+            }
+        }
+        
+        Ok(())
+    }
+}
+
+impl Validate for UpdateStrength {
+    fn validate(&self) -> ValidationResult<()> {
+        if let Some(name) = &self.name {
+            validate_required(name, "name")?;
+            validate_length(name, "name", 1, 100)?;
+        }
+        
+        if let Some(level) = self.level {
+            if level < 1 || level > 5 {
+                return Err(crate::errors::AppError::ValidationError(
+                    "level must be between 1 and 5".to_string()
+                ));
+            }
+        }
+        
+        if let Some(desc) = &self.description {
+            if !desc.is_empty() {
+                validate_length(desc, "description", 1, 500)?;
+            }
+        }
+        
+        Ok(())
+    }
 }

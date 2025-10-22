@@ -3,6 +3,8 @@
 mod handlers;
 mod models;
 mod middleware;
+mod errors;
+mod validation;
 
 use std::{env, sync::Arc};
 use tokio_postgres::{NoTls, Client};
