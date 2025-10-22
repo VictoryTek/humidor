@@ -12,6 +12,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css">
 </head>
 <body>
     <div id="app">
@@ -21,17 +22,15 @@
                     <h3 class="nav-section-title">Collections</h3>
                     <a href="#" class="nav-item active" data-page="humidors">
                         <div class="nav-content">
-                            <span class="nav-icon">🏠</span>
+                            <span class="nav-icon mdi mdi-treasure-chest-outline"></span>
                             Humidors
                         </div>
-                        <span class="nav-count" id="humidorCount">0</span>
                     </a>
                     <a href="#" class="nav-item" data-page="favorites">
                         <div class="nav-content">
-                            <span class="nav-icon">❤️</span>
+                            <span class="nav-icon mdi mdi-heart-outline"></span>
                             Favorites
                         </div>
-                        <span class="nav-count" id="favoriteCount">0</span>
                     </a>
                 </div>
                 
@@ -39,59 +38,69 @@
                     <div class="nav-dropdown">
                         <button class="nav-dropdown-toggle" id="organizersToggle">
                             <div class="nav-content">
-                                <span class="nav-icon">📂</span>
+                                <span class="nav-icon mdi mdi-file-cabinet"></span>
                                 Organizers
                             </div>
-                            <span class="dropdown-arrow">▼</span>
+                            <span class="dropdown-arrow mdi mdi-chevron-down"></span>
                         </button>
                         <div class="nav-dropdown-content" id="organizersDropdown">
                             <a href="#" class="nav-item" data-page="brands">
                                 <div class="nav-content">
-                                    <span class="nav-icon">🏷️</span>
+                                    <span class="nav-icon mdi mdi-tag-outline"></span>
                                     Brand
                                 </div>
-                                <span class="nav-count" id="brandCount">0</span>
                             </a>
                             <a href="#" class="nav-item" data-page="sizes">
                                 <div class="nav-content">
-                                    <span class="nav-icon">📏</span>
+                                    <span class="nav-icon mdi mdi-ruler"></span>
                                     Size
                                 </div>
-                                <span class="nav-count" id="sizeCount">0</span>
                             </a>
                             <a href="#" class="nav-item" data-page="origins">
                                 <div class="nav-content">
-                                    <span class="nav-icon">🌍</span>
+                                    <span class="nav-icon mdi mdi-map-marker-outline"></span>
                                     Origin
                                 </div>
-                                <span class="nav-count" id="originCount">0</span>
                             </a>
                             <a href="#" class="nav-item" data-page="strength">
                                 <div class="nav-content">
-                                    <span class="nav-icon">💪</span>
+                                    <span class="nav-icon mdi mdi-chart-line"></span>
                                     Strength
                                 </div>
-                                <span class="nav-count" id="strengthCount">0</span>
                             </a>
                             <a href="#" class="nav-item" data-page="ring-gauge">
                                 <div class="nav-content">
-                                    <span class="nav-icon">⭕</span>
+                                    <span class="nav-icon mdi mdi-circle-outline"></span>
                                     Ring Gauge
                                 </div>
-                                <span class="nav-count" id="ringGaugeCount">0</span>
                             </a>
                         </div>
                     </div>
+                </div>
+                
+                <div class="nav-section">
+                    <a href="#" class="nav-item" data-page="wishlist">
+                        <div class="nav-content">
+                            <span class="nav-icon mdi mdi-book-edit-outline"></span>
+                            Wish List
+                        </div>
+                    </a>
                 </div>
                 
                 <!-- Settings at bottom -->
                 <div class="nav-section nav-section-bottom">
                     <a href="#" class="nav-item" data-page="settings">
                         <div class="nav-content">
-                            <span class="nav-icon">⚙️</span>
+                            <span class="nav-icon mdi mdi-cog"></span>
                             Settings
                         </div>
                     </a>
+                    
+                    <!-- Action Button -->
+                    <button class="nav-action-btn" id="addCigarBtnNav">
+                        <span class="add-icon">+</span>
+                        <span>CIGAR</span>
+                    </button>
                 </div>
             </nav>
         </aside>
@@ -155,12 +164,52 @@
                         <div class="page-actions-header">
                             <div class="page-title">
                                 <h1>My Humidors</h1>
-                                <p id="collectionSummary">0 humidors • 0 cigars</p>
                             </div>
                             <div class="header-actions">
-                                <button class="add-cigar-btn-primary" id="addCigarBtn">
+                                <button class="add-humidor-btn-primary" id="addHumidorBtnHeader">
                                     <span class="add-icon">+</span>
-                                    <span>Add Cigar</span>
+                                    <span>HUMIDOR</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Search and Filter Section -->
+                        <div class="cigar-search-section">
+                            <div class="search-bar">
+                                <input type="text" id="cigarSearchInput" placeholder="Search cigars..." class="search-input">
+                                <button class="search-btn" id="cigarSearchBtn">
+                                    <span class="mdi mdi-magnify"></span>
+                                </button>
+                            </div>
+                            <div class="search-filters">
+                                <button class="filter-chip" id="filterBrandChip" data-active="false">
+                                    <span class="mdi mdi-tag-outline"></span>
+                                    <span>Brands</span>
+                                    <span class="filter-badge" id="brandBadge">0</span>
+                                </button>
+                                <button class="filter-chip" id="filterSizeChip" data-active="false">
+                                    <span class="mdi mdi-ruler"></span>
+                                    <span>Sizes</span>
+                                    <span class="filter-badge" id="sizeBadge">0</span>
+                                </button>
+                                <button class="filter-chip" id="filterOriginChip" data-active="false">
+                                    <span class="mdi mdi-map-marker-outline"></span>
+                                    <span>Origins</span>
+                                    <span class="filter-badge" id="originBadge">0</span>
+                                </button>
+                                <button class="filter-chip" id="filterStrengthChip" data-active="false">
+                                    <span class="mdi mdi-chart-line"></span>
+                                    <span>Strengths</span>
+                                    <span class="filter-badge" id="strengthBadge">0</span>
+                                </button>
+                                <button class="filter-chip" id="filterRingGaugeChip" data-active="false">
+                                    <span class="mdi mdi-circle-outline"></span>
+                                    <span>Ring Gauges</span>
+                                    <span class="filter-badge" id="ringGaugeBadge">0</span>
+                                </button>
+                                <button class="filter-chip clear-filters" id="clearFiltersBtn" style="display: none;">
+                                    <span class="mdi mdi-close-circle"></span>
+                                    <span>Clear Filters</span>
                                 </button>
                             </div>
                         </div>
@@ -436,27 +485,11 @@
             
             <form id="brandForm" class="organizer-form">
                 <div class="form-group">
-                    <label for="brandName">Name *</label>
-                    <input type="text" id="brandName" name="name" required placeholder="e.g., Montecristo, Cohiba">
-                </div>
-                
-                <div class="form-group">
-                    <label for="brandCountry">Country</label>
-                    <input type="text" id="brandCountry" name="country" placeholder="e.g., Cuba, Dominican Republic">
-                </div>
-                
-                <div class="form-group">
-                    <label for="brandWebsite">Website</label>
-                    <input type="url" id="brandWebsite" name="website" placeholder="https://...">
-                </div>
-                
-                <div class="form-group full-width">
-                    <label for="brandDescription">Description</label>
-                    <textarea id="brandDescription" name="description" rows="3" placeholder="Brand history, characteristics, etc."></textarea>
+                    <label for="brandName">Brand Name *</label>
+                    <input type="text" id="brandName" name="name" required placeholder="e.g., Montecristo, Cohiba, Arturo Fuente">
                 </div>
                 
                 <div class="form-actions">
-                    <button type="button" class="btn-secondary" id="cancelBrandBtn">Cancel</button>
                     <button type="submit" class="btn-primary" id="saveBrandBtn">Save Brand</button>
                 </div>
             </form>
@@ -473,27 +506,11 @@
             
             <form id="sizeForm" class="organizer-form">
                 <div class="form-group">
-                    <label for="sizeName">Name *</label>
-                    <input type="text" id="sizeName" name="name" required placeholder="e.g., Robusto, Churchill">
-                </div>
-                
-                <div class="form-group">
-                    <label for="sizeLength">Length (inches)</label>
-                    <input type="number" id="sizeLength" name="length_inches" step="0.1" min="0" placeholder="5.5">
-                </div>
-                
-                <div class="form-group">
-                    <label for="sizeRingGauge">Ring Gauge</label>
-                    <input type="number" id="sizeRingGauge" name="ring_gauge" min="30" max="70" placeholder="50">
-                </div>
-                
-                <div class="form-group full-width">
-                    <label for="sizeDescription">Description</label>
-                    <textarea id="sizeDescription" name="description" rows="3" placeholder="Size characteristics, smoking time, etc."></textarea>
+                    <label for="sizeName">Size Name *</label>
+                    <input type="text" id="sizeName" name="name" required placeholder="e.g., Robusto, Churchill, Toro">
                 </div>
                 
                 <div class="form-actions">
-                    <button type="button" class="btn-secondary" id="cancelSizeBtn">Cancel</button>
                     <button type="submit" class="btn-primary" id="saveSizeBtn">Save Size</button>
                 </div>
             </form>
@@ -510,27 +527,11 @@
             
             <form id="originForm" class="organizer-form">
                 <div class="form-group">
-                    <label for="originName">Name *</label>
-                    <input type="text" id="originName" name="name" required placeholder="e.g., Vuelta Abajo, Esteli">
-                </div>
-                
-                <div class="form-group">
-                    <label for="originCountry">Country *</label>
-                    <input type="text" id="originCountry" name="country" required placeholder="e.g., Cuba, Nicaragua">
-                </div>
-                
-                <div class="form-group">
-                    <label for="originRegion">Region</label>
-                    <input type="text" id="originRegion" name="region" placeholder="e.g., Pinar del Rio">
-                </div>
-                
-                <div class="form-group full-width">
-                    <label for="originDescription">Description</label>
-                    <textarea id="originDescription" name="description" rows="3" placeholder="Climate, soil, tobacco characteristics, etc."></textarea>
+                    <label for="originName">Origin Name *</label>
+                    <input type="text" id="originName" name="name" required placeholder="e.g., Cuba, Nicaragua, Dominican Republic">
                 </div>
                 
                 <div class="form-actions">
-                    <button type="button" class="btn-secondary" id="cancelOriginBtn">Cancel</button>
                     <button type="submit" class="btn-primary" id="saveOriginBtn">Save Origin</button>
                 </div>
             </form>
@@ -547,29 +548,11 @@
             
             <form id="strengthForm" class="organizer-form">
                 <div class="form-group">
-                    <label for="strengthName">Name *</label>
-                    <input type="text" id="strengthName" name="name" required placeholder="e.g., Mild, Medium-Full">
-                </div>
-                
-                <div class="form-group">
-                    <label for="strengthLevel">Level (1-5) *</label>
-                    <select id="strengthLevel" name="level" required>
-                        <option value="">Select Level</option>
-                        <option value="1">1 - Mild</option>
-                        <option value="2">2 - Medium-Mild</option>
-                        <option value="3">3 - Medium</option>
-                        <option value="4">4 - Medium-Full</option>
-                        <option value="5">5 - Full</option>
-                    </select>
-                </div>
-                
-                <div class="form-group full-width">
-                    <label for="strengthDescription">Description</label>
-                    <textarea id="strengthDescription" name="description" rows="3" placeholder="Strength characteristics, flavor profile, etc."></textarea>
+                    <label for="strengthName">Strength Name *</label>
+                    <input type="text" id="strengthName" name="name" required placeholder="e.g., Mild, Medium, Full">
                 </div>
                 
                 <div class="form-actions">
-                    <button type="button" class="btn-secondary" id="cancelStrengthBtn">Cancel</button>
                     <button type="submit" class="btn-primary" id="saveStrengthBtn">Save Strength</button>
                 </div>
             </form>
@@ -586,22 +569,11 @@
             
             <form id="ringGaugeForm" class="organizer-form">
                 <div class="form-group">
-                    <label for="ringGaugeGauge">Gauge (30-70) *</label>
-                    <input type="number" id="ringGaugeGauge" name="gauge" required min="30" max="70" placeholder="50">
-                </div>
-                
-                <div class="form-group">
-                    <label for="ringGaugeCommonNames">Common Names</label>
-                    <input type="text" id="ringGaugeCommonNames" name="common_names" placeholder="Robusto, Toro (comma-separated)">
-                </div>
-                
-                <div class="form-group full-width">
-                    <label for="ringGaugeDescription">Description</label>
-                    <textarea id="ringGaugeDescription" name="description" rows="3" placeholder="Ring gauge characteristics, typical length, etc."></textarea>
+                    <label for="ringGaugeName">Ring Gauge Name *</label>
+                    <input type="text" id="ringGaugeName" name="name" required placeholder="e.g., 50, 52, 54">
                 </div>
                 
                 <div class="form-actions">
-                    <button type="button" class="btn-secondary" id="cancelRingGaugeBtn">Cancel</button>
                     <button type="submit" class="btn-primary" id="saveRingGaugeBtn">Save Ring Gauge</button>
                 </div>
             </form>
@@ -614,6 +586,13 @@
             <div class="modal-header">
                 <h2 id="cigarModalTitle">Add New Cigar</h2>
                 <button class="close-btn" id="closeCigarModal">&times;</button>
+            </div>
+            
+            <div class="import-url-section">
+                <button type="button" class="btn-import-url" id="importFromUrlBtn">
+                    <span class="mdi mdi-link-variant"></span>
+                    Import from URL
+                </button>
             </div>
             
             <form id="cigarForm" class="cigar-form">
@@ -682,10 +661,30 @@
                 </div>
                 
                 <div class="form-actions">
-                    <button type="button" class="btn-secondary" id="cancelCigarBtn">Cancel</button>
                     <button type="submit" class="btn-primary" id="saveCigarBtn">Save Cigar</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Import URL Modal -->
+    <div class="modal" id="importUrlModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Import Cigar from URL</h2>
+                <button class="close-btn" id="closeImportUrlModal">&times;</button>
+            </div>
+            
+            <div class="import-url-content">
+                <p>Enter a product URL from a cigar retailer or review site:</p>
+                <div class="form-group">
+                    <input type="url" id="importUrl" placeholder="https://www.cigaraficionado.com/..." class="url-input">
+                </div>
+                <div id="importStatus" class="import-status"></div>
+                <div class="form-actions">
+                    <button type="button" class="btn-primary" id="startImportBtn">Import</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -725,16 +724,6 @@
                         <label for="humidorLocation">Location</label>
                         <input type="text" id="humidorLocation" name="location" placeholder="e.g., Office, Living Room">
                     </div>
-                    
-                    <div class="form-group">
-                        <label for="humidorHumidity">Target Humidity (%)</label>
-                        <input type="number" id="humidorHumidity" name="target_humidity" min="60" max="75" placeholder="69">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="humidorTemperature">Target Temperature (°F)</label>
-                        <input type="number" id="humidorTemperature" name="target_temperature" min="65" max="75" placeholder="70">
-                    </div>
                 </div>
                 
                 <div class="form-group full-width">
@@ -743,10 +732,32 @@
                 </div>
                 
                 <div class="form-actions">
-                    <button type="button" class="btn-secondary" id="cancelHumidorBtn">Cancel</button>
-                    <button type="submit" class="btn-primary" id="saveHumidorBtn">Save Humidor</button>
+                    <button type="submit" class="btn-primary" id="saveHumidorBtn">Create Humidor</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Filter Selection Modal -->
+    <div class="modal" id="filterModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="filterModalTitle">Select Filters</h2>
+                <button class="close-btn" id="closeFilterModal">&times;</button>
+            </div>
+            
+            <div class="filter-modal-body">
+                <div class="filter-search">
+                    <input type="text" id="filterSearchInput" placeholder="Search..." class="search-input">
+                </div>
+                <div class="filter-list" id="filterList">
+                    <!-- Filter items will be dynamically inserted here -->
+                </div>
+                <div class="filter-actions">
+                    <button class="btn-secondary" id="clearFilterSelection">Clear Selection</button>
+                    <button class="btn-primary" id="applyFilterSelection">Apply Filters</button>
+                </div>
+            </div>
         </div>
     </div>
 

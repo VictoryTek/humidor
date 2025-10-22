@@ -8,7 +8,7 @@ pub mod strengths;
 pub mod ring_gauges;
 
 // Re-export handler functions with specific names to avoid conflicts
-pub use cigars::{get_cigars, get_cigar, create_cigar, update_cigar, delete_cigar};
+pub use cigars::{get_cigars, get_cigar, create_cigar, update_cigar, delete_cigar, scrape_cigar_url};
 
 pub use brands::{
     get_brands, 

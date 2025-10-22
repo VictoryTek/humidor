@@ -12,8 +12,28 @@ pub struct CigarResponse {
     pub total: i64,
 }
 
-pub async fn get_cigars(db: DbPool) -> Result<impl Reply, Rejection> {
-    match db.query("SELECT id, brand, name, size, strength, origin, wrapper, binder, filler, price, purchase_date, notes, quantity, humidor_location, created_at, updated_at FROM cigars ORDER BY created_at DESC LIMIT 50", &[]).await {
+pub async fn get_cigars(
+    params: std::collections::HashMap<String, String>,
+    db: DbPool
+) -> Result<impl Reply, Rejection> {
+    // Build query based on parameters
+    let mut query = String::from("SELECT id, brand, name, size, strength, origin, wrapper, binder, filler, price, purchase_date, notes, quantity, humidor_location, created_at, updated_at FROM cigars");
+    let mut conditions = Vec::new();
+    
+    // Check for humidor_id filter
+    if let Some(humidor_id) = params.get("humidor_id") {
+        conditions.push(format!("humidor_location = '{}'", humidor_id));
+    }
+    
+    // Add WHERE clause if there are conditions
+    if !conditions.is_empty() {
+        query.push_str(" WHERE ");
+        query.push_str(&conditions.join(" AND "));
+    }
+    
+    query.push_str(" ORDER BY created_at DESC LIMIT 50");
+    
+    match db.query(&query, &[]).await {
         Ok(rows) => {
             let mut cigars = Vec::new();
             for row in rows {
@@ -197,6 +217,23 @@ pub async fn delete_cigar(id: Uuid, db: DbPool) -> Result<impl Reply, Rejection>
         Err(e) => {
             eprintln!("Database error: {}", e);
             Ok(warp::reply::json(&json!({"error": "Failed to delete cigar"})))
+        }
+    }
+}
+
+#[derive(serde::Deserialize)]
+pub struct ScrapeRequest {
+    url: String,
+}
+
+pub async fn scrape_cigar_url(body: ScrapeRequest) -> Result<impl Reply, Rejection> {
+    use crate::services::scrape_cigar_url;
+    
+    match scrape_cigar_url(&body.url).await {
+        Ok(data) => Ok(warp::reply::json(&data)),
+        Err(e) => {
+            eprintln!("Scraping error: {}", e);
+            Ok(warp::reply::json(&json!({"error": "Failed to scrape cigar information"})))
         }
     }
 }

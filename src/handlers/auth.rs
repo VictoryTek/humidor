@@ -155,10 +155,11 @@ pub async fn create_setup_user(
                 ).into_response());
             }
             
-            let response = LoginResponse {
-                user: user_response,
-                token,
-            };
+            let response = json!({
+                "user": user_response,
+                "token": token,
+                "humidor_id": humidor_id.to_string()
+            });
             
             Ok(warp::reply::json(&response).into_response())
         }

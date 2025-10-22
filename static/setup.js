@@ -22,7 +22,6 @@ const elements = {
     humidorName: document.getElementById('humidorName'),
     humidorDescription: document.getElementById('humidorDescription'),
     capacity: document.getElementById('capacity'),
-    targetHumidity: document.getElementById('targetHumidity'),
     location: document.getElementById('location'),
     sampleData: document.getElementById('sampleData'),
     
@@ -32,7 +31,6 @@ const elements = {
     summaryEmail: document.getElementById('summaryEmail'),
     summaryHumidorName: document.getElementById('summaryHumidorName'),
     summaryCapacity: document.getElementById('summaryCapacity'),
-    summaryHumidity: document.getElementById('summaryHumidity'),
     summarySampleData: document.getElementById('summarySampleData'),
     
     setupLoading: document.getElementById('setupLoading'),
@@ -344,7 +342,6 @@ function captureHumidorData() {
         name: elements.humidorName.value.trim(),
         description: elements.humidorDescription.value.trim(),
         capacity: parseInt(elements.capacity.value) || null,
-        target_humidity: parseInt(elements.targetHumidity.value) || null,
         location: elements.location.value.trim(),
         includeSampleData: elements.sampleData.checked
     };
@@ -363,7 +360,6 @@ function updateSummary() {
     if (formData.humidor) {
         elements.summaryHumidorName.textContent = formData.humidor.name || 'Not provided';
         elements.summaryCapacity.textContent = formData.humidor.capacity ? formData.humidor.capacity + ' cigars' : 'Not specified';
-        elements.summaryHumidity.textContent = formData.humidor.target_humidity ? formData.humidor.target_humidity + '%' : 'Not specified';
         elements.summarySampleData.textContent = formData.humidor.includeSampleData ? 'Yes' : 'No';
     }
     
@@ -410,7 +406,7 @@ async function submitSetup() {
         
         // If sample data is requested, add sample cigars
         if (formData.humidor.includeSampleData) {
-            await addSampleData(userData.token);
+            await addSampleData(userData.token, userData.humidor_id);
         }
         
         // Setup successful, move to completion step
@@ -434,7 +430,7 @@ async function submitSetup() {
     }
 }
 
-async function addSampleData(token) {
+async function addSampleData(token, humidorId) {
     const sampleCigars = [
         {
             brand: 'Montecristo',
@@ -446,7 +442,8 @@ async function addSampleData(token) {
             origin: 'Cuba',
             wrapper: 'Natural',
             price: 15.99,
-            quantity: 5
+            quantity: 5,
+            humidor_location: humidorId
         },
         {
             brand: 'Romeo y Julieta',
@@ -458,7 +455,8 @@ async function addSampleData(token) {
             origin: 'Cuba',
             wrapper: 'Natural',
             price: 12.50,
-            quantity: 3
+            quantity: 3,
+            humidor_location: humidorId
         },
         {
             brand: 'Cohiba',
@@ -470,7 +468,21 @@ async function addSampleData(token) {
             origin: 'Cuba',
             wrapper: 'Natural',
             price: 22.00,
-            quantity: 2
+            quantity: 2,
+            humidor_location: humidorId
+        },
+        {
+            brand: 'Arturo Fuente',
+            name: 'Opus X Robusto',
+            size: 'Robusto',
+            ring_gauge: 50,
+            length: 5.5,
+            strength: 'Full',
+            origin: 'Dominican Republic',
+            wrapper: 'Natural',
+            price: 28.00,
+            quantity: 1,
+            humidor_location: humidorId
         }
     ];
     

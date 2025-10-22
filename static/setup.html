@@ -159,18 +159,10 @@
                             <textarea id="humidorDescription" name="description" rows="3" placeholder="Describe your humidor setup..."></textarea>
                         </div>
                         
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="capacity">Capacity</label>
-                                <input type="number" id="capacity" name="capacity" min="1" placeholder="50">
-                                <span class="form-help">Number of cigars it can hold</span>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="targetHumidity">Target Humidity (%)</label>
-                                <input type="number" id="targetHumidity" name="target_humidity" min="60" max="75" placeholder="70">
-                                <span class="form-help">Ideal: 65-72%</span>
-                            </div>
+                        <div class="form-group">
+                            <label for="capacity">Capacity</label>
+                            <input type="number" id="capacity" name="capacity" min="1" placeholder="50">
+                            <span class="form-help">Number of cigars it can hold</span>
                         </div>
                         
                         <div class="form-group">
@@ -224,10 +216,6 @@
                                 <span class="summary-value" id="summaryCapacity"></span>
                             </div>
                             <div class="summary-item">
-                                <span class="summary-label">Target Humidity:</span>
-                                <span class="summary-value" id="summaryHumidity"></span>
-                            </div>
-                            <div class="summary-item">
                                 <span class="summary-label">Sample Data:</span>
                                 <span class="summary-value" id="summarySampleData"></span>
                             </div>
@@ -271,13 +259,6 @@
                                 <p>Discover search, filtering, and collection management tools</p>
                             </div>
                         </div>
-                    </div>
-                    
-                    <!-- Test button for debugging -->
-                    <div style="text-align: center; margin-top: 2rem;">
-                        <button id="testFinishBtn" class="btn btn-primary" onclick="window.location.href='/'">
-                            🔧 Test Enter Humidor (Debug)
-                        </button>
                     </div>
                 </div>
             </div>

@@ -2,14 +2,14 @@
   <img src="static/logo.png" alt="Humidor Logo" width="120" height="120">
   <h1>Humidor</h1>
   <p><em>Cigar Inventory Management System</em></p>
+  <p><em>** WORK IN PROGRESS **</em></p>
 </div>
 
-A mobile-friendly web application for managing your cigar collection, built with Rust, PostgreSQL, and Docker.
+A heavily inspired by Mealie application for managing your cigar collection to fill a personal need. Built with Rust, PostgreSQL, and Docker. 
 
 ## Features
 
 - **Inventory Management**: Add, edit, and delete cigars from your collection
-- **Detailed Tracking**: Track brand, name, size, strength, origin, and more
 - **Search & Filter**: Find cigars by brand, strength, origin, or search terms
 - **Mobile-Friendly**: Responsive design for phones and tablets
 

@@ -5,6 +5,7 @@ mod models;
 mod middleware;
 mod errors;
 mod validation;
+mod services;
 
 use std::{env, sync::Arc};
 use tokio_postgres::{NoTls, Client};
@@ -119,6 +120,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and(warp::path("v1"))
         .and(warp::path("cigars"))
         .and(warp::get())
+        .and(warp::query::<std::collections::HashMap<String, String>>())
         .and(with_db(db_pool.clone()))
         .and_then(handlers::get_cigars);
 
@@ -154,6 +156,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and(warp::delete())
         .and(with_db(db_pool.clone()))
         .and_then(handlers::delete_cigar);
+
+    let scrape_cigar = warp::path("api")
+        .and(warp::path("v1"))
+        .and(warp::path("cigars"))
+        .and(warp::path("scrape"))
+        .and(warp::post())
+        .and(warp::body::json())
+        .and_then(handlers::scrape_cigar_url);
 
     // Brand API routes
     let get_brands = warp::path("api")
@@ -409,6 +419,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .or(get_cigar)
         .or(update_cigar)
         .or(delete_cigar)
+        .or(scrape_cigar)
         .or(get_brands)
         .or(create_brand)
         .or(update_brand)
