@@ -661,13 +661,17 @@ async function loadCigars() {
 // Organizer Functions
 async function loadOrganizers() {
     try {
-        [brands, sizes, origins, strengths, ringGauges] = await Promise.all([
-            OrganizerAPI.getBrands(),
-            OrganizerAPI.getSizes(),
-            OrganizerAPI.getOrigins(),
-            OrganizerAPI.getStrengths(),
-            OrganizerAPI.getRingGauges()
+        console.log('Starting to load organizers...');
+        const results = await Promise.all([
+            OrganizerAPI.getBrands().catch(e => { console.error('Brands error:', e); throw e; }),
+            OrganizerAPI.getSizes().catch(e => { console.error('Sizes error:', e); throw e; }),
+            OrganizerAPI.getOrigins().catch(e => { console.error('Origins error:', e); throw e; }),
+            OrganizerAPI.getStrengths().catch(e => { console.error('Strengths error:', e); throw e; }),
+            OrganizerAPI.getRingGauges().catch(e => { console.error('Ring gauges error:', e); throw e; })
         ]);
+        
+        [brands, sizes, origins, strengths, ringGauges] = results;
+        console.log('Organizers loaded:', { brands: brands.length, sizes: sizes.length, origins: origins.length, strengths: strengths.length, ringGauges: ringGauges.length });
         
         // Update navigation counts
         updateOrganizerCounts();
@@ -676,16 +680,23 @@ async function loadOrganizers() {
         updateFormDropdowns();
     } catch (error) {
         console.error('Error loading organizers:', error);
-        showToast('Failed to load organizers', 'error');
+        console.error('Error details:', error.message, error.stack);
+        showToast('Failed to load organizers: ' + error.message, 'error');
     }
 }
 
 function updateOrganizerCounts() {
-    document.getElementById('brandCount').textContent = brands.length;
-    document.getElementById('sizeCount').textContent = sizes.length;
-    document.getElementById('originCount').textContent = origins.length;
-    document.getElementById('strengthCount').textContent = strengths.length;
-    document.getElementById('ringGaugeCount').textContent = ringGauges.length;
+    const brandCountEl = document.getElementById('brandCount');
+    const sizeCountEl = document.getElementById('sizeCount');
+    const originCountEl = document.getElementById('originCount');
+    const strengthCountEl = document.getElementById('strengthCount');
+    const ringGaugeCountEl = document.getElementById('ringGaugeCount');
+    
+    if (brandCountEl) brandCountEl.textContent = brands.length;
+    if (sizeCountEl) sizeCountEl.textContent = sizes.length;
+    if (originCountEl) originCountEl.textContent = origins.length;
+    if (strengthCountEl) strengthCountEl.textContent = strengths.length;
+    if (ringGaugeCountEl) ringGaugeCountEl.textContent = ringGauges.length;
 }
 
 function updateFormDropdowns() {
@@ -845,6 +856,82 @@ function closeOrganizerModal(type) {
         modal.classList.remove('show');
         isEditingOrganizer = false;
         currentOrganizer = null;
+    }
+}
+
+async function saveOrganizer(type) {
+    const form = document.getElementById(`${type}Form`);
+    if (!form) return;
+    
+    const formData = new FormData(form);
+    const data = {
+        name: formData.get('name')
+    };
+    
+    // Add additional fields based on type
+    switch(type) {
+        case 'brand':
+            if (formData.get('description')) data.description = formData.get('description');
+            break;
+        case 'size':
+            if (formData.get('length')) data.length = formData.get('length');
+            if (formData.get('ring_gauge')) data.ring_gauge = formData.get('ring_gauge');
+            if (formData.get('description')) data.description = formData.get('description');
+            break;
+        case 'origin':
+            if (formData.get('country')) data.country = formData.get('country');
+            if (formData.get('region')) data.region = formData.get('region');
+            if (formData.get('description')) data.description = formData.get('description');
+            break;
+        case 'strength':
+            if (formData.get('level')) data.level = formData.get('level');
+            if (formData.get('description')) data.description = formData.get('description');
+            break;
+        case 'ringGauge':
+            if (formData.get('gauge')) data.gauge = formData.get('gauge');
+            if (formData.get('description')) data.description = formData.get('description');
+            break;
+    }
+    
+    try {
+        // API method mapping
+        const apiMethods = {
+            'brand': { create: OrganizerAPI.createBrand, update: OrganizerAPI.updateBrand },
+            'size': { create: OrganizerAPI.createSize, update: OrganizerAPI.updateSize },
+            'origin': { create: OrganizerAPI.createOrigin, update: OrganizerAPI.updateOrigin },
+            'strength': { create: OrganizerAPI.createStrength, update: OrganizerAPI.updateStrength },
+            'ringGauge': { create: OrganizerAPI.createRingGauge, update: OrganizerAPI.updateRingGauge }
+        };
+        
+        if (isEditingOrganizer && currentOrganizer) {
+            await apiMethods[type].update(currentOrganizer.id, data);
+            showToast(`${type.charAt(0).toUpperCase() + type.slice(1)} updated successfully!`);
+        } else {
+            await apiMethods[type].create(data);
+            showToast(`${type.charAt(0).toUpperCase() + type.slice(1)} created successfully!`);
+        }
+        
+        closeOrganizerModal(type);
+        await loadOrganizers();
+        
+        // Navigate to the organizer page to show the new/updated entry
+        const currentPageMap = {
+            'brand': 'brands',
+            'size': 'sizes',
+            'origin': 'origins',
+            'strength': 'strength',
+            'ringGauge': 'ring-gauge'
+        };
+        
+        const targetPage = currentPageMap[type];
+        if (targetPage) {
+            // Always navigate to refresh the view with new data
+            navigateToPage(targetPage);
+        }
+        
+    } catch (error) {
+        console.error(`Error saving ${type}:`, error);
+        showToast(error.message || `Failed to save ${type}`, 'error');
     }
 }
 
@@ -1097,8 +1184,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const organizerTypes = ['brand', 'size', 'origin', 'strength', 'ringGauge'];
     organizerTypes.forEach(type => {
         const modal = document.getElementById(`${type}Modal`);
+        const form = document.getElementById(`${type}Form`);
         const closeBtn = document.getElementById(`close${type.charAt(0).toUpperCase() + type.slice(1)}Modal`);
         const cancelBtn = document.getElementById(`cancel${type.charAt(0).toUpperCase() + type.slice(1)}Btn`);
+        
+        // Form submission
+        if (form) {
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await saveOrganizer(type);
+            });
+        }
         
         // Close button
         if (closeBtn) {
@@ -1203,6 +1299,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize the interface
     loadHumidors();
+    loadOrganizers();
 
     // Dropdown functionality
     initializeDropdowns();
@@ -1361,31 +1458,37 @@ async function deleteOrganizer(id, type) {
 // Humidor Functions
 async function loadHumidors() {
     try {
+        console.log('=== loadHumidors() called ===');
         const response = await makeAuthenticatedRequest('/api/v1/humidors');
 
         if (response.ok) {
             humidors = await response.json();
+            console.log('✓ Humidors loaded:', humidors.length, humidors);
             // Load cigars for each humidor
             cigars = [];
             for (const humidor of humidors) {
+                console.log(`→ Loading cigars for humidor "${humidor.name}" (${humidor.id})...`);
                 const cigarResponse = await makeAuthenticatedRequest(`/api/v1/humidors/${humidor.id}/cigars`);
                 if (cigarResponse.ok) {
                     const humidorCigars = await cigarResponse.json();
+                    console.log(`✓ Loaded ${humidorCigars.length} cigars for humidor ${humidor.name}:`, humidorCigars);
                     cigars.push(...humidorCigars);
                 } else {
-                    console.error(`Failed to load cigars for humidor ${humidor.id}:`, cigarResponse.status);
+                    console.error(`✗ Failed to load cigars for humidor ${humidor.id}:`, cigarResponse.status);
                 }
             }
+            console.log('✓ Total cigars loaded:', cigars.length, cigars);
         } else {
-            console.error('Failed to load humidors:', response.status, response.statusText);
+            console.error('✗ Failed to load humidors:', response.status, response.statusText);
             humidors = [];
             cigars = [];
         }
         
         // Show appropriate section based on whether humidors exist
+        console.log('→ Calling showAppropriateSection()');
         showAppropriateSection();
     } catch (error) {
-        console.error('Error loading humidors:', error);
+        console.error('✗ Error loading humidors:', error);
         if (error.message !== 'Authentication failed') {
             showToast('Failed to load humidors', 'error');
         }
@@ -1631,9 +1734,11 @@ function filterSearchHandler(query) {
 }
 
 function renderHumidorSections() {
+    console.log('=== renderHumidorSections() called ===');
     const container = document.getElementById('humidorsContainer');
     
     if (humidors.length === 0) {
+        console.log('✗ No humidors to render');
         container.innerHTML = '';
         return;
     }
@@ -1643,10 +1748,20 @@ function renderHumidorSections() {
                             selectedOrigins.length > 0 || selectedStrengths.length > 0 || 
                             selectedRingGauges.length > 0) ? filteredCigars : cigars;
     
+    console.log(`→ Total cigars available: ${cigars.length}`);
+    console.log(`→ Cigars to display (after filters): ${cigarsToDisplay.length}`);
+    
     container.innerHTML = humidors.map(humidor => {
-        const humidorCigars = cigarsToDisplay.filter(cigar => cigar.humidor_location === humidor.id);
+        const humidorCigars = cigarsToDisplay.filter(cigar => {
+            const matches = cigar.humidor_id === humidor.id;
+            console.log(`  Comparing cigar.humidor_id="${cigar.humidor_id}" (${typeof cigar.humidor_id}) with humidor.id="${humidor.id}" (${typeof humidor.id}) = ${matches}`);
+            return matches;
+        });
+        console.log(`→ Rendering humidor "${humidor.name}" (${humidor.id}) with ${humidorCigars.length} cigars`, humidorCigars);
         return createHumidorSection(humidor, humidorCigars);
     }).join('');
+    
+    console.log('✓ Humidor sections rendered');
 }
 
 function createHumidorSection(humidor, humidorCigars) {
@@ -1752,6 +1867,11 @@ function closeHumidorModal() {
 }
 
 function openCigarModal(humidorId = null, cigar = null) {
+    console.log('=== openCigarModal() called ===');
+    console.log('→ humidorId:', humidorId);
+    console.log('→ cigar:', cigar);
+    console.log('→ Available humidors:', humidors.length);
+    
     isEditingCigar = !!cigar;
     currentCigar = cigar;
     
@@ -1759,6 +1879,11 @@ function openCigarModal(humidorId = null, cigar = null) {
     const title = document.getElementById('cigarModalTitle');
     const form = document.getElementById('cigarForm');
     const humidorSelect = document.getElementById('cigarHumidor');
+    
+    if (!humidorSelect) {
+        console.error('✗ cigarHumidor select element not found!');
+        return;
+    }
     
     title.textContent = isEditingCigar ? 'Edit Cigar' : 'Add New Cigar';
     
@@ -1773,6 +1898,8 @@ function openCigarModal(humidorId = null, cigar = null) {
         }
         humidorSelect.appendChild(option);
     });
+    
+    console.log(`✓ Humidor dropdown populated with ${humidors.length} options`);
     
     if (isEditingCigar) {
         // Populate form with cigar data
@@ -1920,14 +2047,27 @@ async function saveCigar() {
         wrapper: formData.get('wrapper') || null,
         quantity: parseInt(formData.get('quantity')) || 1,
         purchase_date: formData.get('purchase_date') || null,
-        purchase_price: formData.get('purchase_price') ? parseFloat(formData.get('purchase_price')) : null,
+        price: formData.get('price') ? parseFloat(formData.get('price')) : null,
         notes: formData.get('notes') || null
     };
+
+    console.log('=== saveCigar() called ===');
+    console.log('→ Form data extracted:', cigarData);
+    
+    // Validate that a humidor is selected
+    if (!cigarData.humidor_id || cigarData.humidor_id.trim() === '') {
+        console.error('✗ No humidor selected!');
+        showToast('Please select a humidor for this cigar', 'error');
+        return;
+    }
+    
+    console.log(`✓ Humidor selected: ${cigarData.humidor_id}`);
 
     try {
         let response;
         if (isEditingCigar && currentCigar) {
             // Update existing cigar
+            console.log(`→ Updating existing cigar ${currentCigar.id}...`);
             response = await makeAuthenticatedRequest(`/api/v1/cigars/${currentCigar.id}`, {
                 method: 'PUT',
                 headers: {
@@ -1937,6 +2077,7 @@ async function saveCigar() {
             });
         } else {
             // Create new cigar
+            console.log('→ Creating new cigar...');
             response = await makeAuthenticatedRequest('/api/v1/cigars', {
                 method: 'POST',
                 headers: {
@@ -1946,16 +2087,22 @@ async function saveCigar() {
             });
         }
 
+        console.log(`→ API response status: ${response.status}`);
+        
         if (response.ok) {
+            const savedCigar = await response.json();
+            console.log('✓ Cigar saved successfully:', savedCigar);
+            console.log('→ Reloading humidors and cigars...');
             await loadHumidors();
             showToast(isEditingCigar ? 'Cigar updated successfully!' : 'Cigar added successfully!', 'success');
             closeCigarModal();
         } else {
             const errorData = await response.json();
+            console.error('✗ Failed to save cigar:', errorData);
             showToast(errorData.error || 'Failed to save cigar', 'error');
         }
     } catch (error) {
-        console.error('Error saving cigar:', error);
+        console.error('✗ Error saving cigar:', error);
         showToast('Failed to save cigar', 'error');
     }
 }

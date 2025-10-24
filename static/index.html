@@ -249,7 +249,6 @@
                         <div class="empty-icon">🏷️</div>
                         <h3>No brands found</h3>
                         <p>Create brand entries to organize your cigar collection!</p>
-                        <button class="add-btn" onclick="openBrandModal()">Add First Brand</button>
                     </div>
                 </div>
 
@@ -281,7 +280,6 @@
                         <div class="empty-icon">📏</div>
                         <h3>No sizes found</h3>
                         <p>Create size entries to organize your cigar collection!</p>
-                        <button class="add-btn" onclick="openSizeModal()">Add First Size</button>
                     </div>
                 </div>
 
@@ -313,7 +311,6 @@
                         <div class="empty-icon">🌍</div>
                         <h3>No origins found</h3>
                         <p>Create origin entries to organize your cigar collection!</p>
-                        <button class="add-btn" onclick="openOriginModal()">Add First Origin</button>
                     </div>
                 </div>
 
@@ -345,7 +342,6 @@
                         <div class="empty-icon">💪</div>
                         <h3>No strengths found</h3>
                         <p>Create strength entries to organize your cigar collection!</p>
-                        <button class="add-btn" onclick="openStrengthModal()">Add First Strength</button>
                     </div>
                 </div>
 
@@ -377,102 +373,12 @@
                         <div class="empty-icon">⭕</div>
                         <h3>No ring gauges found</h3>
                         <p>Create ring gauge entries to organize your cigar collection!</p>
-                        <button class="add-btn" onclick="openRingGaugeModal()">Add First Ring Gauge</button>
                     </div>
                 </div>
 
                 <!-- Other sections will be added here for brands, humidors, etc. -->
             </div>
         </main>
-    </div>
-
-    <!-- Add/Edit Cigar Modal -->
-    <div class="modal" id="cigarModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="modalTitle">Add New Cigar</h2>
-                <button class="close-btn" id="closeModal">&times;</button>
-            </div>
-            
-            <form id="cigarForm" class="cigar-form">
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label for="brand">Brand *</label>
-                        <input type="text" id="brand" name="brand" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="name">Name *</label>
-                        <input type="text" id="name" name="name" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="size">Size *</label>
-                        <input type="text" id="size" name="size" placeholder="e.g., Robusto, Churchill" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="strength">Strength *</label>
-                        <select id="strength" name="strength" required>
-                            <option value="">Select strength</option>
-                            <option value="Mild">Mild</option>
-                            <option value="Medium">Medium</option>
-                            <option value="Full">Full</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="origin">Origin *</label>
-                        <input type="text" id="origin" name="origin" placeholder="e.g., Dominican Republic" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="wrapper">Wrapper</label>
-                        <input type="text" id="wrapper" name="wrapper" placeholder="e.g., Connecticut">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="binder">Binder</label>
-                        <input type="text" id="binder" name="binder">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="filler">Filler</label>
-                        <input type="text" id="filler" name="filler">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="price">Price</label>
-                        <input type="number" id="price" name="price" step="0.01" min="0" placeholder="0.00">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="quantity">Quantity *</label>
-                        <input type="number" id="quantity" name="quantity" min="1" value="1" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="humidor_location">Humidor Location</label>
-                        <input type="text" id="humidor_location" name="humidor_location" placeholder="e.g., Top shelf, Drawer 2">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="purchase_date">Purchase Date</label>
-                        <input type="date" id="purchase_date" name="purchase_date">
-                    </div>
-                </div>
-                
-                <div class="form-group full-width">
-                    <label for="notes">Notes</label>
-                    <textarea id="notes" name="notes" rows="3" placeholder="Tasting notes, pairing suggestions, etc."></textarea>
-                </div>
-                
-                <div class="form-actions">
-                    <button type="button" class="btn-secondary" id="cancelBtn">Cancel</button>
-                    <button type="submit" class="btn-primary" id="saveBtn">Save Cigar</button>
-                </div>
-            </form>
-        </div>
     </div>
 
     <!-- Brand Modal -->

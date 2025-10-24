@@ -83,17 +83,128 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             wrapper VARCHAR,
             binder VARCHAR,
             filler VARCHAR,
-            price DECIMAL(10,2),
+            price DOUBLE PRECISION,
             purchase_date TIMESTAMPTZ,
             notes TEXT,
             quantity INTEGER NOT NULL DEFAULT 1,
             ring_gauge INTEGER,
-            length DECIMAL(4,2),
+            length DOUBLE PRECISION,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )",
         &[],
     ).await?;
+
+    // Create organizer tables
+    // Brands table
+    client.execute(
+        "CREATE TABLE IF NOT EXISTS brands (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            name VARCHAR NOT NULL UNIQUE,
+            description TEXT,
+            country VARCHAR,
+            website VARCHAR,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )",
+        &[],
+    ).await?;
+
+    // Sizes table
+    client.execute(
+        "CREATE TABLE IF NOT EXISTS sizes (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            name VARCHAR NOT NULL UNIQUE,
+            length_inches DECIMAL(4,2),
+            ring_gauge INTEGER,
+            description TEXT,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )",
+        &[],
+    ).await?;
+
+    // Origins table
+    client.execute(
+        "CREATE TABLE IF NOT EXISTS origins (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            name VARCHAR NOT NULL UNIQUE,
+            country VARCHAR NOT NULL,
+            region VARCHAR,
+            description TEXT,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )",
+        &[],
+    ).await?;
+
+    // Strengths table
+    client.execute(
+        "CREATE TABLE IF NOT EXISTS strengths (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            name VARCHAR NOT NULL UNIQUE,
+            level INTEGER NOT NULL,
+            description TEXT,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )",
+        &[],
+    ).await?;
+
+    // Ring Gauges table
+    client.execute(
+        "CREATE TABLE IF NOT EXISTS ring_gauges (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            gauge INTEGER NOT NULL UNIQUE,
+            description TEXT,
+            common_names VARCHAR[],
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )",
+        &[],
+    ).await?;
+
+    // Insert default strength values if the table is empty
+    let strength_count: i64 = client
+        .query_one("SELECT COUNT(*) FROM strengths", &[])
+        .await?
+        .get(0);
+    
+    if strength_count == 0 {
+        client.execute(
+            "INSERT INTO strengths (name, level, description) VALUES
+             ('Mild', 1, 'Light and smooth, perfect for beginners'),
+             ('Medium-Mild', 2, 'Slightly more body than mild, still approachable'),
+             ('Medium', 3, 'Balanced strength with good complexity'),
+             ('Medium-Full', 4, 'Strong flavor with substantial body'),
+             ('Full', 5, 'Bold and intense, for experienced smokers')",
+            &[],
+        ).await?;
+    }
+
+    // Insert common ring gauges if the table is empty
+    let ring_gauge_count: i64 = client
+        .query_one("SELECT COUNT(*) FROM ring_gauges", &[])
+        .await?
+        .get(0);
+    
+    if ring_gauge_count == 0 {
+        client.execute(
+            "INSERT INTO ring_gauges (gauge, description, common_names) VALUES
+             (38, 'Very thin gauge, quick smoke', ARRAY['Lancero thin', 'Panetela']),
+             (42, 'Classic thin gauge', ARRAY['Corona', 'Petit Corona']),
+             (44, 'Standard corona size', ARRAY['Corona', 'Lonsdale']),
+             (46, 'Popular medium gauge', ARRAY['Corona Gorda', 'Petit Robusto']),
+             (48, 'Medium-thick gauge', ARRAY['Robusto thin']),
+             (50, 'Classic robusto gauge', ARRAY['Robusto', 'Rothschild']),
+             (52, 'Thick robusto gauge', ARRAY['Robusto Extra', 'Toro thin']),
+             (54, 'Toro gauge', ARRAY['Toro', 'Gordo']),
+             (56, 'Churchill gauge', ARRAY['Churchill', 'Double Corona']),
+             (58, 'Thick churchill', ARRAY['Churchill Extra']),
+             (60, 'Very thick gauge', ARRAY['Gordo', 'Double Toro'])",
+            &[],
+        ).await?;
+    }
 
     let db_pool = Arc::new(client);
     
@@ -370,6 +481,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and(warp::path("v1"))
         .and(warp::path("humidors"))
         .and(with_uuid())
+        .and(warp::path::end())
         .and(warp::get())
         .and(with_current_user(db_pool.clone()))
         .and(with_db(db_pool.clone()))
@@ -444,11 +556,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .or(create_setup_user)
         .or(login_user)
         .or(get_humidors)
-        .or(get_humidor)
+        .or(get_humidor_cigars)  // Must come before get_humidor (more specific route)
         .or(create_humidor)
         .or(update_humidor)
         .or(delete_humidor)
-        .or(get_humidor_cigars);
+        .or(get_humidor);  // Less specific, should be last
 
     // Root route
     let root = warp::path::end()

@@ -334,7 +334,7 @@ function captureUserData() {
         email: elements.email.value.trim(),
         password: elements.password.value
     };
-    console.log('Captured user data:', formData.user);
+    console.log('User data captured (password hidden for security)');
 }
 
 function captureHumidorData() {
@@ -403,10 +403,16 @@ async function submitSetup() {
         }
         
         const userData = await userResponse.json();
+        console.log('User data received:', userData);
+        console.log('Include sample data?', formData.humidor.includeSampleData);
+        console.log('Humidor ID:', userData.humidor_id);
         
         // If sample data is requested, add sample cigars
         if (formData.humidor.includeSampleData) {
+            console.log('Calling addSampleData...');
             await addSampleData(userData.token, userData.humidor_id);
+        } else {
+            console.log('Sample data not requested');
         }
         
         // Setup successful, move to completion step
@@ -431,6 +437,10 @@ async function submitSetup() {
 }
 
 async function addSampleData(token, humidorId) {
+    console.log('=== ADDING SAMPLE DATA ===');
+    console.log('Token:', token ? 'Present' : 'Missing');
+    console.log('Humidor ID:', humidorId);
+    
     const sampleCigars = [
         {
             brand: 'Montecristo',
@@ -443,7 +453,7 @@ async function addSampleData(token, humidorId) {
             wrapper: 'Natural',
             price: 15.99,
             quantity: 5,
-            humidor_location: humidorId
+            humidor_id: humidorId
         },
         {
             brand: 'Romeo y Julieta',
@@ -456,7 +466,7 @@ async function addSampleData(token, humidorId) {
             wrapper: 'Natural',
             price: 12.50,
             quantity: 3,
-            humidor_location: humidorId
+            humidor_id: humidorId
         },
         {
             brand: 'Cohiba',
@@ -469,7 +479,7 @@ async function addSampleData(token, humidorId) {
             wrapper: 'Natural',
             price: 22.00,
             quantity: 2,
-            humidor_location: humidorId
+            humidor_id: humidorId
         },
         {
             brand: 'Arturo Fuente',
@@ -482,13 +492,17 @@ async function addSampleData(token, humidorId) {
             wrapper: 'Natural',
             price: 28.00,
             quantity: 1,
-            humidor_location: humidorId
+            humidor_id: humidorId
         }
     ];
     
+    let successCount = 0;
+    let failCount = 0;
+    
     for (const cigar of sampleCigars) {
         try {
-            await fetch('/api/v1/cigars', {
+            console.log(`Adding sample cigar: ${cigar.brand} ${cigar.name}`);
+            const response = await fetch('/api/v1/cigars', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -496,11 +510,29 @@ async function addSampleData(token, humidorId) {
                 },
                 body: JSON.stringify(cigar)
             });
+            
+            if (response.ok) {
+                const result = await response.json();
+                // Check if the response contains an error field
+                if (result.error) {
+                    console.error(`✗ Failed to add ${cigar.brand} ${cigar.name}:`, result.error);
+                    failCount++;
+                } else {
+                    console.log(`✓ Successfully added: ${cigar.brand} ${cigar.name}`, result);
+                    successCount++;
+                }
+            } else {
+                const error = await response.text();
+                console.error(`✗ Failed to add ${cigar.brand} ${cigar.name}:`, response.status, error);
+                failCount++;
+            }
         } catch (error) {
-            console.error('Failed to add sample cigar:', error);
-            // Continue adding other cigars even if one fails
+            console.error(`✗ Error adding ${cigar.brand} ${cigar.name}:`, error);
+            failCount++;
         }
     }
+    
+    console.log(`=== SAMPLE DATA COMPLETE: ${successCount} added, ${failCount} failed ===`);
 }
 
 // Toast notifications

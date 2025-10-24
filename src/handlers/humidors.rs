@@ -304,34 +304,35 @@ pub async fn get_humidor_cigars(
         Ok(Some(_)) => {
             // Humidor exists and belongs to user, get cigars
             let query = "
-                SELECT c.id, c.brand, c.name, c.size, c.wrapper, 
+                SELECT c.id, c.humidor_id, c.brand, c.name, c.size, c.wrapper, 
                        c.strength, c.origin, c.price, c.purchase_date, c.notes, c.quantity, 
-                       c.humidor_location, c.created_at, c.updated_at
+                       c.ring_gauge, c.length, c.created_at, c.updated_at
                 FROM cigars c 
-                WHERE c.humidor_location = $1
+                WHERE c.humidor_id = $1
                 ORDER BY c.created_at DESC
             ";
 
-            let humidor_id_str = humidor_id.to_string();
-            match db.query(query, &[&humidor_id_str]).await {
+            match db.query(query, &[&humidor_id]).await {
                 Ok(rows) => {
                     let cigars: Vec<serde_json::Value> = rows
                         .iter()
                         .map(|row| json!({
                             "id": row.get::<_, Uuid>(0),
-                            "brand": row.get::<_, String>(1),
-                            "name": row.get::<_, String>(2),
-                            "size": row.get::<_, String>(3),
-                            "wrapper": row.get::<_, Option<String>>(4),
-                            "strength": row.get::<_, String>(5),
-                            "origin": row.get::<_, String>(6),
-                            "price": row.get::<_, Option<f64>>(7),
-                            "purchase_date": row.get::<_, Option<chrono::DateTime<chrono::Utc>>>(8),
-                            "notes": row.get::<_, Option<String>>(9),
-                            "quantity": row.get::<_, i32>(10),
-                            "humidor_location": row.get::<_, Option<String>>(11),
-                            "created_at": row.get::<_, chrono::DateTime<chrono::Utc>>(12),
-                            "updated_at": row.get::<_, chrono::DateTime<chrono::Utc>>(13),
+                            "humidor_id": row.get::<_, Option<Uuid>>(1),
+                            "brand": row.get::<_, String>(2),
+                            "name": row.get::<_, String>(3),
+                            "size": row.get::<_, String>(4),
+                            "wrapper": row.get::<_, Option<String>>(5),
+                            "strength": row.get::<_, String>(6),
+                            "origin": row.get::<_, String>(7),
+                            "price": row.get::<_, Option<f64>>(8),
+                            "purchase_date": row.get::<_, Option<chrono::DateTime<chrono::Utc>>>(9),
+                            "notes": row.get::<_, Option<String>>(10),
+                            "quantity": row.get::<_, i32>(11),
+                            "ring_gauge": row.get::<_, Option<i32>>(12),
+                            "length": row.get::<_, Option<f64>>(13),
+                            "created_at": row.get::<_, chrono::DateTime<chrono::Utc>>(14),
+                            "updated_at": row.get::<_, chrono::DateTime<chrono::Utc>>(15),
                         }))
                         .collect();
 

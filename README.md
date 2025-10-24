@@ -1,11 +1,13 @@
 <div align="center">
-  <img src="static/logo.png" alt="Humidor Logo" width="120" height="120">
+  <img src="static/logo.png" alt="Humidor Logo" width="150" height="150">
   <h1>Humidor</h1>
   <p><em>Cigar Inventory Management System</em></p>
   <p><em>** WORK IN PROGRESS **</em></p>
 </div>
 
-A heavily inspired by Mealie application for managing your cigar collection to fill a personal need. Built with Rust, PostgreSQL, and Docker. 
+Heavily inspired by Mealie. 
+An pplication for managing your cigar collection. Built with Rust, PostgreSQL, and Docker. 
+This project was started because I am a homelabber and couldn't find anything to help me track what I have and what I want, so this started out to fill a personal need. Hopefully if I can make it work, it will be useful to other cigar enjoyers, who want to keep track of their humidor inventory.
 
 ## Features
 

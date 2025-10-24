@@ -6,6 +6,7 @@ use crate::validation::{Validate, ValidationResult, validate_length, validate_po
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Cigar {
     pub id: Uuid,
+    pub humidor_id: Option<Uuid>,
     pub brand: String,
     pub name: String,
     pub size: String,
@@ -18,7 +19,8 @@ pub struct Cigar {
     pub purchase_date: Option<DateTime<Utc>>,
     pub notes: Option<String>,
     pub quantity: i32,
-    pub humidor_location: Option<String>,
+    pub ring_gauge: Option<i32>,
+    pub length: Option<f64>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -37,7 +39,9 @@ pub struct CreateCigar {
     pub purchase_date: Option<DateTime<Utc>>,
     pub notes: Option<String>,
     pub quantity: i32,
-    pub humidor_location: Option<String>,
+    pub ring_gauge: Option<i32>,
+    pub length: Option<f64>,
+    pub humidor_id: Option<Uuid>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -54,7 +58,9 @@ pub struct UpdateCigar {
     pub purchase_date: Option<DateTime<Utc>>,
     pub notes: Option<String>,
     pub quantity: Option<i32>,
-    pub humidor_location: Option<String>,
+    pub ring_gauge: Option<i32>,
+    pub length: Option<f64>,
+    pub humidor_id: Option<Uuid>,
 }
 
 impl Validate for CreateCigar {
@@ -78,9 +84,7 @@ impl Validate for CreateCigar {
         if let Some(notes) = &self.notes {
             validate_length(notes, "Notes", 0, 1000)?;
         }
-        if let Some(location) = &self.humidor_location {
-            validate_length(location, "Humidor location", 1, 100)?;
-        }
+        // humidor_id is a UUID, no validation needed
         
         Ok(())
     }
