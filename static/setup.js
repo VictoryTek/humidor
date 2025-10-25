@@ -67,7 +67,6 @@ document.addEventListener('DOMContentLoaded', function() {
     elements.confirmPassword.addEventListener('input', validatePasswords);
     
     // Set default values
-    elements.targetHumidity.value = 70;
     elements.capacity.value = 50;
 });
 

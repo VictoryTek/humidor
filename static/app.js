@@ -1468,9 +1468,10 @@ async function loadHumidors() {
             cigars = [];
             for (const humidor of humidors) {
                 console.log(`→ Loading cigars for humidor "${humidor.name}" (${humidor.id})...`);
-                const cigarResponse = await makeAuthenticatedRequest(`/api/v1/humidors/${humidor.id}/cigars`);
+                const cigarResponse = await makeAuthenticatedRequest(`/api/v1/cigars?humidor_id=${humidor.id}`);
                 if (cigarResponse.ok) {
-                    const humidorCigars = await cigarResponse.json();
+                    const responseData = await cigarResponse.json();
+                    const humidorCigars = responseData.cigars || [];
                     console.log(`✓ Loaded ${humidorCigars.length} cigars for humidor ${humidor.name}:`, humidorCigars);
                     cigars.push(...humidorCigars);
                 } else {
