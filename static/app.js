@@ -1372,6 +1372,20 @@ function initializeNavigation() {
     document.getElementById('addOriginBtn')?.addEventListener('click', () => openOriginModal());
     document.getElementById('addStrengthBtn')?.addEventListener('click', () => openStrengthModal());
     document.getElementById('addRingGaugeBtn')?.addEventListener('click', () => openRingGaugeModal());
+    
+    // Add event listeners for profile/settings buttons
+    document.getElementById('saveProfileBtn')?.addEventListener('click', saveProfile);
+    document.getElementById('changePasswordBtn')?.addEventListener('click', changePassword);
+    
+    // Add event listener for Account Settings in user dropdown
+    document.querySelectorAll('[data-page="profile"]').forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.preventDefault();
+            navigateToPage('profile');
+            // Close the user dropdown
+            document.getElementById('userDropdownMenu')?.classList.remove('show');
+        });
+    });
 }
 
 function navigateToPage(page) {
@@ -1381,7 +1395,7 @@ function navigateToPage(page) {
     });
 
     // Hide all sections
-    document.querySelectorAll('.humidors-section, .organizer-section').forEach(section => {
+    document.querySelectorAll('.humidors-section, .organizer-section, .profile-section').forEach(section => {
         section.style.display = 'none';
     });
 
@@ -1410,6 +1424,10 @@ function navigateToPage(page) {
         case 'ring-gauge':
             document.getElementById('ringGaugeSection').style.display = 'block';
             renderOrganizers(ringGauges, 'ringGaugesGrid', 'ringGauges');
+            break;
+        case 'profile':
+            document.getElementById('profileSection').style.display = 'block';
+            loadUserProfile();
             break;
     }
 
@@ -2146,6 +2164,150 @@ function deleteCigar(id) {
     cigars = cigars.filter(c => c.id !== id);
     renderHumidorSections();
     showToast('Cigar deleted successfully!');
+}
+
+// Profile/Account Settings Functions
+async function loadUserProfile() {
+    try {
+        const response = await makeAuthenticatedRequest('/api/v1/users/self');
+        
+        if (response && response.ok) {
+            const user = await response.json();
+            displayUserProfile(user);
+        } else {
+            showToast('Failed to load user profile', 'error');
+        }
+    } catch (error) {
+        console.error('Error loading profile:', error);
+        showToast('Error loading profile', 'error');
+    }
+}
+
+function displayUserProfile(user) {
+    // Fill form fields
+    document.getElementById('profileUsername').value = user.username || '';
+    document.getElementById('profileEmail').value = user.email || '';
+    document.getElementById('profileFullName').value = user.full_name || '';
+}
+
+async function saveProfile() {
+    const username = document.getElementById('profileUsername').value.trim();
+    const email = document.getElementById('profileEmail').value.trim();
+    const fullName = document.getElementById('profileFullName').value.trim();
+    
+    // Validation
+    if (!username) {
+        showToast('Username is required', 'error');
+        return;
+    }
+    
+    if (!email) {
+        showToast('Email is required', 'error');
+        return;
+    }
+    
+    if (!email.includes('@')) {
+        showToast('Please enter a valid email address', 'error');
+        return;
+    }
+    
+    const updateData = {
+        username,
+        email,
+        full_name: fullName || null
+    };
+    
+    try {
+        const saveBtn = document.getElementById('saveProfileBtn');
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<span class="mdi mdi-loading mdi-spin"></span> Saving...';
+        
+        const response = await makeAuthenticatedRequest('/api/v1/users/self', {
+            method: 'PUT',
+            body: JSON.stringify(updateData)
+        });
+        
+        if (response && response.ok) {
+            const updatedUser = await response.json();
+            displayUserProfile(updatedUser);
+            // Update user display
+            initializeUserDisplay();
+            showToast('Profile updated successfully!');
+        } else {
+            const error = await response.json();
+            showToast(error.error || 'Failed to update profile', 'error');
+        }
+    } catch (error) {
+        console.error('Error updating profile:', error);
+        showToast('Error updating profile', 'error');
+    } finally {
+        const saveBtn = document.getElementById('saveProfileBtn');
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<span class="mdi mdi-content-save"></span> Save Profile';
+    }
+}
+
+async function changePassword() {
+    const currentPassword = document.getElementById('currentPassword').value;
+    const newPassword = document.getElementById('newPassword').value;
+    const confirmPassword = document.getElementById('confirmPassword').value;
+    
+    // Validation
+    if (!currentPassword) {
+        showToast('Current password is required', 'error');
+        return;
+    }
+    
+    if (!newPassword) {
+        showToast('New password is required', 'error');
+        return;
+    }
+    
+    if (newPassword.length < 8) {
+        showToast('New password must be at least 8 characters', 'error');
+        return;
+    }
+    
+    if (newPassword !== confirmPassword) {
+        showToast('New passwords do not match', 'error');
+        return;
+    }
+    
+    const passwordData = {
+        current_password: currentPassword,
+        new_password: newPassword
+    };
+    
+    try {
+        const changeBtn = document.getElementById('changePasswordBtn');
+        changeBtn.disabled = true;
+        changeBtn.innerHTML = '<span class="mdi mdi-loading mdi-spin"></span> Changing...';
+        
+        const response = await makeAuthenticatedRequest('/api/v1/users/password', {
+            method: 'PUT',
+            body: JSON.stringify(passwordData)
+        });
+        
+        if (response && response.ok) {
+            const result = await response.json();
+            showToast(result.message || 'Password changed successfully!');
+            
+            // Clear password fields
+            document.getElementById('currentPassword').value = '';
+            document.getElementById('newPassword').value = '';
+            document.getElementById('confirmPassword').value = '';
+        } else {
+            const error = await response.json();
+            showToast(error.error || 'Failed to change password', 'error');
+        }
+    } catch (error) {
+        console.error('Error changing password:', error);
+        showToast('Error changing password', 'error');
+    } finally {
+        const changeBtn = document.getElementById('changePasswordBtn');
+        changeBtn.disabled = false;
+        changeBtn.innerHTML = '<span class="mdi mdi-lock-check"></span> Change Password';
+    }
 }
 
 // Global functions for modal opening (called from HTML)

@@ -468,6 +468,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and(with_db(db_pool.clone()))
         .and_then(handlers::login_user);
 
+    // User profile API routes (authenticated)
+    let get_current_user = warp::path("api")
+        .and(warp::path("v1"))
+        .and(warp::path("users"))
+        .and(warp::path("self"))
+        .and(warp::get())
+        .and(with_current_user(db_pool.clone()))
+        .and(with_db(db_pool.clone()))
+        .and_then(handlers::get_current_user);
+
+    let update_current_user = warp::path("api")
+        .and(warp::path("v1"))
+        .and(warp::path("users"))
+        .and(warp::path("self"))
+        .and(warp::put())
+        .and(warp::body::json())
+        .and(with_current_user(db_pool.clone()))
+        .and(with_db(db_pool.clone()))
+        .and_then(handlers::update_current_user);
+
+    let change_password = warp::path("api")
+        .and(warp::path("v1"))
+        .and(warp::path("users"))
+        .and(warp::path("password"))
+        .and(warp::put())
+        .and(warp::body::json())
+        .and(with_current_user(db_pool.clone()))
+        .and(with_db(db_pool.clone()))
+        .and_then(handlers::change_password);
+
     // Humidor API routes (authenticated)
     let get_humidors = warp::path("api")
         .and(warp::path("v1"))
@@ -555,6 +585,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .or(get_setup_status)
         .or(create_setup_user)
         .or(login_user)
+        .or(get_current_user)
+        .or(update_current_user)
+        .or(change_password)
         .or(get_humidors)
         .or(get_humidor_cigars)  // Must come before get_humidor (more specific route)
         .or(create_humidor)
@@ -572,6 +605,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and(warp::get())
         .and_then(serve_setup);
 
+    // Login route
+    let login = warp::path("login.html")
+        .and(warp::get())
+        .and_then(serve_login);
+
     let cors = warp::cors()
         .allow_any_origin()
         .allow_headers(vec!["content-type", "authorization"])
@@ -579,6 +617,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let routes = root
         .or(setup)
+        .or(login)
         .or(static_files)
         .or(api)
         .recover(handle_rejection)
@@ -661,6 +700,16 @@ async fn serve_setup() -> Result<impl Reply, warp::Rejection> {
         Ok(content) => Ok(warp::reply::html(content).into_response()),
         Err(_) => Ok(warp::reply::with_status(
             warp::reply::html("<h1>Setup Not Found</h1>".to_string()),
+            warp::http::StatusCode::NOT_FOUND,
+        ).into_response()),
+    }
+}
+
+async fn serve_login() -> Result<impl Reply, warp::Rejection> {
+    match tokio::fs::read_to_string("static/login.html").await {
+        Ok(content) => Ok(warp::reply::html(content).into_response()),
+        Err(_) => Ok(warp::reply::with_status(
+            warp::reply::html("<h1>Login Not Found</h1>".to_string()),
             warp::http::StatusCode::NOT_FOUND,
         ).into_response()),
     }

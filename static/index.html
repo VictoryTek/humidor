@@ -133,6 +133,10 @@
                                 </div>
                             </div>
                             <div class="user-dropdown-divider"></div>
+                            <a href="#" class="user-dropdown-item" data-page="profile">
+                                <span class="dropdown-item-icon">⚙️</span>
+                                <span>Account Settings</span>
+                            </a>
                             <button class="user-dropdown-item logout-item" id="logoutBtn" type="button">
                                 <span class="dropdown-item-icon">🚪</span>
                                 <span>Logout</span>
@@ -373,6 +377,63 @@
                         <div class="empty-icon">⭕</div>
                         <h3>No ring gauges found</h3>
                         <p>Create ring gauge entries to organize your cigar collection!</p>
+                    </div>
+                </div>
+
+                <!-- Profile/Account Settings Section -->
+                <div class="profile-section" id="profileSection" style="display: none;">
+                    <div class="content-header">
+                        <h1 class="page-title">Account Settings</h1>
+                    </div>
+
+                    <div class="settings-container">
+                        <!-- Profile Information Section -->
+                        <div class="settings-section">
+                            <h3 class="section-title">
+                                <span class="mdi mdi-account"></span>
+                                Profile Information
+                            </h3>
+                            <div class="form-group">
+                                <label for="profileUsername">Username</label>
+                                <input type="text" id="profileUsername" placeholder="Enter username">
+                            </div>
+                            <div class="form-group">
+                                <label for="profileEmail">Email</label>
+                                <input type="email" id="profileEmail" placeholder="Enter email">
+                            </div>
+                            <div class="form-group">
+                                <label for="profileFullName">Full Name</label>
+                                <input type="text" id="profileFullName" placeholder="Enter full name">
+                            </div>
+                            <button class="btn btn-primary" id="saveProfileBtn">
+                                <span class="mdi mdi-content-save"></span>
+                                Save Profile
+                            </button>
+                        </div>
+
+                        <!-- Password Change Section -->
+                        <div class="settings-section">
+                            <h3 class="section-title">
+                                <span class="mdi mdi-lock-reset"></span>
+                                Change Password
+                            </h3>
+                            <div class="form-group">
+                                <label for="currentPassword">Current Password</label>
+                                <input type="password" id="currentPassword" placeholder="Enter current password">
+                            </div>
+                            <div class="form-group">
+                                <label for="newPassword">New Password</label>
+                                <input type="password" id="newPassword" placeholder="Enter new password">
+                            </div>
+                            <div class="form-group">
+                                <label for="confirmPassword">Confirm New Password</label>
+                                <input type="password" id="confirmPassword" placeholder="Confirm new password">
+                            </div>
+                            <button class="btn btn-primary" id="changePasswordBtn">
+                                <span class="mdi mdi-lock-check"></span>
+                                Change Password
+                            </button>
+                        </div>
                     </div>
                 </div>
 

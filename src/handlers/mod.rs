@@ -8,6 +8,7 @@ pub mod strengths;
 pub mod ring_gauges;
 
 // Re-export handler functions with specific names to avoid conflicts
+pub use auth::{get_setup_status, create_setup_user, login_user, get_current_user, update_current_user, change_password};
 pub use cigars::{get_cigars, get_cigar, create_cigar, update_cigar, delete_cigar, scrape_cigar_url};
 
 pub use brands::{
@@ -52,10 +53,4 @@ pub use humidors::{
     update_humidor,
     delete_humidor,
     get_humidor_cigars
-};
-
-pub use auth::{
-    get_setup_status,
-    create_setup_user,
-    login_user
 };

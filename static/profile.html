@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account Settings - Humidor</title>
+    <link rel="icon" type="image/png" href="static/logo.png">
+    <link rel="shortcut icon" type="image/png" href="static/logo.png">
+    <link rel="apple-touch-icon" href="static/logo.png">
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css">
+</head>
+<body>
+    <div id="app">
+        <aside class="sidebar">
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <h3 class="nav-section-title">Collections</h3>
+                    <a href="/" class="nav-item">
+                        <div class="nav-content">
+                            <span class="nav-icon mdi mdi-treasure-chest-outline"></span>
+                            Humidors
+                        </div>
+                    </a>
+                    <a href="/" class="nav-item">
+                        <div class="nav-content">
+                            <span class="nav-icon mdi mdi-heart-outline"></span>
+                            Favorites
+                        </div>
+                    </a>
+                </div>
+                
+                <div class="nav-section">
+                    <div class="nav-dropdown">
+                        <button class="nav-dropdown-toggle" id="organizersToggle">
+                            <div class="nav-content">
+                                <span class="nav-icon mdi mdi-file-cabinet"></span>
+                                Organizers
+                            </div>
+                            <span class="dropdown-arrow mdi mdi-chevron-down"></span>
+                        </button>
+                        <div class="nav-dropdown-content" id="organizersDropdown">
+                            <a href="/" class="nav-item">
+                                <div class="nav-content">
+                                    <span class="nav-icon mdi mdi-tag-outline"></span>
+                                    Brand
+                                </div>
+                            </a>
+                            <a href="/" class="nav-item">
+                                <div class="nav-content">
+                                    <span class="nav-icon mdi mdi-ruler"></span>
+                                    Size
+                                </div>
+                            </a>
+                            <a href="/" class="nav-item">
+                                <div class="nav-content">
+                                    <span class="nav-icon mdi mdi-map-marker-outline"></span>
+                                    Origin
+                                </div>
+                            </a>
+                            <a href="/" class="nav-item">
+                                <div class="nav-content">
+                                    <span class="nav-icon mdi mdi-chart-line"></span>
+                                    Strength
+                                </div>
+                            </a>
+                            <a href="/" class="nav-item">
+                                <div class="nav-content">
+                                    <span class="nav-icon mdi mdi-circle-outline"></span>
+                                    Ring Gauge
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="nav-section">
+                    <a href="/" class="nav-item">
+                        <div class="nav-content">
+                            <span class="nav-icon mdi mdi-book-edit-outline"></span>
+                            Wish List
+                        </div>
+                    </a>
+                </div>
+                
+                <!-- Settings at bottom -->
+                <div class="nav-section nav-section-bottom">
+                    <a href="/static/profile.html" class="nav-item active">
+                        <div class="nav-content">
+                            <span class="nav-icon mdi mdi-account-cog"></span>
+                            Account Settings
+                        </div>
+                    </a>
+                    
+                    <!-- Action Button -->
+                    <button class="nav-action-btn" id="addCigarBtnNav">
+                        <span class="add-icon">+</span>
+                        <span>CIGAR</span>
+                    </button>
+                </div>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header class="page-header">
+                <div class="header-left">
+                    <div class="app-logo">
+                        <img src="/static/logo.png" alt="" class="logo-icon">
+                        <span class="logo-text">Humidor</span>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <div class="user-info" id="userInfo">
+                        <button class="user-menu-trigger" id="userMenuTrigger" type="button">
+                            <div class="user-avatar">
+                                <span class="user-avatar-text" id="userAvatar"></span>
+                            </div>
+                            <span class="user-name" id="userName"></span>
+                            <span class="user-dropdown-arrow">▼</span>
+                        </button>
+                        <div class="user-dropdown-menu" id="userDropdownMenu">
+                            <div class="user-dropdown-header">
+                                <div class="user-dropdown-avatar">
+                                    <span class="user-dropdown-avatar-text" id="userDropdownAvatar"></span>
+                                </div>
+                                <div class="user-dropdown-info">
+                                    <div class="user-dropdown-name" id="userDropdownName"></div>
+                                    <div class="user-dropdown-username" id="userDropdownUsername"></div>
+                                </div>
+                            </div>
+                            <div class="user-dropdown-divider"></div>
+                            <a href="/static/profile.html" class="user-dropdown-item">
+                                <span class="dropdown-item-icon">⚙️</span>
+                                <span>Account Settings</span>
+                            </a>
+                            <button class="user-dropdown-item logout-item" id="logoutBtn" type="button">
+                                <span class="dropdown-item-icon">🚪</span>
+                                <span>Logout</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="page-content">
+                <div class="content-header">
+                    <h1 class="page-title">Account Settings</h1>
+                </div>
+
+                <div class="settings-container">
+                    <!-- Profile Information Section -->
+                    <div class="settings-section">
+                        <h3 class="section-title">
+                            <span class="mdi mdi-account"></span>
+                            Profile Information
+                        </h3>
+                        <div class="form-group">
+                            <label for="profileUsername">Username</label>
+                            <input type="text" id="profileUsername" placeholder="Enter username">
+                        </div>
+                        <div class="form-group">
+                            <label for="profileEmail">Email</label>
+                            <input type="email" id="profileEmail" placeholder="Enter email">
+                        </div>
+                        <div class="form-group">
+                            <label for="profileFullName">Full Name</label>
+                            <input type="text" id="profileFullName" placeholder="Enter full name">
+                        </div>
+                        <button class="btn btn-primary" id="saveProfileBtn">
+                            <span class="mdi mdi-content-save"></span>
+                            Save Profile
+                        </button>
+                    </div>
+
+                    <!-- Password Change Section -->
+                    <div class="settings-section">
+                        <h3 class="section-title">
+                            <span class="mdi mdi-lock-reset"></span>
+                            Change Password
+                        </h3>
+                        <div class="form-group">
+                            <label for="currentPassword">Current Password</label>
+                            <input type="password" id="currentPassword" placeholder="Enter current password">
+                        </div>
+                        <div class="form-group">
+                            <label for="newPassword">New Password</label>
+                            <input type="password" id="newPassword" placeholder="Enter new password">
+                        </div>
+                        <div class="form-group">
+                            <label for="confirmPassword">Confirm New Password</label>
+                            <input type="password" id="confirmPassword" placeholder="Confirm new password">
+                        </div>
+                        <button class="btn btn-primary" id="changePasswordBtn">
+                            <span class="mdi mdi-lock-check"></span>
+                            Change Password
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <script src="/static/profile.js"></script>
+</body>
+</html>

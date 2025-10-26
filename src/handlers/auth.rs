@@ -377,3 +377,158 @@ pub fn verify_token(token: &str) -> Result<Claims, jsonwebtoken::errors::Error> 
     
     decode::<Claims>(token, &key, &validation).map(|data| data.claims)
 }
+
+// User profile management
+pub async fn get_current_user(
+    auth: crate::middleware::AuthContext,
+    db: DbPool,
+) -> Result<impl Reply, warp::Rejection> {
+    match db.query_one(
+        "SELECT id, username, email, full_name, is_admin, is_active, created_at, updated_at FROM users WHERE id = $1",
+        &[&auth.user_id]
+    ).await {
+        Ok(row) => {
+            let user = UserResponse {
+                id: row.get(0),
+                username: row.get(1),
+                email: row.get(2),
+                full_name: row.get(3),
+                is_admin: row.get(4),
+                is_active: row.get(5),
+                created_at: row.get(6),
+                updated_at: row.get(7),
+            };
+            Ok(warp::reply::json(&user))
+        }
+        Err(e) => {
+            eprintln!("Database error: {}", e);
+            Ok(warp::reply::json(&json!({"error": "Failed to fetch user"})))
+        }
+    }
+}
+
+pub async fn update_current_user(
+    update_req: crate::models::UpdateUserRequest,
+    auth: crate::middleware::AuthContext,
+    db: DbPool,
+) -> Result<impl Reply, warp::Rejection> {
+    let mut updates = Vec::new();
+    let mut values: Vec<String> = Vec::new();
+    let mut param_index = 1;
+
+    if let Some(username) = &update_req.username {
+        updates.push(format!("username = ${}", param_index));
+        values.push(username.clone());
+        param_index += 1;
+    }
+
+    if let Some(email) = &update_req.email {
+        updates.push(format!("email = ${}", param_index));
+        values.push(email.clone());
+        param_index += 1;
+    }
+
+    if let Some(full_name) = &update_req.full_name {
+        updates.push(format!("full_name = ${}", param_index));
+        values.push(full_name.clone());
+        param_index += 1;
+    }
+
+    if updates.is_empty() {
+        return Ok(warp::reply::json(&json!({"message": "No updates provided"})));
+    }
+
+    updates.push(format!("updated_at = ${}", param_index));
+    let now = Utc::now();
+
+    let query = format!(
+        "UPDATE users SET {} WHERE id = ${} RETURNING id, username, email, full_name, is_admin, is_active, created_at, updated_at",
+        updates.join(", "),
+        param_index + 1
+    );
+
+    // Build parameters
+    let mut params: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> = Vec::new();
+    for value in &values {
+        params.push(value);
+    }
+    params.push(&now);
+    params.push(&auth.user_id);
+
+    match db.query_one(&query, &params).await {
+        Ok(row) => {
+            let user = UserResponse {
+                id: row.get(0),
+                username: row.get(1),
+                email: row.get(2),
+                full_name: row.get(3),
+                is_admin: row.get(4),
+                is_active: row.get(5),
+                created_at: row.get(6),
+                updated_at: row.get(7),
+            };
+            Ok(warp::reply::json(&user))
+        }
+        Err(e) => {
+            eprintln!("Database error: {}", e);
+            Ok(warp::reply::json(&json!({"error": "Failed to update user"})))
+        }
+    }
+}
+
+pub async fn change_password(
+    password_req: crate::models::ChangePasswordRequest,
+    auth: crate::middleware::AuthContext,
+    db: DbPool,
+) -> Result<impl Reply, warp::Rejection> {
+    // Get current password hash
+    match db.query_one(
+        "SELECT password_hash FROM users WHERE id = $1",
+        &[&auth.user_id]
+    ).await {
+        Ok(row) => {
+            let current_hash: String = row.get(0);
+            
+            // Verify current password
+            match verify(&password_req.current_password, &current_hash) {
+                Ok(valid) => {
+                    if !valid {
+                        return Ok(warp::reply::json(&json!({"error": "Current password is incorrect"})));
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Password verification error: {}", e);
+                    return Ok(warp::reply::json(&json!({"error": "Password verification failed"})));
+                }
+            }
+
+            // Hash new password
+            let new_hash = match hash(&password_req.new_password, DEFAULT_COST) {
+                Ok(h) => h,
+                Err(e) => {
+                    eprintln!("Password hashing error: {}", e);
+                    return Ok(warp::reply::json(&json!({"error": "Failed to hash new password"})));
+                }
+            };
+
+            // Update password
+            let now = Utc::now();
+            match db.execute(
+                "UPDATE users SET password_hash = $1, updated_at = $2 WHERE id = $3",
+                &[&new_hash, &now, &auth.user_id]
+            ).await {
+                Ok(_) => {
+                    Ok(warp::reply::json(&json!({"message": "Password updated successfully"})))
+                }
+                Err(e) => {
+                    eprintln!("Database error: {}", e);
+                    Ok(warp::reply::json(&json!({"error": "Failed to update password"})))
+                }
+            }
+        }
+        Err(e) => {
+            eprintln!("Database error: {}", e);
+            Ok(warp::reply::json(&json!({"error": "Failed to fetch user"})))
+        }
+    }
+}
