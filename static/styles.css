@@ -998,6 +998,8 @@ body {
     overflow: hidden;
 }
 
+.btn-primary::before,
+.btn-secondary::before,
 .add-btn::before {
     content: '';
     position: absolute;
@@ -1014,6 +1016,8 @@ body {
     transition: left 0.5s ease;
 }
 
+.btn-primary:hover::before,
+.btn-secondary:hover::before,
 .add-btn:hover::before {
     left: 100%;
 }
@@ -1042,19 +1046,23 @@ body {
 }
 
 .btn-secondary {
-    background: var(--surface-color);
-    color: var(--text-secondary);
-    border-color: var(--border-color);
+    background: linear-gradient(135deg, var(--accent-gold), var(--accent-copper));
+    color: var(--primary-dark);
+    border: none;
 }
 
 .btn-secondary:hover {
-    background: var(--primary-light);
-    color: var(--text-primary);
-    border-color: var(--accent-gold);
     transform: translateY(-2px);
     box-shadow: 
-        0 6px 20px rgba(0, 0, 0, 0.3),
-        inset 0 1px 0 rgba(255, 215, 0, 0.1);
+        0 6px 25px rgba(212, 175, 55, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.btn-secondary:active {
+    transform: translateY(0);
+    box-shadow: 
+        0 2px 10px rgba(212, 175, 55, 0.3),
+        inset 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .add-icon {
@@ -1582,8 +1590,8 @@ body {
     font-family: monospace;
     font-size: 1rem;
     letter-spacing: 2px;
-    color: var(--primary-color);
-    background: rgba(212, 175, 55, 0.1);
+    color: #dc3545;
+    background: rgba(220, 53, 69, 0.1);
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
     font-weight: bold;
@@ -1633,6 +1641,45 @@ body {
 /* Humidor Sections */
 .humidor-section {
     margin-bottom: 3rem;
+}
+
+.humidor-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--gold);
+}
+
+.humidor-info {
+    flex: 1;
+}
+
+.humidor-title {
+    color: var(--gold);
+    font-size: 1.75rem;
+    margin: 0 0 0.5rem 0;
+}
+
+.humidor-meta {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.humidor-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-left: 2rem;
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
+}
+
+.humidor-section-header:hover .humidor-actions {
+    opacity: 1;
 }
 
 .humidor-header {
@@ -1815,6 +1862,14 @@ body {
     border-color: var(--accent-gold);
     transform: scale(1.05);
     box-shadow: 0 4px 12px rgba(212, 175, 55, 0.4);
+}
+
+/* Import URL Section */
+.import-url-section {
+    display: flex;
+    justify-content: center;
+    padding: 1rem 2rem;
+    margin-bottom: 1rem;
 }
 
 /* Form */

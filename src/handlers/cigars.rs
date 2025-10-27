@@ -17,7 +17,7 @@ pub async fn get_cigars(
     db: DbPool
 ) -> Result<impl Reply, Rejection> {
     // Build query based on parameters
-    let mut query = String::from("SELECT id, humidor_id, brand, name, size, strength, origin, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge, length, created_at, updated_at FROM cigars");
+    let mut query = String::from("SELECT id, humidor_id, brand, name, size, strength, origin, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge, length, image_url, created_at, updated_at FROM cigars");
     let mut conditions = Vec::new();
     
     // Check for humidor_id filter
@@ -54,8 +54,9 @@ pub async fn get_cigars(
                     quantity: row.get(13),
                     ring_gauge: row.get(14),
                     length: row.get(15),
-                    created_at: row.get(16),
-                    updated_at: row.get(17),
+                    image_url: row.get(16),
+                    created_at: row.get(17),
+                    updated_at: row.get(18),
                 };
                 cigars.push(cigar);
             }
@@ -83,12 +84,12 @@ pub async fn create_cigar(create_cigar: CreateCigar, db: DbPool) -> Result<impl 
     let now = Utc::now();
     
     match db.query_one(
-        "INSERT INTO cigars (id, humidor_id, brand, name, size, strength, origin, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge, length, created_at, updated_at) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) 
-         RETURNING id, humidor_id, brand, name, size, strength, origin, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge, length, created_at, updated_at",
+        "INSERT INTO cigars (id, humidor_id, brand, name, size, strength, origin, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge, length, image_url, created_at, updated_at) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) 
+         RETURNING id, humidor_id, brand, name, size, strength, origin, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge, length, image_url, created_at, updated_at",
         &[&id, &create_cigar.humidor_id, &create_cigar.brand, &create_cigar.name, &create_cigar.size, &create_cigar.strength, &create_cigar.origin, 
           &create_cigar.wrapper, &create_cigar.binder, &create_cigar.filler, &create_cigar.price, &create_cigar.purchase_date, 
-          &create_cigar.notes, &create_cigar.quantity, &create_cigar.ring_gauge, &create_cigar.length, &now, &now]
+          &create_cigar.notes, &create_cigar.quantity, &create_cigar.ring_gauge, &create_cigar.length, &create_cigar.image_url, &now, &now]
     ).await {
         Ok(row) => {
             let cigar = Cigar {
@@ -108,8 +109,9 @@ pub async fn create_cigar(create_cigar: CreateCigar, db: DbPool) -> Result<impl 
                 quantity: row.get(13),
                 ring_gauge: row.get(14),
                 length: row.get(15),
-                created_at: row.get(16),
-                updated_at: row.get(17),
+                image_url: row.get(16),
+                created_at: row.get(17),
+                updated_at: row.get(18),
             };
             Ok(warp::reply::json(&cigar))
         }
@@ -122,7 +124,7 @@ pub async fn create_cigar(create_cigar: CreateCigar, db: DbPool) -> Result<impl 
 
 pub async fn get_cigar(id: Uuid, db: DbPool) -> Result<impl Reply, Rejection> {
     match db.query_one(
-        "SELECT id, humidor_id, brand, name, size, strength, origin, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge, length, created_at, updated_at FROM cigars WHERE id = $1",
+        "SELECT id, humidor_id, brand, name, size, strength, origin, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge, length, image_url, created_at, updated_at FROM cigars WHERE id = $1",
         &[&id]
     ).await {
         Ok(row) => {
@@ -143,8 +145,9 @@ pub async fn get_cigar(id: Uuid, db: DbPool) -> Result<impl Reply, Rejection> {
                 quantity: row.get(13),
                 ring_gauge: row.get(14),
                 length: row.get(15),
-                created_at: row.get(16),
-                updated_at: row.get(17),
+                image_url: row.get(16),
+                created_at: row.get(17),
+                updated_at: row.get(18),
             };
             Ok(warp::reply::json(&cigar))
         }
@@ -178,12 +181,13 @@ pub async fn update_cigar(id: Uuid, update_cigar: UpdateCigar, db: DbPool) -> Re
          quantity = COALESCE($14, quantity),
          ring_gauge = COALESCE($15, ring_gauge),
          length = COALESCE($16, length),
-         updated_at = $17
+         image_url = COALESCE($17, image_url),
+         updated_at = $18
          WHERE id = $1
-         RETURNING id, humidor_id, brand, name, size, strength, origin, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge, length, created_at, updated_at",
+         RETURNING id, humidor_id, brand, name, size, strength, origin, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge, length, image_url, created_at, updated_at",
         &[&id, &update_cigar.humidor_id, &update_cigar.brand, &update_cigar.name, &update_cigar.size, &update_cigar.strength, &update_cigar.origin,
           &update_cigar.wrapper, &update_cigar.binder, &update_cigar.filler, &update_cigar.price, &update_cigar.purchase_date,
-          &update_cigar.notes, &update_cigar.quantity, &update_cigar.ring_gauge, &update_cigar.length, &now]
+          &update_cigar.notes, &update_cigar.quantity, &update_cigar.ring_gauge, &update_cigar.length, &update_cigar.image_url, &now]
     ).await {
         Ok(row) => {
             let cigar = Cigar {
@@ -203,8 +207,9 @@ pub async fn update_cigar(id: Uuid, update_cigar: UpdateCigar, db: DbPool) -> Re
                 quantity: row.get(13),
                 ring_gauge: row.get(14),
                 length: row.get(15),
-                created_at: row.get(16),
-                updated_at: row.get(17),
+                image_url: row.get(16),
+                created_at: row.get(17),
+                updated_at: row.get(18),
             };
             Ok(warp::reply::json(&cigar))
         }

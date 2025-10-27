@@ -89,6 +89,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             quantity INTEGER NOT NULL DEFAULT 1,
             ring_gauge INTEGER,
             length DOUBLE PRECISION,
+            image_url TEXT,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )",

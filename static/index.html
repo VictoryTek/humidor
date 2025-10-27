@@ -617,14 +617,25 @@
             </div>
             
             <div class="import-url-section">
-                <button type="button" class="btn-import-url" id="importFromUrlBtn">
-                    <span class="mdi mdi-link-variant"></span>
-                    Import from URL
+                <button type="button" class="btn-secondary" id="importFromUrlBtn">
+                    🔗 Import from URL
                 </button>
             </div>
             
             <form id="cigarForm" class="cigar-form">
                 <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label for="cigarImageUrl">Image URL</label>
+                        <input type="url" id="cigarImageUrl" name="image_url" placeholder="https://example.com/cigar-image.jpg">
+                        <small class="form-hint">Or upload an image below</small>
+                    </div>
+                    
+                    <div class="form-group full-width">
+                        <label for="cigarImageUpload">Upload Image</label>
+                        <input type="file" id="cigarImageUpload" accept="image/*">
+                        <small class="form-hint">Recommended: JPG or PNG, max 5MB</small>
+                    </div>
+                    
                     <div class="form-group">
                         <label for="cigarHumidor">Humidor *</label>
                         <select id="cigarHumidor" name="humidor_id" required>
@@ -633,33 +644,43 @@
                     </div>
                     
                     <div class="form-group">
-                        <label for="cigarBrand">Brand *</label>
-                        <input type="text" id="cigarBrand" name="brand" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="cigarName">Name *</label>
-                        <input type="text" id="cigarName" name="name" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="cigarSize">Size *</label>
-                        <input type="text" id="cigarSize" name="size" placeholder="e.g., Robusto, Churchill" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="cigarStrength">Strength *</label>
-                        <select id="cigarStrength" name="strength" required>
-                            <option value="">Select strength</option>
-                            <option value="Mild">Mild</option>
-                            <option value="Medium">Medium</option>
-                            <option value="Full">Full</option>
+                        <label for="cigarBrand">Brand</label>
+                        <select id="cigarBrand" name="brand">
+                            <option value="">Select or type brand</option>
                         </select>
                     </div>
                     
                     <div class="form-group">
-                        <label for="cigarOrigin">Origin *</label>
-                        <input type="text" id="cigarOrigin" name="origin" placeholder="e.g., Dominican Republic" required>
+                        <label for="cigarName">Name *</label>
+                        <input type="text" id="cigarName" name="name" required placeholder="Cigar name">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="cigarSize">Size</label>
+                        <select id="cigarSize" name="size">
+                            <option value="">Select size</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="cigarStrength">Strength</label>
+                        <select id="cigarStrength" name="strength">
+                            <option value="">Select strength</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="cigarOrigin">Origin</label>
+                        <select id="cigarOrigin" name="origin">
+                            <option value="">Select origin</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="cigarRingGauge">Ring Gauge</label>
+                        <select id="cigarRingGauge" name="ring_gauge">
+                            <option value="">Select ring gauge</option>
+                        </select>
                     </div>
                     
                     <div class="form-group">

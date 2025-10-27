@@ -1984,6 +1984,9 @@ function openCigarModal(humidorId = null, cigar = null) {
     
     console.log(`✓ Humidor dropdown populated with ${humidors.length} options`);
     
+    // Populate organizer dropdowns
+    populateOrganizerDropdowns();
+    
     if (isEditingCigar) {
         // Populate form with cigar data
         Object.keys(cigar).forEach(key => {
@@ -1991,6 +1994,8 @@ function openCigarModal(humidorId = null, cigar = null) {
             if (input) {
                 if (key === 'purchase_date' && cigar[key]) {
                     input.value = cigar[key].split('T')[0];
+                } else if (key === 'image_url' && cigar[key]) {
+                    input.value = cigar[key];
                 } else {
                     input.value = cigar[key] || '';
                 }
@@ -2004,6 +2009,70 @@ function openCigarModal(humidorId = null, cigar = null) {
     }
     
     modal.classList.add('show');
+}
+
+function populateOrganizerDropdowns() {
+    // Populate Brand dropdown
+    const brandSelect = document.getElementById('cigarBrand');
+    if (brandSelect) {
+        brandSelect.innerHTML = '<option value="">Select or type brand</option>';
+        brands.forEach(brand => {
+            const option = document.createElement('option');
+            option.value = brand.name;
+            option.textContent = brand.name;
+            brandSelect.appendChild(option);
+        });
+        // Make it editable by allowing datalist-style behavior
+        brandSelect.setAttribute('onchange', 'allowCustomBrand(this)');
+    }
+    
+    // Populate Size dropdown
+    const sizeSelect = document.getElementById('cigarSize');
+    if (sizeSelect) {
+        sizeSelect.innerHTML = '<option value="">Select size</option>';
+        sizes.forEach(size => {
+            const option = document.createElement('option');
+            option.value = size.name;
+            option.textContent = size.name;
+            sizeSelect.appendChild(option);
+        });
+    }
+    
+    // Populate Strength dropdown
+    const strengthSelect = document.getElementById('cigarStrength');
+    if (strengthSelect) {
+        strengthSelect.innerHTML = '<option value="">Select strength</option>';
+        strengths.forEach(strength => {
+            const option = document.createElement('option');
+            option.value = strength.name;
+            option.textContent = strength.name;
+            strengthSelect.appendChild(option);
+        });
+    }
+    
+    // Populate Origin dropdown
+    const originSelect = document.getElementById('cigarOrigin');
+    if (originSelect) {
+        originSelect.innerHTML = '<option value="">Select origin</option>';
+        origins.forEach(origin => {
+            const option = document.createElement('option');
+            option.value = origin.name;
+            option.textContent = origin.name;
+            originSelect.appendChild(option);
+        });
+    }
+    
+    // Populate Ring Gauge dropdown
+    const ringGaugeSelect = document.getElementById('cigarRingGauge');
+    if (ringGaugeSelect) {
+        ringGaugeSelect.innerHTML = '<option value="">Select ring gauge</option>';
+        ringGauges.forEach(rg => {
+            const option = document.createElement('option');
+            option.value = rg.gauge;
+            option.textContent = `${rg.gauge}${rg.common_names && rg.common_names.length > 0 ? ' (' + rg.common_names.join(', ') + ')' : ''}`;
+            ringGaugeSelect.appendChild(option);
+        });
+    }
 }
 
 function closeCigarModal() {
@@ -2101,37 +2170,63 @@ function updateHumidor(id, humidorData) {
     }
 }
 
-function deleteHumidor(id) {
+async function deleteHumidor(id) {
     if (!confirm('Are you sure you want to delete this humidor and all its cigars?')) return;
     
-    // Remove cigars from this humidor
-    cigars = cigars.filter(cigar => cigar.humidor_id !== id);
-    
-    // Remove the humidor
-    humidors = humidors.filter(h => h.id !== id);
-    
-    showAppropriateSection();
-    showToast('Humidor deleted successfully!');
+    try {
+        const response = await makeAuthenticatedRequest(`/api/v1/humidors/${id}`, {
+            method: 'DELETE'
+        });
+        
+        if (response) {
+            // Remove cigars from this humidor locally
+            cigars = cigars.filter(cigar => cigar.humidor_id !== id);
+            
+            // Remove the humidor locally
+            humidors = humidors.filter(h => h.id !== id);
+            
+            showAppropriateSection();
+            showToast('Humidor deleted successfully!');
+        } else {
+            throw new Error('Failed to delete humidor');
+        }
+    } catch (error) {
+        console.error('Error deleting humidor:', error);
+        showToast('Failed to delete humidor', 'error');
+    }
 }
 
 async function saveCigar() {
     const form = document.getElementById('cigarForm');
     const formData = new FormData(form);
     
+    // Get image URL from input or handle file upload
+    let imageUrl = formData.get('image_url') || null;
+    const imageFile = document.getElementById('cigarImageUpload').files[0];
+    
+    // If a file was uploaded, we'll need to handle it (TODO: implement backend endpoint for file upload)
+    if (imageFile && !imageUrl) {
+        console.log('Image file selected:', imageFile.name);
+        // For now, we'll just note that a file was selected
+        // In the future, this should upload to the backend or convert to base64
+        showToast('Image upload not yet implemented. Please use Image URL for now.', 'warning');
+    }
+    
     const cigarData = {
         humidor_id: formData.get('humidor_id'),
-        brand: formData.get('brand'),
+        brand: document.getElementById('cigarBrand').value || null,
         name: formData.get('name'),
-        size: formData.get('size') || null,
-        origin: formData.get('origin') || null,
-        strength: formData.get('strength') || null,
-        ring_gauge: formData.get('ring_gauge') ? parseInt(formData.get('ring_gauge')) : null,
+        size: document.getElementById('cigarSize').value || null,
+        origin: document.getElementById('cigarOrigin').value || null,
+        strength: document.getElementById('cigarStrength').value || null,
+        ring_gauge: document.getElementById('cigarRingGauge').value ? parseInt(document.getElementById('cigarRingGauge').value) : null,
         length: formData.get('length') ? parseFloat(formData.get('length')) : null,
         wrapper: formData.get('wrapper') || null,
         quantity: parseInt(formData.get('quantity')) || 1,
         purchase_date: formData.get('purchase_date') || null,
         price: formData.get('price') ? parseFloat(formData.get('price')) : null,
-        notes: formData.get('notes') || null
+        notes: formData.get('notes') || null,
+        image_url: imageUrl
     };
 
     console.log('=== saveCigar() called ===');
