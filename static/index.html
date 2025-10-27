@@ -456,6 +456,21 @@
                     <input type="text" id="brandName" name="name" required placeholder="e.g., Montecristo, Cohiba, Arturo Fuente">
                 </div>
                 
+                <div class="form-group">
+                    <label for="brandCountry">Country of Origin</label>
+                    <input type="text" id="brandCountry" name="country" placeholder="e.g., Cuba, Dominican Republic, Nicaragua">
+                </div>
+                
+                <div class="form-group">
+                    <label for="brandWebsite">Website</label>
+                    <input type="url" id="brandWebsite" name="website" placeholder="https://example.com">
+                </div>
+                
+                <div class="form-group">
+                    <label for="brandDescription">Description</label>
+                    <textarea id="brandDescription" name="description" rows="3" placeholder="Brief description of the brand..."></textarea>
+                </div>
+                
                 <div class="form-actions">
                     <button type="submit" class="btn-primary" id="saveBrandBtn">Save Brand</button>
                 </div>
@@ -477,6 +492,16 @@
                     <input type="text" id="sizeName" name="name" required placeholder="e.g., Robusto, Churchill, Toro">
                 </div>
                 
+                <div class="form-group">
+                    <label for="sizeLength">Length (inches)</label>
+                    <input type="number" id="sizeLength" name="length" step="0.01" min="3" max="12" placeholder="e.g., 5.0, 6.5, 7.0">
+                </div>
+                
+                <div class="form-group">
+                    <label for="sizeDescription">Description</label>
+                    <textarea id="sizeDescription" name="description" rows="3" placeholder="Brief description of the size..."></textarea>
+                </div>
+                
                 <div class="form-actions">
                     <button type="submit" class="btn-primary" id="saveSizeBtn">Save Size</button>
                 </div>
@@ -494,8 +519,14 @@
             
             <form id="originForm" class="organizer-form">
                 <div class="form-group">
-                    <label for="originName">Origin Name *</label>
+                    <label for="originName">Country of Origin *</label>
                     <input type="text" id="originName" name="name" required placeholder="e.g., Cuba, Nicaragua, Dominican Republic">
+                    <small class="form-hint">The country where the cigar is made</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="originDescription">Description</label>
+                    <textarea id="originDescription" name="description" rows="3" placeholder="Brief description of cigars from this origin..."></textarea>
                 </div>
                 
                 <div class="form-actions">
@@ -519,6 +550,24 @@
                     <input type="text" id="strengthName" name="name" required placeholder="e.g., Mild, Medium, Full">
                 </div>
                 
+                <div class="form-group">
+                    <label for="strengthLevel">Strength Level *</label>
+                    <select id="strengthLevel" name="level" required>
+                        <option value="">Select level...</option>
+                        <option value="1">1 - Mild</option>
+                        <option value="2">2 - Medium-Mild</option>
+                        <option value="3">3 - Medium</option>
+                        <option value="4">4 - Medium-Full</option>
+                        <option value="5">5 - Full</option>
+                    </select>
+                    <small class="form-hint">1 = Mildest, 5 = Strongest</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="strengthDescription">Description</label>
+                    <textarea id="strengthDescription" name="description" rows="3" placeholder="Brief description of this strength level..."></textarea>
+                </div>
+                
                 <div class="form-actions">
                     <button type="submit" class="btn-primary" id="saveStrengthBtn">Save Strength</button>
                 </div>
@@ -536,8 +585,20 @@
             
             <form id="ringGaugeForm" class="organizer-form">
                 <div class="form-group">
-                    <label for="ringGaugeName">Ring Gauge Name *</label>
-                    <input type="text" id="ringGaugeName" name="name" required placeholder="e.g., 50, 52, 54">
+                    <label for="ringGaugeNumber">Ring Gauge Number *</label>
+                    <input type="number" id="ringGaugeNumber" name="gauge" required min="20" max="100" placeholder="e.g., 50, 52, 54">
+                    <small class="form-hint">The diameter measurement in 64ths of an inch</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="ringGaugeCommonNames">Common Names</label>
+                    <input type="text" id="ringGaugeCommonNames" name="common_names" placeholder="e.g., Robusto, Rothschild (comma-separated)">
+                    <small class="form-hint">Common cigar sizes that use this ring gauge</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="ringGaugeDescription">Description</label>
+                    <textarea id="ringGaugeDescription" name="description" rows="3" placeholder="Brief description of this ring gauge..."></textarea>
                 </div>
                 
                 <div class="form-actions">

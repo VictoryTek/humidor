@@ -115,7 +115,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "CREATE TABLE IF NOT EXISTS sizes (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             name VARCHAR NOT NULL UNIQUE,
-            length_inches DECIMAL(4,2),
+            length_inches DOUBLE PRECISION,
             ring_gauge INTEGER,
             description TEXT,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -202,6 +202,99 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
              (56, 'Churchill gauge', ARRAY['Churchill', 'Double Corona']),
              (58, 'Thick churchill', ARRAY['Churchill Extra']),
              (60, 'Very thick gauge', ARRAY['Gordo', 'Double Toro'])",
+            &[],
+        ).await?;
+    }
+
+    // Insert common brands if the table is empty
+    let brand_count: i64 = client
+        .query_one("SELECT COUNT(*) FROM brands", &[])
+        .await?
+        .get(0);
+    
+    if brand_count == 0 {
+        client.execute(
+            "INSERT INTO brands (name, description, country) VALUES
+             ('Arturo Fuente', 'Premium Dominican cigars, known for OpusX and Hemingway lines', 'Dominican Republic'),
+             ('Davidoff', 'Luxury Swiss brand with premium tobacco', 'Switzerland'),
+             ('Padron', 'Family-owned Nicaraguan brand known for quality and consistency', 'Nicaragua'),
+             ('Cohiba', 'Iconic Cuban brand, flagship of Habanos', 'Cuba'),
+             ('Montecristo', 'One of the most recognized Cuban brands worldwide', 'Cuba'),
+             ('Romeo y Julieta', 'Classic Cuban brand with wide variety', 'Cuba'),
+             ('Partagas', 'Historic Cuban brand known for full-bodied cigars', 'Cuba'),
+             ('Hoyo de Monterrey', 'Cuban brand known for mild to medium strength', 'Cuba'),
+             ('Oliva', 'Nicaraguan family business with consistent quality', 'Nicaragua'),
+             ('My Father', 'Premium Nicaraguan brand by Jose ''Pepin'' Garcia', 'Nicaragua'),
+             ('Drew Estate', 'Innovative American brand, makers of Liga Privada and Acid', 'United States'),
+             ('Rocky Patel', 'Popular brand with wide range of blends', 'Honduras'),
+             ('Ashton', 'Premium brand with Dominican and Nicaraguan lines', 'United States'),
+             ('Alec Bradley', 'Honduran brand known for Prensado and Black Market', 'Honduras'),
+             ('La Flor Dominicana', 'Dominican brand known for powerful cigars', 'Dominican Republic'),
+             ('Perdomo', 'Nicaraguan brand with extensive aging program', 'Nicaragua'),
+             ('Tatuaje', 'Boutique brand known for Nicaraguan puros', 'Nicaragua'),
+             ('Liga Privada', 'Premium line from Drew Estate', 'United States'),
+             ('Punch', 'Cuban brand known for robust flavors', 'Cuba'),
+             ('H. Upmann', 'Historic Cuban brand dating to 1844', 'Cuba')",
+            &[],
+        ).await?;
+    }
+
+    // Insert common origins if the table is empty
+    let origin_count: i64 = client
+        .query_one("SELECT COUNT(*) FROM origins", &[])
+        .await?
+        .get(0);
+    
+    if origin_count == 0 {
+        client.execute(
+            "INSERT INTO origins (name, country, region, description) VALUES
+             ('Cuba', 'Cuba', NULL, 'Historic birthplace of premium cigars, known for rich flavor profiles'),
+             ('Dominican Republic', 'Dominican Republic', NULL, 'World''s largest cigar producer, known for smooth, mild to medium cigars'),
+             ('Nicaragua', 'Nicaragua', NULL, 'Produces full-bodied, peppery cigars with bold flavors'),
+             ('Honduras', 'Honduras', NULL, 'Known for robust, flavorful cigars with Cuban-seed tobacco'),
+             ('Mexico', 'Mexico', NULL, 'Produces rich, earthy cigars with quality wrapper tobacco'),
+             ('United States', 'United States', NULL, 'Home to premium brands and innovative blends'),
+             ('Ecuador', 'Ecuador', NULL, 'Famous for high-quality Connecticut Shade wrapper tobacco'),
+             ('Brazil', 'Brazil', NULL, 'Known for dark, sweet maduro wrapper leaves'),
+             ('Peru', 'Peru', NULL, 'Emerging origin with quality tobacco production'),
+             ('Costa Rica', 'Costa Rica', NULL, 'Produces mild, smooth cigars with balanced flavor'),
+             ('Panama', 'Panama', NULL, 'Small production of premium boutique cigars'),
+             ('Colombia', 'Colombia', NULL, 'Growing reputation for quality tobacco'),
+             ('Philippines', 'Philippines', NULL, 'Historic cigar production, value-priced offerings'),
+             ('Indonesia', 'Indonesia', NULL, 'Known for Sumatra wrapper tobacco')",
+            &[],
+        ).await?;
+    }
+
+    // Insert common sizes if the table is empty
+    let size_count: i64 = client
+        .query_one("SELECT COUNT(*) FROM sizes", &[])
+        .await?
+        .get(0);
+    
+    if size_count == 0 {
+        client.execute(
+            "INSERT INTO sizes (name, length_inches, ring_gauge, description) VALUES
+             ('Petit Corona', 4.5, 42, 'Small classic size, 30-40 minute smoke'),
+             ('Corona', 5.5, 42, 'Traditional Cuban size, balanced proportions'),
+             ('Corona Gorda', 5.625, 46, 'Larger corona with more body'),
+             ('Petit Robusto', 4.0, 50, 'Short and thick, concentrated flavor'),
+             ('Robusto', 5.0, 50, 'Most popular size, 45-60 minute smoke'),
+             ('Robusto Extra', 5.5, 50, 'Longer robusto for extended enjoyment'),
+             ('Toro', 6.0, 50, 'Popular modern size, well-balanced'),
+             ('Gordo', 6.0, 60, 'Large ring gauge, cooler smoke'),
+             ('Churchill', 7.0, 47, 'Named after Winston Churchill, elegant size'),
+             ('Double Corona', 7.5, 50, 'Large premium size, 90+ minute smoke'),
+             ('Lancero', 7.5, 38, 'Long and thin, concentrated flavors'),
+             ('Panetela', 6.0, 34, 'Slim and elegant, quick smoke'),
+             ('Lonsdale', 6.5, 42, 'Classic thin vitola, refined smoke'),
+             ('Torpedo', 6.125, 52, 'Tapered head, concentrated flavors'),
+             ('Belicoso', 5.0, 52, 'Short pyramid shape with tapered head'),
+             ('Perfecto', 5.0, 48, 'Tapered at both ends, unique experience'),
+             ('Presidente', 8.0, 50, 'Extra-long premium size'),
+             ('Rothschild', 4.5, 50, 'Short robusto, rich and quick'),
+             ('Corona Extra', 5.5, 46, 'Medium size with good balance'),
+             ('Gigante', 9.0, 52, 'Exceptionally large, 2+ hour smoke')",
             &[],
         ).await?;
     }

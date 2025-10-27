@@ -1564,6 +1564,31 @@ body {
     margin: 0;
 }
 
+.organizer-metadata {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    margin: 0.5rem 0 0 0;
+    padding: 0.25rem 0;
+    font-weight: 500;
+}
+
+.organizer-metadata.strength-level {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.strength-meter {
+    font-family: monospace;
+    font-size: 1rem;
+    letter-spacing: 2px;
+    color: var(--primary-color);
+    background: rgba(212, 175, 55, 0.1);
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-weight: bold;
+}
+
 /* Empty State */
 .empty-state {
     text-align: center;
@@ -1873,6 +1898,14 @@ body {
 .form-group textarea {
     resize: vertical;
     min-height: 100px;
+}
+
+.form-hint {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+    font-style: italic;
 }
 
 .form-actions {

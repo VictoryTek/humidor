@@ -773,33 +773,54 @@ function createOrganizerCard(organizer, type) {
             'brands': '🏷️',
             'sizes': '📏',
             'origins': '🌍',
-            'strengths': '💪',
+            'strengths': '', // Will use custom strength meter
             'ringGauges': '⭕'
         };
         return icons[type] || '📋';
     };
 
+    const getStrengthMeter = (level) => {
+        if (!level) return '';
+        const filled = '█';
+        const empty = '░';
+        let meter = '';
+        for (let i = 1; i <= 5; i++) {
+            meter += i <= level ? filled : empty;
+        }
+        return `<span class="strength-meter" title="Level ${level}/5">${meter}</span>`;
+    };
+
     const getDisplayValue = (organizer, type) => {
         switch(type) {
             case 'brands':
-                return organizer.country ? `${organizer.name} (${organizer.country})` : organizer.name;
+                return organizer.name;
             case 'sizes':
-                const details = [];
-                if (organizer.length_inches) details.push(`${organizer.length_inches}"`);
-                if (organizer.ring_gauge) details.push(`RG ${organizer.ring_gauge}`);
-                return details.length ? `${organizer.name} (${details.join(', ')})` : organizer.name;
+                return organizer.name;
             case 'origins':
-                return organizer.region ? `${organizer.name}, ${organizer.region}` : `${organizer.name}, ${organizer.country}`;
+                return organizer.name;
             case 'strengths':
-                return `${organizer.name} (Level ${organizer.level})`;
+                return organizer.name;
             case 'ringGauges':
-                const names = organizer.common_names && organizer.common_names.length > 0 
-                    ? ` (${organizer.common_names.join(', ')})` 
-                    : '';
-                return `${organizer.gauge}${names}`;
+                return `Ring Gauge ${organizer.gauge}`;
             default:
                 return organizer.name || organizer.gauge;
         }
+    };
+
+    const getMetadata = (organizer, type) => {
+        if (type === 'brands' && organizer.country) {
+            return `<p class="organizer-metadata">📍 ${organizer.country}</p>`;
+        }
+        if (type === 'sizes' && organizer.length_inches) {
+            return `<p class="organizer-metadata">${organizer.length_inches}" length</p>`;
+        }
+        if (type === 'strengths' && organizer.level) {
+            return `<p class="organizer-metadata strength-level">${getStrengthMeter(organizer.level)} Level ${organizer.level}/5</p>`;
+        }
+        if (type === 'ringGauges' && organizer.common_names && organizer.common_names.length > 0) {
+            return `<p class="organizer-metadata">Common: ${organizer.common_names.join(', ')}</p>`;
+        }
+        return '';
     };
 
     return `
@@ -812,6 +833,7 @@ function createOrganizerCard(organizer, type) {
                     <button class="action-btn delete-btn" onclick="deleteOrganizer('${organizer.id}', '${type}')" title="Delete">🗑️</button>
                 </div>
             </div>
+            ${getMetadata(organizer, type)}
             ${organizer.description ? `<p class="organizer-description">${organizer.description}</p>` : ''}
         </div>
     `;
@@ -843,10 +865,41 @@ function populateOrganizerForm(type, organizer) {
     const form = document.getElementById(`${type}Form`);
     if (!form || !organizer) return;
 
-    // Only populate the name field (simplified forms)
-    const nameField = form.querySelector('[name="name"]');
-    if (nameField && organizer.name) {
-        nameField.value = organizer.name;
+    // Populate based on type
+    switch(type) {
+        case 'brand':
+            if (organizer.name) form.querySelector('[name="name"]').value = organizer.name;
+            if (organizer.country) form.querySelector('[name="country"]').value = organizer.country;
+            if (organizer.website) form.querySelector('[name="website"]').value = organizer.website;
+            if (organizer.description) form.querySelector('[name="description"]').value = organizer.description;
+            break;
+        case 'size':
+            if (organizer.name) form.querySelector('[name="name"]').value = organizer.name;
+            if (organizer.length_inches) form.querySelector('[name="length"]').value = organizer.length_inches;
+            if (organizer.description) form.querySelector('[name="description"]').value = organizer.description;
+            break;
+        case 'origin':
+            if (organizer.name) form.querySelector('[name="name"]').value = organizer.name;
+            if (organizer.description) form.querySelector('[name="description"]').value = organizer.description;
+            break;
+        case 'strength':
+            if (organizer.name) form.querySelector('[name="name"]').value = organizer.name;
+            if (organizer.level) form.querySelector('[name="level"]').value = organizer.level;
+            if (organizer.description) form.querySelector('[name="description"]').value = organizer.description;
+            break;
+        case 'ringGauge':
+            if (organizer.gauge) form.querySelector('[name="gauge"]').value = organizer.gauge;
+            if (organizer.common_names && organizer.common_names.length > 0) {
+                form.querySelector('[name="common_names"]').value = organizer.common_names.join(', ');
+            }
+            if (organizer.description) form.querySelector('[name="description"]').value = organizer.description;
+            break;
+        default:
+            // Generic: only populate name field
+            const nameField = form.querySelector('[name="name"]');
+            if (nameField && organizer.name) {
+                nameField.value = organizer.name;
+            }
     }
 }
 
@@ -864,31 +917,42 @@ async function saveOrganizer(type) {
     if (!form) return;
     
     const formData = new FormData(form);
-    const data = {
-        name: formData.get('name')
-    };
+    const data = {};
+    
+    // Handle name field for most types
+    if (type !== 'ringGauge' && formData.get('name')) {
+        data.name = formData.get('name');
+    }
     
     // Add additional fields based on type
     switch(type) {
         case 'brand':
+            if (formData.get('country')) data.country = formData.get('country');
+            if (formData.get('website')) data.website = formData.get('website');
             if (formData.get('description')) data.description = formData.get('description');
             break;
         case 'size':
-            if (formData.get('length')) data.length = formData.get('length');
-            if (formData.get('ring_gauge')) data.ring_gauge = formData.get('ring_gauge');
+            if (formData.get('length')) data.length_inches = parseFloat(formData.get('length'));
             if (formData.get('description')) data.description = formData.get('description');
             break;
         case 'origin':
-            if (formData.get('country')) data.country = formData.get('country');
-            if (formData.get('region')) data.region = formData.get('region');
+            // For origins, the country is the same as the name (country of origin)
+            data.country = formData.get('name');
             if (formData.get('description')) data.description = formData.get('description');
             break;
         case 'strength':
-            if (formData.get('level')) data.level = formData.get('level');
+            if (formData.get('level')) data.level = parseInt(formData.get('level'));
             if (formData.get('description')) data.description = formData.get('description');
             break;
         case 'ringGauge':
-            if (formData.get('gauge')) data.gauge = formData.get('gauge');
+            if (formData.get('gauge')) data.gauge = parseInt(formData.get('gauge'));
+            // Parse comma-separated common names into an array
+            if (formData.get('common_names')) {
+                const namesStr = formData.get('common_names').trim();
+                if (namesStr) {
+                    data.common_names = namesStr.split(',').map(n => n.trim()).filter(n => n.length > 0);
+                }
+            }
             if (formData.get('description')) data.description = formData.get('description');
             break;
     }
