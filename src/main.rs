@@ -70,33 +70,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         &[],
     ).await?;
 
-    // Create cigars table (updated with humidor_id)
-    client.execute(
-        "CREATE TABLE IF NOT EXISTS cigars (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            humidor_id UUID REFERENCES humidors(id) ON DELETE SET NULL,
-            brand VARCHAR NOT NULL,
-            name VARCHAR NOT NULL,
-            size VARCHAR NOT NULL,
-            strength VARCHAR NOT NULL,
-            origin VARCHAR NOT NULL,
-            wrapper VARCHAR,
-            binder VARCHAR,
-            filler VARCHAR,
-            price DOUBLE PRECISION,
-            purchase_date TIMESTAMPTZ,
-            notes TEXT,
-            quantity INTEGER NOT NULL DEFAULT 1,
-            ring_gauge INTEGER,
-            length DOUBLE PRECISION,
-            image_url TEXT,
-            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )",
-        &[],
-    ).await?;
-
-    // Create organizer tables
+    // Create organizer tables FIRST (before cigars table that references them)
     // Brands table
     client.execute(
         "CREATE TABLE IF NOT EXISTS brands (
@@ -300,6 +274,39 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ).await?;
     }
 
+    // NOW create cigars table (using foreign keys to organizer tables created above)
+    client.execute(
+        "CREATE TABLE IF NOT EXISTS cigars (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            humidor_id UUID REFERENCES humidors(id) ON DELETE SET NULL,
+            brand_id UUID REFERENCES brands(id) ON DELETE SET NULL,
+            name VARCHAR NOT NULL,
+            size_id UUID REFERENCES sizes(id) ON DELETE SET NULL,
+            strength_id UUID REFERENCES strengths(id) ON DELETE SET NULL,
+            origin_id UUID REFERENCES origins(id) ON DELETE SET NULL,
+            wrapper VARCHAR,
+            binder VARCHAR,
+            filler VARCHAR,
+            price DOUBLE PRECISION,
+            purchase_date TIMESTAMPTZ,
+            notes TEXT,
+            quantity INTEGER NOT NULL DEFAULT 1,
+            ring_gauge_id UUID REFERENCES ring_gauges(id) ON DELETE SET NULL,
+            length DOUBLE PRECISION,
+            image_url TEXT,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )",
+        &[],
+    ).await?;
+    
+    // Create indexes for better query performance
+    client.execute("CREATE INDEX IF NOT EXISTS idx_cigars_brand_id ON cigars(brand_id)", &[]).await?;
+    client.execute("CREATE INDEX IF NOT EXISTS idx_cigars_size_id ON cigars(size_id)", &[]).await?;
+    client.execute("CREATE INDEX IF NOT EXISTS idx_cigars_origin_id ON cigars(origin_id)", &[]).await?;
+    client.execute("CREATE INDEX IF NOT EXISTS idx_cigars_strength_id ON cigars(strength_id)", &[]).await?;
+    client.execute("CREATE INDEX IF NOT EXISTS idx_cigars_ring_gauge_id ON cigars(ring_gauge_id)", &[]).await?;
+
     let db_pool = Arc::new(client);
     
     // Helper function to pass database to handlers
@@ -320,28 +327,44 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let static_files = warp::path("static")
         .and(warp::fs::dir("static"));
 
-    // Cigar API routes
+    // Cigar API routes (authenticated)
     let get_cigars = warp::path("api")
         .and(warp::path("v1"))
         .and(warp::path("cigars"))
+        .and(warp::path::end())
         .and(warp::get())
         .and(warp::query::<std::collections::HashMap<String, String>>())
+        .and(with_current_user(db_pool.clone()))
         .and(with_db(db_pool.clone()))
         .and_then(handlers::get_cigars);
 
     let create_cigar = warp::path("api")
         .and(warp::path("v1"))
         .and(warp::path("cigars"))
+        .and(warp::path::end())
         .and(warp::post())
         .and(warp::body::json())
+        .and(with_current_user(db_pool.clone()))
         .and(with_db(db_pool.clone()))
         .and_then(handlers::create_cigar);
+
+    let scrape_cigar = warp::path("api")
+        .and(warp::path("v1"))
+        .and(warp::path("cigars"))
+        .and(warp::path("scrape"))
+        .and(warp::path::end())
+        .and(warp::post())
+        .and(warp::body::json())
+        .and(with_current_user(db_pool.clone()))
+        .and_then(handlers::scrape_cigar_url);
 
     let get_cigar = warp::path("api")
         .and(warp::path("v1"))
         .and(warp::path("cigars"))
         .and(with_uuid())
+        .and(warp::path::end())
         .and(warp::get())
+        .and(with_current_user(db_pool.clone()))
         .and(with_db(db_pool.clone()))
         .and_then(handlers::get_cigar);
 
@@ -349,8 +372,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and(warp::path("v1"))
         .and(warp::path("cigars"))
         .and(with_uuid())
+        .and(warp::path::end())
         .and(warp::put())
         .and(warp::body::json())
+        .and(with_current_user(db_pool.clone()))
         .and(with_db(db_pool.clone()))
         .and_then(handlers::update_cigar);
 
@@ -358,17 +383,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and(warp::path("v1"))
         .and(warp::path("cigars"))
         .and(with_uuid())
+        .and(warp::path::end())
         .and(warp::delete())
+        .and(with_current_user(db_pool.clone()))
         .and(with_db(db_pool.clone()))
         .and_then(handlers::delete_cigar);
-
-    let scrape_cigar = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("cigars"))
-        .and(warp::path("scrape"))
-        .and(warp::post())
-        .and(warp::body::json())
-        .and_then(handlers::scrape_cigar_url);
 
     // Brand API routes
     let get_brands = warp::path("api")

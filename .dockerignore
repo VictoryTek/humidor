@@ -4,6 +4,9 @@ Dockerfile
 .dockerignore
 README.md
 .git/
+.github/
 .vscode/
 analysis/
 screenshots/
+migrations/
+backups/

@@ -27,6 +27,72 @@ let selectedStrengths = [];
 let selectedRingGauges = [];
 let filteredCigars = [];
 
+// Helper functions to get organizer names from IDs
+function getBrandName(brandId) {
+    if (!brandId) {
+        console.log('getBrandName: brandId is null/undefined');
+        return 'Unknown Brand';
+    }
+    const brand = brands.find(b => b.id === brandId);
+    if (!brand) {
+        console.warn(`getBrandName: No brand found for ID ${brandId}. Available brands:`, brands.length);
+        return 'Unknown Brand';
+    }
+    return brand.name;
+}
+
+function getSizeName(sizeId) {
+    if (!sizeId) {
+        console.log('getSizeName: sizeId is null/undefined');
+        return 'Unknown Size';
+    }
+    const size = sizes.find(s => s.id === sizeId);
+    if (!size) {
+        console.warn(`getSizeName: No size found for ID ${sizeId}. Available sizes:`, sizes.length);
+        return 'Unknown Size';
+    }
+    return size.name;
+}
+
+function getOriginName(originId) {
+    if (!originId) {
+        console.log('getOriginName: originId is null/undefined');
+        return 'Unknown Origin';
+    }
+    const origin = origins.find(o => o.id === originId);
+    if (!origin) {
+        console.warn(`getOriginName: No origin found for ID ${originId}. Available origins:`, origins.length);
+        return 'Unknown Origin';
+    }
+    return origin.name;
+}
+
+function getStrengthName(strengthId) {
+    if (!strengthId) {
+        console.log('getStrengthName: strengthId is null/undefined');
+        return 'Unknown Strength';
+    }
+    const strength = strengths.find(s => s.id === strengthId);
+    if (!strength) {
+        console.warn(`getStrengthName: No strength found for ID ${strengthId}. Available strengths:`, strengths.length);
+        return 'Unknown Strength';
+    }
+    return strength.name;
+}
+
+function getRingGaugeName(ringGaugeId) {
+    if (!ringGaugeId) {
+        console.log('getRingGaugeName: ringGaugeId is null/undefined');
+        return 'N/A';
+    }
+    const ringGauge = ringGauges.find(rg => rg.id === ringGaugeId);
+    if (!ringGauge) {
+        console.warn(`getRingGaugeName: No ring gauge found for ID ${ringGaugeId}. Available ring gauges:`, ringGauges.length);
+        return 'N/A';
+    }
+    return ringGauge.gauge.toString();
+}
+
 // DOM Elements - will be initialized after DOM loads
 let elements = {};
 
@@ -398,7 +464,7 @@ function createCigarCard(cigar) {
         </div>
         <div class="cigar-card-content">
             <div class="cigar-header">
-                <div class="cigar-brand">${cigar.brand}</div>
+                <div class="cigar-brand">${getBrandName(cigar.brand_id)}</div>
                 <div class="cigar-actions">
                     <button class="action-btn edit-btn" onclick="editCigar('${cigar.id}')">✏️</button>
                     <button class="action-btn delete-btn" onclick="deleteCigar('${cigar.id}')">🗑️</button>
@@ -410,15 +476,15 @@ function createCigarCard(cigar) {
             <div class="cigar-details">
                 <div class="detail-item">
                     <div class="detail-label">Size</div>
-                    <div class="detail-value">${cigar.size}</div>
+                    <div class="detail-value">${getSizeName(cigar.size_id)}</div>
                 </div>
                 <div class="detail-item">
                     <div class="detail-label">Strength</div>
-                    <div class="detail-value" style="color: ${getStrengthColor(cigar.strength)}">${cigar.strength}</div>
+                    <div class="detail-value" style="color: ${getStrengthColor(getStrengthName(cigar.strength_id))}">${getStrengthName(cigar.strength_id)}</div>
                 </div>
                 <div class="detail-item">
                     <div class="detail-label">Origin</div>
-                    <div class="detail-value">${cigar.origin}</div>
+                    <div class="detail-value">${getOriginName(cigar.origin_id)}</div>
                 </div>
                 <div class="detail-item">
                     <div class="detail-label">Location</div>
@@ -438,7 +504,7 @@ function createCigarCard(cigar) {
 
 function updateStats() {
     const totalQuantity = cigars.reduce((sum, cigar) => sum + cigar.quantity, 0);
-    const uniqueBrands = new Set(cigars.map(cigar => cigar.brand)).size;
+    const uniqueBrands = new Set(cigars.map(cigar => cigar.brand_id).filter(id => id)).size;
     const totalValue = cigars.reduce((sum, cigar) => {
         const price = parseFloat(cigar.price) || 0;
         return sum + (price * cigar.quantity);
@@ -514,13 +580,13 @@ function filterCigars() {
 
     filteredCigars = cigars.filter(cigar => {
         const matchesSearch = !searchTerm || 
-            cigar.brand.toLowerCase().includes(searchTerm) ||
+            getBrandName(cigar.brand_id).toLowerCase().includes(searchTerm) ||
             cigar.name.toLowerCase().includes(searchTerm) ||
             (cigar.notes && cigar.notes.toLowerCase().includes(searchTerm));
         
-        const matchesBrand = !brandFilter || cigar.brand === brandFilter;
-        const matchesStrength = !strengthFilter || cigar.strength === strengthFilter;
-        const matchesOrigin = !originFilter || cigar.origin === originFilter;
+        const matchesBrand = !brandFilter || cigar.brand_id === brandFilter;
+        const matchesStrength = !strengthFilter || cigar.strength_id === strengthFilter;
+        const matchesOrigin = !originFilter || cigar.origin_id === originFilter;
 
         return matchesSearch && matchesBrand && matchesStrength && matchesOrigin;
     });
@@ -1362,8 +1428,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Initialize the interface
+    // Note: loadHumidors() will call loadOrganizers() internally first
     loadHumidors();
-    loadOrganizers();
 
     // Dropdown functionality
     initializeDropdowns();
@@ -1541,6 +1607,12 @@ async function deleteOrganizer(id, type) {
 async function loadHumidors() {
     try {
         console.log('=== loadHumidors() called ===');
+        
+        // IMPORTANT: Load organizers FIRST before loading cigars
+        console.log('→ Loading organizers first...');
+        await loadOrganizers();
+        console.log('✓ Organizers loaded, proceeding to load humidors');
+        
         const response = await makeAuthenticatedRequest('/api/v1/humidors');
 
         if (response.ok) {
@@ -1561,6 +1633,7 @@ async function loadHumidors() {
                 }
             }
             console.log('✓ Total cigars loaded:', cigars.length, cigars);
+            console.log('✓ Organizers available - brands:', brands.length, 'sizes:', sizes.length, 'origins:', origins.length, 'strengths:', strengths.length, 'ringGauges:', ringGauges.length);
         } else {
             console.error('✗ Failed to load humidors:', response.status, response.statusText);
             humidors = [];
@@ -1879,11 +1952,17 @@ function createHumidorSection(humidor, humidorCigars) {
 }
 
 function createCigarCard(cigar) {
+    // Use helper functions to resolve IDs to names
+    const brandName = getBrandName(cigar.brand_id);
+    const sizeName = getSizeName(cigar.size_id);
+    const originName = getOriginName(cigar.origin_id);
+    const strengthName = getStrengthName(cigar.strength_id);
+    
     return `
         <div class="cigar-card" data-cigar-id="${cigar.id}">
             <div class="cigar-card-header">
                 <div class="cigar-info">
-                    <h4 class="cigar-brand">${cigar.brand}</h4>
+                    <h4 class="cigar-brand">${brandName}</h4>
                     <h3 class="cigar-name">${cigar.name}</h3>
                 </div>
                 <div class="cigar-actions">
@@ -1895,15 +1974,15 @@ function createCigarCard(cigar) {
             <div class="cigar-details">
                 <div class="detail-row">
                     <span class="detail-label">Size:</span>
-                    <span class="detail-value">${cigar.size}</span>
+                    <span class="detail-value">${sizeName}</span>
                 </div>
                 <div class="detail-row">
                     <span class="detail-label">Strength:</span>
-                    <span class="detail-value strength-${cigar.strength?.toLowerCase()}">${cigar.strength}</span>
+                    <span class="detail-value strength-${strengthName.toLowerCase()}">${strengthName}</span>
                 </div>
                 <div class="detail-row">
                     <span class="detail-label">Origin:</span>
-                    <span class="detail-value">${cigar.origin}</span>
+                    <span class="detail-value">${originName}</span>
                 </div>
                 ${cigar.price ? `<div class="detail-row">
                     <span class="detail-label">Price:</span>
@@ -1989,18 +2068,28 @@ function openCigarModal(humidorId = null, cigar = null) {
     
     if (isEditingCigar) {
         // Populate form with cigar data
-        Object.keys(cigar).forEach(key => {
-            const input = document.getElementById(`cigar${key.charAt(0).toUpperCase() + key.slice(1)}`);
-            if (input) {
-                if (key === 'purchase_date' && cigar[key]) {
-                    input.value = cigar[key].split('T')[0];
-                } else if (key === 'image_url' && cigar[key]) {
-                    input.value = cigar[key];
-                } else {
-                    input.value = cigar[key] || '';
-                }
-            }
-        });
+        form.reset();  // Start fresh
+        
+        // Set direct fields
+        document.getElementById('cigarName').value = cigar.name || '';
+        document.getElementById('cigarWrapper').value = cigar.wrapper || '';
+        document.getElementById('cigarQuantity').value = cigar.quantity || 1;
+        document.getElementById('cigarPrice').value = cigar.price || '';
+        document.getElementById('cigarNotes').value = cigar.notes || '';
+        document.getElementById('cigarLength').value = cigar.length || '';
+        document.getElementById('cigarImageUrl').value = cigar.image_url || '';
+        
+        if (cigar.purchase_date) {
+            document.getElementById('cigarPurchaseDate').value = cigar.purchase_date.split('T')[0];
+        }
+        
+        // Set organizer dropdowns using IDs
+        if (cigar.humidor_id) humidorSelect.value = cigar.humidor_id;
+        if (cigar.brand_id) document.getElementById('cigarBrand').value = cigar.brand_id;
+        if (cigar.size_id) document.getElementById('cigarSize').value = cigar.size_id;
+        if (cigar.origin_id) document.getElementById('cigarOrigin').value = cigar.origin_id;
+        if (cigar.strength_id) document.getElementById('cigarStrength').value = cigar.strength_id;
+        if (cigar.ring_gauge_id) document.getElementById('cigarRingGauge').value = cigar.ring_gauge_id;
     } else {
         form.reset();
         if (humidorId) {
@@ -2018,12 +2107,10 @@ function populateOrganizerDropdowns() {
         brandSelect.innerHTML = '<option value="">Select or type brand</option>';
         brands.forEach(brand => {
             const option = document.createElement('option');
-            option.value = brand.name;
+            option.value = brand.id;  // Use ID instead of name
             option.textContent = brand.name;
             brandSelect.appendChild(option);
         });
-        // Make it editable by allowing datalist-style behavior
-        brandSelect.setAttribute('onchange', 'allowCustomBrand(this)');
     }
     
     // Populate Size dropdown
@@ -2032,7 +2119,7 @@ function populateOrganizerDropdowns() {
         sizeSelect.innerHTML = '<option value="">Select size</option>';
         sizes.forEach(size => {
             const option = document.createElement('option');
-            option.value = size.name;
+            option.value = size.id;  // Use ID instead of name
             option.textContent = size.name;
             sizeSelect.appendChild(option);
         });
@@ -2044,7 +2131,7 @@ function populateOrganizerDropdowns() {
         strengthSelect.innerHTML = '<option value="">Select strength</option>';
         strengths.forEach(strength => {
             const option = document.createElement('option');
-            option.value = strength.name;
+            option.value = strength.id;  // Use ID instead of name
             option.textContent = strength.name;
             strengthSelect.appendChild(option);
         });
@@ -2056,7 +2143,7 @@ function populateOrganizerDropdowns() {
         originSelect.innerHTML = '<option value="">Select origin</option>';
         origins.forEach(origin => {
             const option = document.createElement('option');
-            option.value = origin.name;
+            option.value = origin.id;  // Use ID instead of name
             option.textContent = origin.name;
             originSelect.appendChild(option);
         });
@@ -2068,7 +2155,7 @@ function populateOrganizerDropdowns() {
         ringGaugeSelect.innerHTML = '<option value="">Select ring gauge</option>';
         ringGauges.forEach(rg => {
             const option = document.createElement('option');
-            option.value = rg.gauge;
+            option.value = rg.id;  // Use ID instead of gauge number
             option.textContent = `${rg.gauge}${rg.common_names && rg.common_names.length > 0 ? ' (' + rg.common_names.join(', ') + ')' : ''}`;
             ringGaugeSelect.appendChild(option);
         });
@@ -2213,13 +2300,13 @@ async function saveCigar() {
     }
     
     const cigarData = {
-        humidor_id: formData.get('humidor_id'),
-        brand: document.getElementById('cigarBrand').value || null,
+        humidor_id: formData.get('humidor_id') || null,
+        brand_id: document.getElementById('cigarBrand').value || null,
         name: formData.get('name'),
-        size: document.getElementById('cigarSize').value || null,
-        origin: document.getElementById('cigarOrigin').value || null,
-        strength: document.getElementById('cigarStrength').value || null,
-        ring_gauge: document.getElementById('cigarRingGauge').value ? parseInt(document.getElementById('cigarRingGauge').value) : null,
+        size_id: document.getElementById('cigarSize').value || null,
+        origin_id: document.getElementById('cigarOrigin').value || null,
+        strength_id: document.getElementById('cigarStrength').value || null,
+        ring_gauge_id: document.getElementById('cigarRingGauge').value || null,
         length: formData.get('length') ? parseFloat(formData.get('length')) : null,
         wrapper: formData.get('wrapper') || null,
         quantity: parseInt(formData.get('quantity')) || 1,

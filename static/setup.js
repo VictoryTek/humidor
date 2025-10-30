@@ -440,54 +440,87 @@ async function addSampleData(token, humidorId) {
     console.log('Token:', token ? 'Present' : 'Missing');
     console.log('Humidor ID:', humidorId);
     
+    // First, fetch all organizers to get their IDs
+    console.log('Fetching organizers...');
+    let brands, sizes, origins, strengths, ringGauges;
+    
+    try {
+        const [brandsRes, sizesRes, originsRes, strengthsRes, ringGaugesRes] = await Promise.all([
+            fetch('/api/v1/brands'),
+            fetch('/api/v1/sizes'),
+            fetch('/api/v1/origins'),
+            fetch('/api/v1/strengths'),
+            fetch('/api/v1/ring-gauges')
+        ]);
+        
+        brands = await brandsRes.json();
+        sizes = await sizesRes.json();
+        origins = await originsRes.json();
+        strengths = await strengthsRes.json();
+        ringGauges = await ringGaugesRes.json();
+        
+        console.log('✓ Organizers loaded:', { brands: brands.length, sizes: sizes.length, origins: origins.length, strengths: strengths.length, ringGauges: ringGauges.length });
+    } catch (error) {
+        console.error('✗ Failed to load organizers:', error);
+        showToast('Failed to load organizer data for sample cigars', 'error');
+        return;
+    }
+    
+    // Helper functions to find IDs by name
+    const findBrandId = (name) => brands.find(b => b.name === name)?.id;
+    const findSizeId = (name) => sizes.find(s => s.name === name)?.id;
+    const findOriginId = (name) => origins.find(o => o.name === name)?.id;
+    const findStrengthId = (name) => strengths.find(s => s.name === name)?.id;
+    const findRingGaugeId = (gauge) => ringGauges.find(rg => rg.gauge === gauge)?.id;
+    
     const sampleCigars = [
         {
-            brand: 'Montecristo',
+            brand_id: findBrandId('Montecristo'),
             name: 'No. 2',
-            size: 'Torpedo',
-            ring_gauge: 52,
+            size_id: findSizeId('Torpedo'),
+            ring_gauge_id: findRingGaugeId(52),
             length: 6.1,
-            strength: 'Medium',
-            origin: 'Cuba',
+            strength_id: findStrengthId('Medium'),
+            origin_id: findOriginId('Cuba'),
             wrapper: 'Natural',
             price: 15.99,
             quantity: 5,
             humidor_id: humidorId
         },
         {
-            brand: 'Romeo y Julieta',
+            brand_id: findBrandId('Romeo y Julieta'),
             name: 'Churchill',
-            size: 'Churchill',
-            ring_gauge: 47,
+            size_id: findSizeId('Churchill'),
+            ring_gauge_id: findRingGaugeId(56),
             length: 7,
-            strength: 'Medium',
-            origin: 'Cuba',
+            strength_id: findStrengthId('Medium'),
+            origin_id: findOriginId('Cuba'),
             wrapper: 'Natural',
             price: 12.50,
             quantity: 3,
             humidor_id: humidorId
         },
         {
-            brand: 'Cohiba',
+            brand_id: findBrandId('Cohiba'),
             name: 'Robusto',
-            size: 'Robusto',
-            ring_gauge: 50,
+            size_id: findSizeId('Robusto'),
+            ring_gauge_id: findRingGaugeId(50),
             length: 5,
-            strength: 'Full',
-            origin: 'Cuba',
+            strength_id: findStrengthId('Full'),
+            origin_id: findOriginId('Cuba'),
             wrapper: 'Natural',
             price: 22.00,
             quantity: 2,
             humidor_id: humidorId
         },
         {
-            brand: 'Arturo Fuente',
+            brand_id: findBrandId('Arturo Fuente'),
             name: 'Opus X Robusto',
-            size: 'Robusto',
-            ring_gauge: 50,
+            size_id: findSizeId('Robusto'),
+            ring_gauge_id: findRingGaugeId(50),
             length: 5.5,
-            strength: 'Full',
-            origin: 'Dominican Republic',
+            strength_id: findStrengthId('Full'),
+            origin_id: findOriginId('Dominican Republic'),
             wrapper: 'Natural',
             price: 28.00,
             quantity: 1,
@@ -500,7 +533,15 @@ async function addSampleData(token, humidorId) {
     
     for (const cigar of sampleCigars) {
         try {
-            console.log(`Adding sample cigar: ${cigar.brand} ${cigar.name}`);
+            console.log(`Adding sample cigar: ${cigar.name}`);
+            console.log('  Cigar data:', cigar);
+            
+            // Verify all required IDs are present
+            if (!cigar.brand_id) console.warn('  ⚠️ Missing brand_id');
+            if (!cigar.size_id) console.warn('  ⚠️ Missing size_id');
+            if (!cigar.strength_id) console.warn('  ⚠️ Missing strength_id');
+            if (!cigar.origin_id) console.warn('  ⚠️ Missing origin_id');
+            
             const response = await fetch('/api/v1/cigars', {
                 method: 'POST',
                 headers: {

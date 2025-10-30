@@ -25,7 +25,6 @@ WORKDIR /app
 
 COPY --from=builder /app/target/release/humidor ./
 COPY --from=builder /app/static ./static
-COPY --from=builder /app/migrations ./migrations
 
 EXPOSE 3000
 

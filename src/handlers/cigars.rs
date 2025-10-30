@@ -4,7 +4,7 @@ use serde_json::json;
 use uuid::Uuid;
 use warp::{Reply, Rejection};
 
-use crate::{DbPool, models::*, validation::Validate};
+use crate::{DbPool, models::*, validation::Validate, middleware::auth::AuthContext};
 
 #[derive(Debug, Serialize)]
 pub struct CigarResponse {
@@ -14,15 +14,33 @@ pub struct CigarResponse {
 
 pub async fn get_cigars(
     params: std::collections::HashMap<String, String>,
+    _auth: AuthContext,
     db: DbPool
 ) -> Result<impl Reply, Rejection> {
     // Build query based on parameters
-    let mut query = String::from("SELECT id, humidor_id, brand, name, size, strength, origin, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge, length, image_url, created_at, updated_at FROM cigars");
+    let mut query = String::from("SELECT id, humidor_id, brand_id, name, size_id, strength_id, origin_id, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge_id, length, image_url, created_at, updated_at FROM cigars");
     let mut conditions = Vec::new();
     
     // Check for humidor_id filter
     if let Some(humidor_id) = params.get("humidor_id") {
         conditions.push(format!("humidor_id::text = '{}'", humidor_id));
+    }
+    
+    // Check for organizer filters (brand, size, origin, strength, ring_gauge)
+    if let Some(brand_id) = params.get("brand_id") {
+        conditions.push(format!("brand_id::text = '{}'", brand_id));
+    }
+    if let Some(size_id) = params.get("size_id") {
+        conditions.push(format!("size_id::text = '{}'", size_id));
+    }
+    if let Some(origin_id) = params.get("origin_id") {
+        conditions.push(format!("origin_id::text = '{}'", origin_id));
+    }
+    if let Some(strength_id) = params.get("strength_id") {
+        conditions.push(format!("strength_id::text = '{}'", strength_id));
+    }
+    if let Some(ring_gauge_id) = params.get("ring_gauge_id") {
+        conditions.push(format!("ring_gauge_id::text = '{}'", ring_gauge_id));
     }
     
     // Add WHERE clause if there are conditions
@@ -40,11 +58,11 @@ pub async fn get_cigars(
                 let cigar = Cigar {
                     id: row.get(0),
                     humidor_id: row.get(1),
-                    brand: row.get(2),
+                    brand_id: row.get(2),
                     name: row.get(3),
-                    size: row.get(4),
-                    strength: row.get(5),
-                    origin: row.get(6),
+                    size_id: row.get(4),
+                    strength_id: row.get(5),
+                    origin_id: row.get(6),
                     wrapper: row.get(7),
                     binder: row.get(8),
                     filler: row.get(9),
@@ -52,7 +70,7 @@ pub async fn get_cigars(
                     purchase_date: row.get(11),
                     notes: row.get(12),
                     quantity: row.get(13),
-                    ring_gauge: row.get(14),
+                    ring_gauge_id: row.get(14),
                     length: row.get(15),
                     image_url: row.get(16),
                     created_at: row.get(17),
@@ -76,7 +94,7 @@ pub async fn get_cigars(
     }
 }
 
-pub async fn create_cigar(create_cigar: CreateCigar, db: DbPool) -> Result<impl Reply, Rejection> {
+pub async fn create_cigar(create_cigar: CreateCigar, _auth: AuthContext, db: DbPool) -> Result<impl Reply, Rejection> {
     // Validate input
     create_cigar.validate().map_err(warp::reject::custom)?;
     
@@ -84,22 +102,22 @@ pub async fn create_cigar(create_cigar: CreateCigar, db: DbPool) -> Result<impl 
     let now = Utc::now();
     
     match db.query_one(
-        "INSERT INTO cigars (id, humidor_id, brand, name, size, strength, origin, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge, length, image_url, created_at, updated_at) 
+        "INSERT INTO cigars (id, humidor_id, brand_id, name, size_id, strength_id, origin_id, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge_id, length, image_url, created_at, updated_at) 
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) 
-         RETURNING id, humidor_id, brand, name, size, strength, origin, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge, length, image_url, created_at, updated_at",
-        &[&id, &create_cigar.humidor_id, &create_cigar.brand, &create_cigar.name, &create_cigar.size, &create_cigar.strength, &create_cigar.origin, 
+         RETURNING id, humidor_id, brand_id, name, size_id, strength_id, origin_id, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge_id, length, image_url, created_at, updated_at",
+        &[&id, &create_cigar.humidor_id, &create_cigar.brand_id, &create_cigar.name, &create_cigar.size_id, &create_cigar.strength_id, &create_cigar.origin_id, 
           &create_cigar.wrapper, &create_cigar.binder, &create_cigar.filler, &create_cigar.price, &create_cigar.purchase_date, 
-          &create_cigar.notes, &create_cigar.quantity, &create_cigar.ring_gauge, &create_cigar.length, &create_cigar.image_url, &now, &now]
+          &create_cigar.notes, &create_cigar.quantity, &create_cigar.ring_gauge_id, &create_cigar.length, &create_cigar.image_url, &now, &now]
     ).await {
         Ok(row) => {
             let cigar = Cigar {
                 id: row.get(0),
                 humidor_id: row.get(1),
-                brand: row.get(2),
+                brand_id: row.get(2),
                 name: row.get(3),
-                size: row.get(4),
-                strength: row.get(5),
-                origin: row.get(6),
+                size_id: row.get(4),
+                strength_id: row.get(5),
+                origin_id: row.get(6),
                 wrapper: row.get(7),
                 binder: row.get(8),
                 filler: row.get(9),
@@ -107,7 +125,7 @@ pub async fn create_cigar(create_cigar: CreateCigar, db: DbPool) -> Result<impl 
                 purchase_date: row.get(11),
                 notes: row.get(12),
                 quantity: row.get(13),
-                ring_gauge: row.get(14),
+                ring_gauge_id: row.get(14),
                 length: row.get(15),
                 image_url: row.get(16),
                 created_at: row.get(17),
@@ -122,20 +140,20 @@ pub async fn create_cigar(create_cigar: CreateCigar, db: DbPool) -> Result<impl 
     }
 }
 
-pub async fn get_cigar(id: Uuid, db: DbPool) -> Result<impl Reply, Rejection> {
+pub async fn get_cigar(id: Uuid, _auth: AuthContext, db: DbPool) -> Result<impl Reply, Rejection> {
     match db.query_one(
-        "SELECT id, humidor_id, brand, name, size, strength, origin, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge, length, image_url, created_at, updated_at FROM cigars WHERE id = $1",
+        "SELECT id, humidor_id, brand_id, name, size_id, strength_id, origin_id, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge_id, length, image_url, created_at, updated_at FROM cigars WHERE id = $1",
         &[&id]
     ).await {
         Ok(row) => {
             let cigar = Cigar {
                 id: row.get(0),
                 humidor_id: row.get(1),
-                brand: row.get(2),
+                brand_id: row.get(2),
                 name: row.get(3),
-                size: row.get(4),
-                strength: row.get(5),
-                origin: row.get(6),
+                size_id: row.get(4),
+                strength_id: row.get(5),
+                origin_id: row.get(6),
                 wrapper: row.get(7),
                 binder: row.get(8),
                 filler: row.get(9),
@@ -143,7 +161,7 @@ pub async fn get_cigar(id: Uuid, db: DbPool) -> Result<impl Reply, Rejection> {
                 purchase_date: row.get(11),
                 notes: row.get(12),
                 quantity: row.get(13),
-                ring_gauge: row.get(14),
+                ring_gauge_id: row.get(14),
                 length: row.get(15),
                 image_url: row.get(16),
                 created_at: row.get(17),
@@ -158,7 +176,7 @@ pub async fn get_cigar(id: Uuid, db: DbPool) -> Result<impl Reply, Rejection> {
     }
 }
 
-pub async fn update_cigar(id: Uuid, update_cigar: UpdateCigar, db: DbPool) -> Result<impl Reply, Rejection> {
+pub async fn update_cigar(id: Uuid, update_cigar: UpdateCigar, _auth: AuthContext, db: DbPool) -> Result<impl Reply, Rejection> {
     // Validate input
     update_cigar.validate().map_err(warp::reject::custom)?;
     
@@ -167,11 +185,11 @@ pub async fn update_cigar(id: Uuid, update_cigar: UpdateCigar, db: DbPool) -> Re
     match db.query_one(
         "UPDATE cigars SET 
          humidor_id = COALESCE($2, humidor_id),
-         brand = COALESCE($3, brand),
+         brand_id = COALESCE($3, brand_id),
          name = COALESCE($4, name),
-         size = COALESCE($5, size),
-         strength = COALESCE($6, strength),
-         origin = COALESCE($7, origin),
+         size_id = COALESCE($5, size_id),
+         strength_id = COALESCE($6, strength_id),
+         origin_id = COALESCE($7, origin_id),
          wrapper = COALESCE($8, wrapper),
          binder = COALESCE($9, binder),
          filler = COALESCE($10, filler),
@@ -179,25 +197,25 @@ pub async fn update_cigar(id: Uuid, update_cigar: UpdateCigar, db: DbPool) -> Re
          purchase_date = COALESCE($12, purchase_date),
          notes = COALESCE($13, notes),
          quantity = COALESCE($14, quantity),
-         ring_gauge = COALESCE($15, ring_gauge),
+         ring_gauge_id = COALESCE($15, ring_gauge_id),
          length = COALESCE($16, length),
          image_url = COALESCE($17, image_url),
          updated_at = $18
          WHERE id = $1
-         RETURNING id, humidor_id, brand, name, size, strength, origin, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge, length, image_url, created_at, updated_at",
-        &[&id, &update_cigar.humidor_id, &update_cigar.brand, &update_cigar.name, &update_cigar.size, &update_cigar.strength, &update_cigar.origin,
+         RETURNING id, humidor_id, brand_id, name, size_id, strength_id, origin_id, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge_id, length, image_url, created_at, updated_at",
+        &[&id, &update_cigar.humidor_id, &update_cigar.brand_id, &update_cigar.name, &update_cigar.size_id, &update_cigar.strength_id, &update_cigar.origin_id,
           &update_cigar.wrapper, &update_cigar.binder, &update_cigar.filler, &update_cigar.price, &update_cigar.purchase_date,
-          &update_cigar.notes, &update_cigar.quantity, &update_cigar.ring_gauge, &update_cigar.length, &update_cigar.image_url, &now]
+          &update_cigar.notes, &update_cigar.quantity, &update_cigar.ring_gauge_id, &update_cigar.length, &update_cigar.image_url, &now]
     ).await {
         Ok(row) => {
             let cigar = Cigar {
                 id: row.get(0),
                 humidor_id: row.get(1),
-                brand: row.get(2),
+                brand_id: row.get(2),
                 name: row.get(3),
-                size: row.get(4),
-                strength: row.get(5),
-                origin: row.get(6),
+                size_id: row.get(4),
+                strength_id: row.get(5),
+                origin_id: row.get(6),
                 wrapper: row.get(7),
                 binder: row.get(8),
                 filler: row.get(9),
@@ -205,7 +223,7 @@ pub async fn update_cigar(id: Uuid, update_cigar: UpdateCigar, db: DbPool) -> Re
                 purchase_date: row.get(11),
                 notes: row.get(12),
                 quantity: row.get(13),
-                ring_gauge: row.get(14),
+                ring_gauge_id: row.get(14),
                 length: row.get(15),
                 image_url: row.get(16),
                 created_at: row.get(17),
@@ -220,7 +238,7 @@ pub async fn update_cigar(id: Uuid, update_cigar: UpdateCigar, db: DbPool) -> Re
     }
 }
 
-pub async fn delete_cigar(id: Uuid, db: DbPool) -> Result<impl Reply, Rejection> {
+pub async fn delete_cigar(id: Uuid, _auth: AuthContext, db: DbPool) -> Result<impl Reply, Rejection> {
     match db.execute("DELETE FROM cigars WHERE id = $1", &[&id]).await {
         Ok(rows_affected) => {
             if rows_affected > 0 {
@@ -241,7 +259,7 @@ pub struct ScrapeRequest {
     url: String,
 }
 
-pub async fn scrape_cigar_url(body: ScrapeRequest) -> Result<impl Reply, Rejection> {
+pub async fn scrape_cigar_url(body: ScrapeRequest, _auth: AuthContext) -> Result<impl Reply, Rejection> {
     use crate::services::scrape_cigar_url;
     
     match scrape_cigar_url(&body.url).await {

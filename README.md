@@ -46,7 +46,7 @@ name: humidor
 
 services:
   db:
-    image: postgres:15
+    image: postgres:17
     environment:
       POSTGRES_DB: humidor_db
       POSTGRES_USER: humidor_user
