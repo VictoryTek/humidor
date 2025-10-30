@@ -10,3 +10,4 @@ analysis/
 screenshots/
 migrations/
 backups/
+.history/

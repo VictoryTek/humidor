@@ -1973,6 +1973,11 @@ function createCigarCard(cigar) {
             <div class="cigar-card-content">
                 <div class="cigar-card-brand">${brandName}</div>
                 <h3 class="cigar-card-name">${cigar.name}</h3>
+                <div class="cigar-card-quantity" onclick="event.stopPropagation();">
+                    <button class="quantity-btn" onclick="event.stopPropagation(); updateCigarQuantity('${cigar.id}', ${cigar.quantity}, -1)" title="Decrease quantity">−</button>
+                    <span class="quantity-value">${cigar.quantity}</span>
+                    <button class="quantity-btn" onclick="event.stopPropagation(); updateCigarQuantity('${cigar.id}', ${cigar.quantity}, 1)" title="Increase quantity">+</button>
+                </div>
             </div>
         </div>
     `;
@@ -2384,12 +2389,65 @@ function updateCigar(id, cigarData) {
     }
 }
 
-function deleteCigar(id) {
+async function deleteCigar(id) {
     if (!confirm('Are you sure you want to delete this cigar?')) return;
     
-    cigars = cigars.filter(c => c.id !== id);
-    renderHumidorSections();
-    showToast('Cigar deleted successfully!');
+    try {
+        const response = await makeAuthenticatedRequest(`/api/v1/cigars/${id}`, {
+            method: 'DELETE'
+        });
+        
+        if (response && response.ok) {
+            showToast('Cigar deleted successfully!');
+            await loadHumidors();
+        } else {
+            throw new Error('Failed to delete cigar');
+        }
+    } catch (error) {
+        console.error('Error deleting cigar:', error);
+        showToast('Failed to delete cigar', 'error');
+    }
+}
+
+// Quantity update function
+async function updateCigarQuantity(cigarId, currentQuantity, change) {
+    const newQuantity = currentQuantity + change;
+    
+    // Don't allow quantity to go below 0
+    if (newQuantity < 0) {
+        showToast('Quantity cannot be negative', 'error');
+        return;
+    }
+    
+    // If quantity reaches 0, ask if they want to delete the cigar
+    if (newQuantity === 0) {
+        if (confirm('This cigar is out of stock. Would you like to remove it from your humidor?')) {
+            await deleteCigar(cigarId);
+        }
+        return;
+    }
+    
+    try {
+        const response = await makeAuthenticatedRequest(`/api/v1/cigars/${cigarId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ quantity: newQuantity })
+        });
+        
+        if (response && response.ok) {
+            console.log(`✓ Updated quantity for cigar ${cigarId} to ${newQuantity}`);
+            // Reload humidors to refresh the display
+            await loadHumidors();
+            showToast(`Quantity updated to ${newQuantity}`, 'success');
+        } else {
+            throw new Error('Failed to update quantity');
+        }
+    } catch (error) {
+        console.error('Error updating quantity:', error);
+        showToast('Failed to update quantity', 'error');
+    }
 }
 
 // Profile/Account Settings Functions
