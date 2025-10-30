@@ -1954,45 +1954,25 @@ function createHumidorSection(humidor, humidorCigars) {
 function createCigarCard(cigar) {
     // Use helper functions to resolve IDs to names
     const brandName = getBrandName(cigar.brand_id);
-    const sizeName = getSizeName(cigar.size_id);
-    const originName = getOriginName(cigar.origin_id);
-    const strengthName = getStrengthName(cigar.strength_id);
+    
+    // Determine image source or use placeholder
+    const imageHtml = cigar.image_url 
+        ? `<img src="${cigar.image_url}" alt="${cigar.name}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+           <img src="/static/cigar-placeholder.png" alt="Cigar placeholder" style="display: none; width: 100%; height: 100%; object-fit: contain; padding: 2rem;">`
+        : `<img src="/static/cigar-placeholder.png" alt="Cigar placeholder" style="width: 100%; height: 100%; object-fit: contain; padding: 2rem;">`;
     
     return `
-        <div class="cigar-card" data-cigar-id="${cigar.id}">
-            <div class="cigar-card-header">
-                <div class="cigar-info">
-                    <h4 class="cigar-brand">${brandName}</h4>
-                    <h3 class="cigar-name">${cigar.name}</h3>
-                </div>
-                <div class="cigar-actions">
-                    <button class="action-btn edit-btn" onclick="editCigar('${cigar.id}')" title="Edit">✏️</button>
-                    <button class="action-btn delete-btn" onclick="deleteCigar('${cigar.id}')" title="Delete">🗑️</button>
+        <div class="cigar-card" data-cigar-id="${cigar.id}" onclick="editCigar('${cigar.id}')">
+            <div class="cigar-card-image">
+                ${imageHtml}
+                <div class="cigar-card-actions" onclick="event.stopPropagation();">
+                    <button class="action-btn edit-btn" onclick="event.stopPropagation(); editCigar('${cigar.id}')" title="Edit">✏️</button>
+                    <button class="action-btn delete-btn" onclick="event.stopPropagation(); deleteCigar('${cigar.id}')" title="Delete">🗑️</button>
                 </div>
             </div>
-            
-            <div class="cigar-details">
-                <div class="detail-row">
-                    <span class="detail-label">Size:</span>
-                    <span class="detail-value">${sizeName}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Strength:</span>
-                    <span class="detail-value strength-${strengthName.toLowerCase()}">${strengthName}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Origin:</span>
-                    <span class="detail-value">${originName}</span>
-                </div>
-                ${cigar.price ? `<div class="detail-row">
-                    <span class="detail-label">Price:</span>
-                    <span class="detail-value">$${parseFloat(cigar.price).toFixed(2)}</span>
-                </div>` : ''}
-            </div>
-            
-            <div class="cigar-footer">
-                <span class="quantity-badge">${cigar.quantity} ${cigar.quantity === 1 ? 'cigar' : 'cigars'}</span>
-                ${cigar.purchase_date ? `<span class="purchase-date">Purchased: ${new Date(cigar.purchase_date).toLocaleDateString()}</span>` : ''}
+            <div class="cigar-card-content">
+                <div class="cigar-card-brand">${brandName}</div>
+                <h3 class="cigar-card-name">${cigar.name}</h3>
             </div>
         </div>
     `;

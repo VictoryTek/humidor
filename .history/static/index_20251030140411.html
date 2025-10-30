@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Humidor - Premium Cigar Collection Management</title>
+    <link rel="icon" type="image/png" href="static/logo.png">
+    <link rel="shortcut icon" type="image/png" href="static/logo.png">
+    <link rel="apple-touch-icon" href="static/logo.png">
+    <link rel="stylesheet" href="static/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css">
+</head>
+<body>
+    <div id="app">
+        <aside class="sidebar">
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <h3 class="nav-section-title">Collections</h3>
+                    <a href="#" class="nav-item active" data-page="humidors">
+                        <div class="nav-content">
+                            <span class="nav-icon mdi mdi-treasure-chest-outline"></span>
+                            Humidors
+                        </div>
+                    </a>
+                    <a href="#" class="nav-item" data-page="favorites">
+                        <div class="nav-content">
+                            <span class="nav-icon mdi mdi-heart-outline"></span>
+                            Favorites
+                        </div>
+                    </a>
+                    <a href="#" class="nav-item" data-page="wishlist">
+                        <div class="nav-content">
+                            <span class="nav-icon mdi mdi-book-edit-outline"></span>
+                            Wish List
+                        </div>
+                    </a>
+                </div>
+                
+                <div class="nav-section">
+                    <div class="nav-dropdown">
+                        <button class="nav-dropdown-toggle" id="organizersToggle">
+                            <div class="nav-content">
+                                <span class="nav-icon mdi mdi-file-cabinet"></span>
+                                Organizers
+                            </div>
+                            <span class="dropdown-arrow mdi mdi-chevron-down"></span>
+                        </button>
+                        <div class="nav-dropdown-content" id="organizersDropdown">
+                            <a href="#" class="nav-item" data-page="brands">
+                                <div class="nav-content">
+                                    <span class="nav-icon mdi mdi-tag-outline"></span>
+                                    Brand
+                                </div>
+                            </a>
+                            <a href="#" class="nav-item" data-page="sizes">
+                                <div class="nav-content">
+                                    <span class="nav-icon mdi mdi-ruler"></span>
+                                    Size
+                                </div>
+                            </a>
+                            <a href="#" class="nav-item" data-page="origins">
+                                <div class="nav-content">
+                                    <span class="nav-icon mdi mdi-map-marker-outline"></span>
+                                    Origin
+                                </div>
+                            </a>
+                            <a href="#" class="nav-item" data-page="strength">
+                                <div class="nav-content">
+                                    <span class="nav-icon mdi mdi-chart-line"></span>
+                                    Strength
+                                </div>
+                            </a>
+                            <a href="#" class="nav-item" data-page="ring-gauge">
+                                <div class="nav-content">
+                                    <span class="nav-icon mdi mdi-circle-outline"></span>
+                                    Ring Gauge
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Settings at bottom -->
+                <div class="nav-section nav-section-bottom">
+                    <a href="#" class="nav-item" data-page="settings">
+                        <div class="nav-content">
+                            <span class="nav-icon mdi mdi-cog"></span>
+                            Settings
+                        </div>
+                    </a>
+                    
+                    <!-- Action Button -->
+                    <button class="nav-action-btn" id="addCigarBtnNav">
+                        <span class="add-icon">+</span>
+                        <span>CIGAR</span>
+                    </button>
+                </div>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header class="page-header">
+                <div class="header-left">
+                    <div class="app-logo">
+                        <img src="/static/logo.png" alt="" class="logo-icon">
+                        <span class="logo-text">Humidor</span>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <div class="user-info" id="userInfo" style="display: none;">
+                        <button class="user-menu-trigger" id="userMenuTrigger" type="button">
+                            <div class="user-avatar">
+                                <span class="user-avatar-text" id="userAvatar"></span>
+                            </div>
+                            <span class="user-name" id="userName"></span>
+                            <span class="user-dropdown-arrow">▼</span>
+                        </button>
+                        <div class="user-dropdown-menu" id="userDropdownMenu">
+                            <div class="user-dropdown-header">
+                                <div class="user-dropdown-avatar">
+                                    <span class="user-dropdown-avatar-text" id="userDropdownAvatar"></span>
+                                </div>
+                                <div class="user-dropdown-info">
+                                    <div class="user-dropdown-name" id="userDropdownName"></div>
+                                    <div class="user-dropdown-username" id="userDropdownUsername"></div>
+                                </div>
+                            </div>
+                            <div class="user-dropdown-divider"></div>
+                            <a href="#" class="user-dropdown-item" data-page="profile">
+                                <span class="dropdown-item-icon">⚙️</span>
+                                <span>Account Settings</span>
+                            </a>
+                            <button class="user-dropdown-item logout-item" id="logoutBtn" type="button">
+                                <span class="dropdown-item-icon">🚪</span>
+                                <span>Logout</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="page-content">
+                <!-- Humidors Section -->
+                <div class="humidors-section" id="humidorsSection">
+                    <!-- Welcome Message for First Time Users -->
+                    <div class="welcome-section" id="welcomeSection">
+                        <div class="welcome-card">
+                            <div class="welcome-icon">🏠</div>
+                            <h1>Welcome to Your Humidor Collection</h1>
+                            <p>Start by creating your first humidor to organize and track your cigars.</p>
+                            <button class="add-btn welcome-btn" id="createFirstHumidorBtn">
+                                <span class="add-icon">+</span>
+                                Create Your First Humidor
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Main Content (Hidden until humidors exist) -->
+                    <div class="main-content-section" id="mainContentSection" style="display: none;">
+                        <!-- Page Header with Actions -->
+                        <div class="page-actions-header">
+                            <div class="page-title">
+                                <h1>My Humidors</h1>
+                            </div>
+                            <div class="header-actions">
+                                <button class="add-humidor-btn-primary" id="addHumidorBtnHeader">
+                                    <span class="add-icon">+</span>
+                                    <span>HUMIDOR</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Search and Filter Section -->
+                        <div class="cigar-search-section">
+                            <div class="search-bar">
+                                <input type="text" id="cigarSearchInput" placeholder="Search cigars..." class="search-input">
+                                <button class="search-btn" id="cigarSearchBtn">
+                                    <span class="mdi mdi-magnify"></span>
+                                </button>
+                            </div>
+                            <div class="search-filters">
+                                <button class="filter-chip" id="filterBrandChip" data-active="false">
+                                    <span class="mdi mdi-tag-outline"></span>
+                                    <span>Brands</span>
+                                    <span class="filter-badge" id="brandBadge">0</span>
+                                </button>
+                                <button class="filter-chip" id="filterSizeChip" data-active="false">
+                                    <span class="mdi mdi-ruler"></span>
+                                    <span>Sizes</span>
+                                    <span class="filter-badge" id="sizeBadge">0</span>
+                                </button>
+                                <button class="filter-chip" id="filterOriginChip" data-active="false">
+                                    <span class="mdi mdi-map-marker-outline"></span>
+                                    <span>Origins</span>
+                                    <span class="filter-badge" id="originBadge">0</span>
+                                </button>
+                                <button class="filter-chip" id="filterStrengthChip" data-active="false">
+                                    <span class="mdi mdi-chart-line"></span>
+                                    <span>Strengths</span>
+                                    <span class="filter-badge" id="strengthBadge">0</span>
+                                </button>
+                                <button class="filter-chip" id="filterRingGaugeChip" data-active="false">
+                                    <span class="mdi mdi-circle-outline"></span>
+                                    <span>Ring Gauges</span>
+                                    <span class="filter-badge" id="ringGaugeBadge">0</span>
+                                </button>
+                                <button class="filter-chip clear-filters" id="clearFiltersBtn" style="display: none;">
+                                    <span class="mdi mdi-close-circle"></span>
+                                    <span>Clear Filters</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Humidors with Cigars -->
+                        <div class="humidors-container" id="humidorsContainer">
+                            <!-- Humidor sections will be dynamically generated here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Brands Section -->
+                <div class="organizer-section" id="brandsSection" style="display: none;">
+                    <div class="section-header">
+                        <h2>Brand Management</h2>
+                        <button class="add-btn" id="addBrandBtn">
+                            <span class="add-icon">+</span>
+                            Add Brand
+                        </button>
+                    </div>
+                    
+                    <div class="search-section">
+                        <div class="search-bar">
+                            <input type="text" id="brandSearchInput" placeholder="Search brands..." class="search-input">
+                            <button class="search-btn" id="brandSearchBtn">🔍</button>
+                        </div>
+                    </div>
+
+                    <div class="loading" id="brandsLoading" style="display: none;">
+                        <div class="spinner"></div>
+                        <p>Loading brands...</p>
+                    </div>
+                    
+                    <div class="organizers-grid" id="brandsGrid"></div>
+                    
+                    <div class="empty-state" id="brandsEmptyState" style="display: none;">
+                        <div class="empty-icon">🏷️</div>
+                        <h3>No brands found</h3>
+                        <p>Create brand entries to organize your cigar collection!</p>
+                    </div>
+                </div>
+
+                <!-- Sizes Section -->
+                <div class="organizer-section" id="sizesSection" style="display: none;">
+                    <div class="section-header">
+                        <h2>Size Management</h2>
+                        <button class="add-btn" id="addSizeBtn">
+                            <span class="add-icon">+</span>
+                            Add Size
+                        </button>
+                    </div>
+                    
+                    <div class="search-section">
+                        <div class="search-bar">
+                            <input type="text" id="sizeSearchInput" placeholder="Search sizes..." class="search-input">
+                            <button class="search-btn" id="sizeSearchBtn">🔍</button>
+                        </div>
+                    </div>
+
+                    <div class="loading" id="sizesLoading" style="display: none;">
+                        <div class="spinner"></div>
+                        <p>Loading sizes...</p>
+                    </div>
+                    
+                    <div class="organizers-grid" id="sizesGrid"></div>
+                    
+                    <div class="empty-state" id="sizesEmptyState" style="display: none;">
+                        <div class="empty-icon">📏</div>
+                        <h3>No sizes found</h3>
+                        <p>Create size entries to organize your cigar collection!</p>
+                    </div>
+                </div>
+
+                <!-- Origins Section -->
+                <div class="organizer-section" id="originsSection" style="display: none;">
+                    <div class="section-header">
+                        <h2>Origin Management</h2>
+                        <button class="add-btn" id="addOriginBtn">
+                            <span class="add-icon">+</span>
+                            Add Origin
+                        </button>
+                    </div>
+                    
+                    <div class="search-section">
+                        <div class="search-bar">
+                            <input type="text" id="originSearchInput" placeholder="Search origins..." class="search-input">
+                            <button class="search-btn" id="originSearchBtn">🔍</button>
+                        </div>
+                    </div>
+
+                    <div class="loading" id="originsLoading" style="display: none;">
+                        <div class="spinner"></div>
+                        <p>Loading origins...</p>
+                    </div>
+                    
+                    <div class="organizers-grid" id="originsGrid"></div>
+                    
+                    <div class="empty-state" id="originsEmptyState" style="display: none;">
+                        <div class="empty-icon">🌍</div>
+                        <h3>No origins found</h3>
+                        <p>Create origin entries to organize your cigar collection!</p>
+                    </div>
+                </div>
+
+                <!-- Strengths Section -->
+                <div class="organizer-section" id="strengthSection" style="display: none;">
+                    <div class="section-header">
+                        <h2>Strength Management</h2>
+                        <button class="add-btn" id="addStrengthBtn">
+                            <span class="add-icon">+</span>
+                            Add Strength
+                        </button>
+                    </div>
+                    
+                    <div class="search-section">
+                        <div class="search-bar">
+                            <input type="text" id="strengthSearchInput" placeholder="Search strengths..." class="search-input">
+                            <button class="search-btn" id="strengthSearchBtn">🔍</button>
+                        </div>
+                    </div>
+
+                    <div class="loading" id="strengthsLoading" style="display: none;">
+                        <div class="spinner"></div>
+                        <p>Loading strengths...</p>
+                    </div>
+                    
+                    <div class="organizers-grid" id="strengthsGrid"></div>
+                    
+                    <div class="empty-state" id="strengthsEmptyState" style="display: none;">
+                        <div class="empty-icon">💪</div>
+                        <h3>No strengths found</h3>
+                        <p>Create strength entries to organize your cigar collection!</p>
+                    </div>
+                </div>
+
+                <!-- Ring Gauge Section -->
+                <div class="organizer-section" id="ringGaugeSection" style="display: none;">
+                    <div class="section-header">
+                        <h2>Ring Gauge Management</h2>
+                        <button class="add-btn" id="addRingGaugeBtn">
+                            <span class="add-icon">+</span>
+                            Add Ring Gauge
+                        </button>
+                    </div>
+                    
+                    <div class="search-section">
+                        <div class="search-bar">
+                            <input type="text" id="ringGaugeSearchInput" placeholder="Search ring gauges..." class="search-input">
+                            <button class="search-btn" id="ringGaugeSearchBtn">🔍</button>
+                        </div>
+                    </div>
+
+                    <div class="loading" id="ringGaugesLoading" style="display: none;">
+                        <div class="spinner"></div>
+                        <p>Loading ring gauges...</p>
+                    </div>
+                    
+                    <div class="organizers-grid" id="ringGaugesGrid"></div>
+                    
+                    <div class="empty-state" id="ringGaugesEmptyState" style="display: none;">
+                        <div class="empty-icon">⭕</div>
+                        <h3>No ring gauges found</h3>
+                        <p>Create ring gauge entries to organize your cigar collection!</p>
+                    </div>
+                </div>
+
+                <!-- Profile/Account Settings Section -->
+                <div class="profile-section" id="profileSection" style="display: none;">
+                    <div class="content-header">
+                        <h1 class="page-title">Account Settings</h1>
+                    </div>
+
+                    <div class="settings-container">
+                        <!-- Profile Information Section -->
+                        <div class="settings-section">
+                            <h3 class="section-title">
+                                <span class="mdi mdi-account"></span>
+                                Profile Information
+                            </h3>
+                            <div class="form-group">
+                                <label for="profileUsername">Username</label>
+                                <input type="text" id="profileUsername" placeholder="Enter username">
+                            </div>
+                            <div class="form-group">
+                                <label for="profileEmail">Email</label>
+                                <input type="email" id="profileEmail" placeholder="Enter email">
+                            </div>
+                            <div class="form-group">
+                                <label for="profileFullName">Full Name</label>
+                                <input type="text" id="profileFullName" placeholder="Enter full name">
+                            </div>
+                            <button class="btn btn-primary" id="saveProfileBtn">
+                                <span class="mdi mdi-content-save"></span>
+                                Save Profile
+                            </button>
+                        </div>
+
+                        <!-- Password Change Section -->
+                        <div class="settings-section">
+                            <h3 class="section-title">
+                                <span class="mdi mdi-lock-reset"></span>
+                                Change Password
+                            </h3>
+                            <div class="form-group">
+                                <label for="currentPassword">Current Password</label>
+                                <input type="password" id="currentPassword" placeholder="Enter current password">
+                            </div>
+                            <div class="form-group">
+                                <label for="newPassword">New Password</label>
+                                <input type="password" id="newPassword" placeholder="Enter new password">
+                            </div>
+                            <div class="form-group">
+                                <label for="confirmPassword">Confirm New Password</label>
+                                <input type="password" id="confirmPassword" placeholder="Confirm new password">
+                            </div>
+                            <button class="btn btn-primary" id="changePasswordBtn">
+                                <span class="mdi mdi-lock-check"></span>
+                                Change Password
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Other sections will be added here for brands, humidors, etc. -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Brand Modal -->
+    <div class="modal" id="brandModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="brandModalTitle">Add New Brand</h2>
+                <button class="close-btn" id="closeBrandModal">&times;</button>
+            </div>
+            
+            <form id="brandForm" class="organizer-form">
+                <div class="form-group">
+                    <label for="brandName">Brand Name *</label>
+                    <input type="text" id="brandName" name="name" required placeholder="e.g., Montecristo, Cohiba, Arturo Fuente">
+                </div>
+                
+                <div class="form-group">
+                    <label for="brandCountry">Country of Origin</label>
+                    <input type="text" id="brandCountry" name="country" placeholder="e.g., Cuba, Dominican Republic, Nicaragua">
+                </div>
+                
+                <div class="form-group">
+                    <label for="brandWebsite">Website</label>
+                    <input type="url" id="brandWebsite" name="website" placeholder="https://example.com">
+                </div>
+                
+                <div class="form-group">
+                    <label for="brandDescription">Description</label>
+                    <textarea id="brandDescription" name="description" rows="3" placeholder="Brief description of the brand..."></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary" id="saveBrandBtn">Save Brand</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Size Modal -->
+    <div class="modal" id="sizeModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="sizeModalTitle">Add New Size</h2>
+                <button class="close-btn" id="closeSizeModal">&times;</button>
+            </div>
+            
+            <form id="sizeForm" class="organizer-form">
+                <div class="form-group">
+                    <label for="sizeName">Size Name *</label>
+                    <input type="text" id="sizeName" name="name" required placeholder="e.g., Robusto, Churchill, Toro">
+                </div>
+                
+                <div class="form-group">
+                    <label for="sizeLength">Length (inches)</label>
+                    <input type="number" id="sizeLength" name="length" step="0.01" min="3" max="12" placeholder="e.g., 5.0, 6.5, 7.0">
+                </div>
+                
+                <div class="form-group">
+                    <label for="sizeDescription">Description</label>
+                    <textarea id="sizeDescription" name="description" rows="3" placeholder="Brief description of the size..."></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary" id="saveSizeBtn">Save Size</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Origin Modal -->
+    <div class="modal" id="originModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="originModalTitle">Add New Origin</h2>
+                <button class="close-btn" id="closeOriginModal">&times;</button>
+            </div>
+            
+            <form id="originForm" class="organizer-form">
+                <div class="form-group">
+                    <label for="originName">Country of Origin *</label>
+                    <input type="text" id="originName" name="name" required placeholder="e.g., Cuba, Nicaragua, Dominican Republic">
+                    <small class="form-hint">The country where the cigar is made</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="originDescription">Description</label>
+                    <textarea id="originDescription" name="description" rows="3" placeholder="Brief description of cigars from this origin..."></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary" id="saveOriginBtn">Save Origin</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Strength Modal -->
+    <div class="modal" id="strengthModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="strengthModalTitle">Add New Strength</h2>
+                <button class="close-btn" id="closeStrengthModal">&times;</button>
+            </div>
+            
+            <form id="strengthForm" class="organizer-form">
+                <div class="form-group">
+                    <label for="strengthName">Strength Name *</label>
+                    <input type="text" id="strengthName" name="name" required placeholder="e.g., Mild, Medium, Full">
+                </div>
+                
+                <div class="form-group">
+                    <label for="strengthLevel">Strength Level *</label>
+                    <select id="strengthLevel" name="level" required>
+                        <option value="">Select level...</option>
+                        <option value="1">1 - Mild</option>
+                        <option value="2">2 - Medium-Mild</option>
+                        <option value="3">3 - Medium</option>
+                        <option value="4">4 - Medium-Full</option>
+                        <option value="5">5 - Full</option>
+                    </select>
+                    <small class="form-hint">1 = Mildest, 5 = Strongest</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="strengthDescription">Description</label>
+                    <textarea id="strengthDescription" name="description" rows="3" placeholder="Brief description of this strength level..."></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary" id="saveStrengthBtn">Save Strength</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Ring Gauge Modal -->
+    <div class="modal" id="ringGaugeModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="ringGaugeModalTitle">Add New Ring Gauge</h2>
+                <button class="close-btn" id="closeRingGaugeModal">&times;</button>
+            </div>
+            
+            <form id="ringGaugeForm" class="organizer-form">
+                <div class="form-group">
+                    <label for="ringGaugeNumber">Ring Gauge Number *</label>
+                    <input type="number" id="ringGaugeNumber" name="gauge" required min="20" max="100" placeholder="e.g., 50, 52, 54">
+                    <small class="form-hint">The diameter measurement in 64ths of an inch</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="ringGaugeCommonNames">Common Names</label>
+                    <input type="text" id="ringGaugeCommonNames" name="common_names" placeholder="e.g., Robusto, Rothschild (comma-separated)">
+                    <small class="form-hint">Common cigar sizes that use this ring gauge</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="ringGaugeDescription">Description</label>
+                    <textarea id="ringGaugeDescription" name="description" rows="3" placeholder="Brief description of this ring gauge..."></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary" id="saveRingGaugeBtn">Save Ring Gauge</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add/Edit Cigar Modal -->
+    <div class="modal" id="cigarModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="cigarModalTitle">Add New Cigar</h2>
+                <button class="close-btn" id="closeCigarModal">&times;</button>
+            </div>
+            
+            <div class="import-url-section">
+                <button type="button" class="btn-secondary" id="importFromUrlBtn">
+                    🔗 Import from URL
+                </button>
+            </div>
+            
+            <form id="cigarForm" class="cigar-form">
+                <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label for="cigarImageUrl">Image URL</label>
+                        <input type="url" id="cigarImageUrl" name="image_url" placeholder="https://example.com/cigar-image.jpg">
+                        <small class="form-hint">Or upload an image below</small>
+                    </div>
+                    
+                    <div class="form-group full-width">
+                        <label for="cigarImageUpload">Upload Image</label>
+                        <input type="file" id="cigarImageUpload" accept="image/*">
+                        <small class="form-hint">Recommended: JPG or PNG, max 5MB</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="cigarHumidor">Humidor *</label>
+                        <select id="cigarHumidor" name="humidor_id" required>
+                            <option value="">Select Humidor</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="cigarBrand">Brand</label>
+                        <select id="cigarBrand" name="brand">
+                            <option value="">Select or type brand</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="cigarName">Name *</label>
+                        <input type="text" id="cigarName" name="name" required placeholder="Cigar name">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="cigarSize">Size</label>
+                        <select id="cigarSize" name="size">
+                            <option value="">Select size</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="cigarStrength">Strength</label>
+                        <select id="cigarStrength" name="strength">
+                            <option value="">Select strength</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="cigarOrigin">Origin</label>
+                        <select id="cigarOrigin" name="origin">
+                            <option value="">Select origin</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="cigarRingGauge">Ring Gauge</label>
+                        <select id="cigarRingGauge" name="ring_gauge">
+                            <option value="">Select ring gauge</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="cigarWrapper">Wrapper</label>
+                        <input type="text" id="cigarWrapper" name="wrapper" placeholder="e.g., Connecticut">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="cigarPrice">Price</label>
+                        <input type="number" id="cigarPrice" name="price" step="0.01" min="0" placeholder="0.00">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="cigarQuantity">Quantity *</label>
+                        <input type="number" id="cigarQuantity" name="quantity" min="1" value="1" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="cigarPurchaseDate">Purchase Date</label>
+                        <input type="date" id="cigarPurchaseDate" name="purchase_date">
+                    </div>
+                </div>
+                
+                <div class="form-group full-width">
+                    <label for="cigarNotes">Notes</label>
+                    <textarea id="cigarNotes" name="notes" rows="3" placeholder="Tasting notes, pairing suggestions, etc."></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary" id="saveCigarBtn">Save Cigar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Import URL Modal -->
+    <div class="modal" id="importUrlModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Import Cigar from URL</h2>
+                <button class="close-btn" id="closeImportUrlModal">&times;</button>
+            </div>
+            
+            <div class="import-url-content">
+                <p>Enter a product URL from a cigar retailer or review site:</p>
+                <div class="form-group">
+                    <input type="url" id="importUrl" placeholder="https://www.cigaraficionado.com/..." class="url-input">
+                </div>
+                <div id="importStatus" class="import-status"></div>
+                <div class="form-actions">
+                    <button type="button" class="btn-primary" id="startImportBtn">Import</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Humidor Modal -->
+    <div class="modal" id="humidorModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="humidorModalTitle">Add New Humidor</h2>
+                <button class="close-btn" id="closeHumidorModal">&times;</button>
+            </div>
+            
+            <form id="humidorForm" class="organizer-form">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="humidorName">Name *</label>
+                        <input type="text" id="humidorName" name="name" required placeholder="e.g., Desktop Humidor, Travel Case">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="humidorType">Type *</label>
+                        <select id="humidorType" name="type" required>
+                            <option value="">Select Type</option>
+                            <option value="Desktop">Desktop Humidor</option>
+                            <option value="Cabinet">Cabinet Humidor</option>
+                            <option value="Travel">Travel Humidor</option>
+                            <option value="Cooler">Coolerdor</option>
+                            <option value="Tupperware">Tupperdor</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="humidorCapacity">Capacity (cigars) *</label>
+                        <input type="number" id="humidorCapacity" name="capacity" required min="1" placeholder="50">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="humidorLocation">Location</label>
+                        <input type="text" id="humidorLocation" name="location" placeholder="e.g., Office, Living Room">
+                    </div>
+                </div>
+                
+                <div class="form-group full-width">
+                    <label for="humidorDescription">Description</label>
+                    <textarea id="humidorDescription" name="description" rows="3" placeholder="Brand, model, special features, etc."></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary" id="saveHumidorBtn">Create Humidor</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Filter Selection Modal -->
+    <div class="modal" id="filterModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="filterModalTitle">Select Filters</h2>
+                <button class="close-btn" id="closeFilterModal">&times;</button>
+            </div>
+            
+            <div class="filter-modal-body">
+                <div class="filter-search">
+                    <input type="text" id="filterSearchInput" placeholder="Search..." class="search-input">
+                </div>
+                <div class="filter-list" id="filterList">
+                    <!-- Filter items will be dynamically inserted here -->
+                </div>
+                <div class="filter-actions">
+                    <button class="btn-secondary" id="clearFilterSelection">Clear Selection</button>
+                    <button class="btn-primary" id="applyFilterSelection">Apply Filters</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="static/app.js"></script>
+</body>
+</html>
