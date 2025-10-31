@@ -417,6 +417,42 @@ const OrganizerAPI = {
     }
 };
 
+// Favorites API Functions
+const FavoritesAPI = {
+    async getFavorites() {
+        const response = await makeAuthenticatedRequest('/api/v1/favorites', {
+            method: 'GET'
+        });
+        if (!response.ok) throw new Error('Failed to fetch favorites');
+        return response.json();
+    },
+
+    async addFavorite(cigarId) {
+        const response = await makeAuthenticatedRequest('/api/v1/favorites', {
+            method: 'POST',
+            body: JSON.stringify({ cigar_id: cigarId })
+        });
+        if (!response.ok) throw new Error('Failed to add favorite');
+        return response.json();
+    },
+
+    async removeFavorite(cigarId) {
+        const response = await makeAuthenticatedRequest(`/api/v1/favorites/${cigarId}`, {
+            method: 'DELETE'
+        });
+        if (!response.ok) throw new Error('Failed to remove favorite');
+        return response.json();
+    },
+
+    async isFavorite(cigarId) {
+        const response = await makeAuthenticatedRequest(`/api/v1/favorites/${cigarId}/check`, {
+            method: 'GET'
+        });
+        if (!response.ok) throw new Error('Failed to check favorite status');
+        return response.json();
+    }
+};
+
 // Utility Functions
 function showToast(message, type = 'success') {
     const toast = document.createElement('div');
@@ -1504,7 +1540,7 @@ function navigateToPage(page) {
     });
 
     // Hide all sections
-    document.querySelectorAll('.humidors-section, .organizer-section, .profile-section').forEach(section => {
+    document.querySelectorAll('.humidors-section, .organizer-section, .profile-section, .favorites-section').forEach(section => {
         section.style.display = 'none';
     });
 
@@ -1513,6 +1549,10 @@ function navigateToPage(page) {
         case 'humidors':
             document.getElementById('humidorsSection').style.display = 'block';
             loadHumidors();
+            break;
+        case 'favorites':
+            document.getElementById('favoritesSection').style.display = 'block';
+            loadFavorites();
             break;
         case 'brands':
             document.getElementById('brandsSection').style.display = 'block';
@@ -1905,6 +1945,24 @@ function renderHumidorSections() {
     }).join('');
     
     console.log('✓ Humidor sections rendered');
+    
+    // Update favorite icons for all displayed cigars
+    updateAllFavoriteIcons();
+}
+
+async function updateAllFavoriteIcons() {
+    try {
+        const favorites = await FavoritesAPI.getFavorites();
+        const favoriteIds = new Set(favorites.map(fav => fav.id));
+        
+        document.querySelectorAll('.favorite-btn').forEach(btn => {
+            const cigarId = btn.getAttribute('data-cigar-id');
+            const isFavorite = favoriteIds.has(cigarId);
+            updateFavoriteIcon(cigarId, isFavorite);
+        });
+    } catch (error) {
+        console.error('Error updating favorite icons:', error);
+    }
 }
 
 function createHumidorSection(humidor, humidorCigars) {
@@ -1954,6 +2012,9 @@ function createCigarCard(cigar) {
         <div class="cigar-card" data-cigar-id="${cigar.id}" onclick="openReportCard('${cigar.id}')">
             <div class="cigar-card-image">
                 ${imageHtml}
+                <button class="favorite-btn" data-cigar-id="${cigar.id}" onclick="event.stopPropagation(); toggleFavorite('${cigar.id}')" title="Add to favorites">
+                    <span class="favorite-icon">♡</span>
+                </button>
                 <div class="cigar-card-actions" onclick="event.stopPropagation();">
                     <button class="action-btn edit-btn" onclick="editCigar('${cigar.id}')" title="Edit">✏️</button>
                     <button class="action-btn delete-btn" onclick="deleteCigar('${cigar.id}')" title="Delete">🗑️</button>
@@ -2658,6 +2719,121 @@ async function changePassword() {
     }
 }
 
+// Favorites Functions
+async function toggleFavorite(cigarId) {
+    try {
+        const status = await FavoritesAPI.isFavorite(cigarId);
+        
+        if (status.is_favorite) {
+            await FavoritesAPI.removeFavorite(cigarId);
+            showToast('Removed from favorites', 'info');
+        } else {
+            await FavoritesAPI.addFavorite(cigarId);
+            showToast('Added to favorites!', 'success');
+        }
+        
+        // Update heart icon on all cards with this cigar
+        updateFavoriteIcon(cigarId, !status.is_favorite);
+        
+        // Refresh favorites page if it's currently visible
+        const favoritesSection = document.getElementById('favoritesSection');
+        if (favoritesSection.style.display !== 'none') {
+            await loadFavorites();
+        }
+    } catch (error) {
+        console.error('Error toggling favorite:', error);
+        showToast('Failed to update favorite', 'error');
+    }
+}
+
+function updateFavoriteIcon(cigarId, isFavorite) {
+    const buttons = document.querySelectorAll(`.favorite-btn[data-cigar-id="${cigarId}"]`);
+    buttons.forEach(btn => {
+        const icon = btn.querySelector('.favorite-icon');
+        if (isFavorite) {
+            icon.textContent = '♥';
+            btn.classList.add('is-favorite');
+            btn.title = 'Remove from favorites';
+        } else {
+            icon.textContent = '♡';
+            btn.classList.remove('is-favorite');
+            btn.title = 'Add to favorites';
+        }
+    });
+}
+
+async function loadFavorites() {
+    try {
+        const favorites = await FavoritesAPI.getFavorites();
+        const emptyState = document.getElementById('favoritesEmptyState');
+        const favoritesGrid = document.getElementById('favoritesGrid');
+        
+        if (favorites.length === 0) {
+            emptyState.style.display = 'block';
+            favoritesGrid.style.display = 'none';
+        } else {
+            emptyState.style.display = 'none';
+            favoritesGrid.style.display = 'grid';
+            
+            favoritesGrid.innerHTML = favorites.map(cigar => createFavoriteCard(cigar)).join('');
+            
+            // Update favorite icons for all loaded favorites
+            favorites.forEach(cigar => updateFavoriteIcon(cigar.id, true));
+        }
+    } catch (error) {
+        console.error('Error loading favorites:', error);
+        showToast('Failed to load favorites', 'error');
+    }
+}
+
+function createFavoriteCard(cigar) {
+    const brandName = getBrandName(cigar.brand_id);
+    
+    const imageHtml = cigar.image_url 
+        ? `<img src="${cigar.image_url}" alt="${cigar.name}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+           <img src="/static/cigar-placeholder.png" alt="Cigar placeholder" style="display: none; width: 100%; height: 100%; object-fit: contain; padding: 2rem;">`
+        : `<img src="/static/cigar-placeholder.png" alt="Cigar placeholder" style="width: 100%; height: 100%; object-fit: contain; padding: 2rem;">`;
+    
+    return `
+        <div class="cigar-card" data-cigar-id="${cigar.id}" onclick="openReportCard('${cigar.id}')">
+            <div class="cigar-card-image">
+                ${imageHtml}
+                <button class="favorite-btn is-favorite" data-cigar-id="${cigar.id}" onclick="event.stopPropagation(); toggleFavorite('${cigar.id}')" title="Remove from favorites">
+                    <span class="favorite-icon">♥</span>
+                </button>
+                <div class="cigar-card-actions" onclick="event.stopPropagation();">
+                    <button class="action-btn delete-btn" onclick="removeFavorite('${cigar.id}')" title="Remove from favorites">🗑️</button>
+                </div>
+            </div>
+            <div class="cigar-card-content">
+                <div class="cigar-card-brand">${brandName}</div>
+                <h3 class="cigar-card-name">${cigar.name}</h3>
+                <div class="cigar-card-info">
+                    <span class="info-badge">Favorite</span>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+async function removeFavorite(cigarId) {
+    if (!confirm('Remove this cigar from your favorites?')) return;
+    
+    try {
+        await FavoritesAPI.removeFavorite(cigarId);
+        showToast('Removed from favorites', 'info');
+        
+        // Update heart icons on all cards
+        updateFavoriteIcon(cigarId, false);
+        
+        // Reload favorites page
+        await loadFavorites();
+    } catch (error) {
+        console.error('Error removing favorite:', error);
+        showToast('Failed to remove favorite', 'error');
+    }
+}
+
 // Global functions for modal opening (called from HTML)
 function openBrandModal() { openOrganizerModal('brand'); }
 function openSizeModal() { openOrganizerModal('size'); }
@@ -2672,3 +2848,5 @@ window.editHumidor = editHumidor;
 window.deleteHumidor = deleteHumidor;
 window.editCigar = editCigar;
 window.deleteCigar = deleteCigar;
+window.toggleFavorite = toggleFavorite;
+window.removeFavorite = removeFavorite;

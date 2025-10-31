@@ -6,6 +6,7 @@ pub mod sizes;
 pub mod origins;
 pub mod strengths;
 pub mod ring_gauges;
+pub mod favorites;
 
 // Re-export handler functions with specific names to avoid conflicts
 pub use auth::{get_setup_status, create_setup_user, login_user, get_current_user, update_current_user, change_password};
@@ -53,4 +54,11 @@ pub use humidors::{
     update_humidor,
     delete_humidor,
     get_humidor_cigars
+};
+
+pub use favorites::{
+    get_favorites,
+    add_favorite,
+    remove_favorite,
+    is_favorite
 };

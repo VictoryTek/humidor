@@ -307,6 +307,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     client.execute("CREATE INDEX IF NOT EXISTS idx_cigars_strength_id ON cigars(strength_id)", &[]).await?;
     client.execute("CREATE INDEX IF NOT EXISTS idx_cigars_ring_gauge_id ON cigars(ring_gauge_id)", &[]).await?;
 
+    // Create favorites table
+    client.execute(
+        "CREATE TABLE IF NOT EXISTS favorites (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            cigar_id UUID NOT NULL REFERENCES cigars(id) ON DELETE CASCADE,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            UNIQUE(user_id, cigar_id)
+        )",
+        &[],
+    ).await?;
+    
+    client.execute("CREATE INDEX IF NOT EXISTS idx_favorites_user_id ON favorites(user_id)", &[]).await?;
+    client.execute("CREATE INDEX IF NOT EXISTS idx_favorites_cigar_id ON favorites(cigar_id)", &[]).await?;
+
     let db_pool = Arc::new(client);
     
     // Helper function to pass database to handlers
@@ -668,6 +683,47 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and(with_db(db_pool.clone()))
         .and_then(handlers::get_humidor_cigars);
 
+    // Favorites routes
+    let get_favorites = warp::path("api")
+        .and(warp::path("v1"))
+        .and(warp::path("favorites"))
+        .and(warp::path::end())
+        .and(warp::get())
+        .and(with_current_user(db_pool.clone()))
+        .and(with_db(db_pool.clone()))
+        .and_then(handlers::get_favorites);
+
+    let add_favorite = warp::path("api")
+        .and(warp::path("v1"))
+        .and(warp::path("favorites"))
+        .and(warp::path::end())
+        .and(warp::post())
+        .and(warp::body::json())
+        .and(with_current_user(db_pool.clone()))
+        .and(with_db(db_pool.clone()))
+        .and_then(handlers::add_favorite);
+
+    let remove_favorite = warp::path("api")
+        .and(warp::path("v1"))
+        .and(warp::path("favorites"))
+        .and(with_uuid())
+        .and(warp::path::end())
+        .and(warp::delete())
+        .and(with_current_user(db_pool.clone()))
+        .and(with_db(db_pool.clone()))
+        .and_then(handlers::remove_favorite);
+
+    let check_favorite = warp::path("api")
+        .and(warp::path("v1"))
+        .and(warp::path("favorites"))
+        .and(with_uuid())
+        .and(warp::path("check"))
+        .and(warp::path::end())
+        .and(warp::get())
+        .and(with_current_user(db_pool.clone()))
+        .and(with_db(db_pool.clone()))
+        .and_then(handlers::is_favorite);
+
     // Combine all API routes
     let api = scrape_cigar
         .or(create_cigar)
@@ -706,7 +762,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .or(create_humidor)
         .or(update_humidor)
         .or(delete_humidor)
-        .or(get_humidor);  // Less specific, should be last
+        .or(get_humidor)  // Less specific, should be last
+        .or(check_favorite)  // Must come before remove_favorite (more specific route)
+        .or(get_favorites)
+        .or(add_favorite)
+        .or(remove_favorite);
 
     // Root route
     let root = warp::path::end()
