@@ -669,12 +669,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and_then(handlers::get_humidor_cigars);
 
     // Combine all API routes
-    let api = get_cigars
+    let api = scrape_cigar
         .or(create_cigar)
-        .or(get_cigar)
         .or(update_cigar)
         .or(delete_cigar)
-        .or(scrape_cigar)
+        .or(get_cigar)
+        .or(get_cigars)
         .or(get_brands)
         .or(create_brand)
         .or(update_brand)

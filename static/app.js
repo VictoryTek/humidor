@@ -1100,7 +1100,6 @@ async function importFromUrl() {
         if (cigarData.ring_gauge) document.getElementById('cigarRingGauge').value = cigarData.ring_gauge;
         if (cigarData.strength) document.getElementById('cigarStrength').value = cigarData.strength;
         if (cigarData.origin) document.getElementById('cigarOrigin').value = cigarData.origin;
-        if (cigarData.wrapper) document.getElementById('cigarWrapper').value = cigarData.wrapper;
         
         // Show success message
         statusDiv.innerHTML = '<p class="success-message"><i class="mdi mdi-check-circle"></i> Cigar information imported successfully!</p>';
@@ -1221,6 +1220,12 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             saveHumidor();
         });
+    }
+    
+    // Report Card modal events
+    const closeReportCardBtn = document.getElementById('closeReportCardModal');
+    if (closeReportCardBtn) {
+        closeReportCardBtn.addEventListener('click', closeReportCard);
     }
     
     // Import URL modal events
@@ -1946,21 +1951,21 @@ function createCigarCard(cigar) {
         : `<img src="/static/cigar-placeholder.png" alt="Cigar placeholder" style="width: 100%; height: 100%; object-fit: contain; padding: 2rem;">`;
     
     return `
-        <div class="cigar-card" data-cigar-id="${cigar.id}" onclick="editCigar('${cigar.id}')">
+        <div class="cigar-card" data-cigar-id="${cigar.id}" onclick="openReportCard('${cigar.id}')">
             <div class="cigar-card-image">
                 ${imageHtml}
                 <div class="cigar-card-actions" onclick="event.stopPropagation();">
-                    <button class="action-btn edit-btn" onclick="event.stopPropagation(); editCigar('${cigar.id}')" title="Edit">✏️</button>
-                    <button class="action-btn delete-btn" onclick="event.stopPropagation(); deleteCigar('${cigar.id}')" title="Delete">🗑️</button>
+                    <button class="action-btn edit-btn" onclick="editCigar('${cigar.id}')" title="Edit">✏️</button>
+                    <button class="action-btn delete-btn" onclick="deleteCigar('${cigar.id}')" title="Delete">🗑️</button>
                 </div>
             </div>
             <div class="cigar-card-content">
                 <div class="cigar-card-brand">${brandName}</div>
                 <h3 class="cigar-card-name">${cigar.name}</h3>
                 <div class="cigar-card-quantity" onclick="event.stopPropagation();">
-                    <button class="quantity-btn" onclick="event.stopPropagation(); updateCigarQuantity('${cigar.id}', ${cigar.quantity}, -1)" title="Decrease quantity">−</button>
+                    <button class="quantity-btn" onclick="updateCigarQuantity('${cigar.id}', ${cigar.quantity}, -1)" title="Decrease quantity">−</button>
                     <span class="quantity-value">${cigar.quantity}</span>
-                    <button class="quantity-btn" onclick="event.stopPropagation(); updateCigarQuantity('${cigar.id}', ${cigar.quantity}, 1)" title="Increase quantity">+</button>
+                    <button class="quantity-btn" onclick="updateCigarQuantity('${cigar.id}', ${cigar.quantity}, 1)" title="Increase quantity">+</button>
                 </div>
             </div>
         </div>
@@ -1995,6 +2000,66 @@ function closeHumidorModal() {
     modal.classList.remove('show');
     isEditingHumidor = false;
     currentHumidor = null;
+}
+
+// Report Card Modal Functions
+function openReportCard(cigarId) {
+    const cigar = cigars.find(c => c.id === cigarId);
+    if (!cigar) {
+        console.error('Cigar not found:', cigarId);
+        return;
+    }
+    
+    const modal = document.getElementById('reportCardModal');
+    
+    // Set image
+    const image = document.getElementById('reportCardImage');
+    image.src = cigar.image_url || '/static/cigar-placeholder.png';
+    
+    // Set brand and name
+    document.getElementById('reportCardBrand').textContent = getBrandName(cigar.brand_id);
+    document.getElementById('reportCardName').textContent = cigar.name;
+    
+    // Set details
+    const humidor = humidors.find(h => h.id === cigar.humidor_id);
+    document.getElementById('reportCardHumidor').textContent = humidor ? humidor.name : '-';
+    document.getElementById('reportCardQuantity').textContent = cigar.quantity || '-';
+    document.getElementById('reportCardSize').textContent = getSizeName(cigar.size_id);
+    document.getElementById('reportCardRingGauge').textContent = getRingGaugeName(cigar.ring_gauge_id);
+    document.getElementById('reportCardStrength').textContent = getStrengthName(cigar.strength_id);
+    document.getElementById('reportCardOrigin').textContent = getOriginName(cigar.origin_id);
+    document.getElementById('reportCardPrice').textContent = cigar.price ? `$${parseFloat(cigar.price).toFixed(2)}` : '-';
+    
+    // Format purchase date
+    if (cigar.purchase_date) {
+        const date = new Date(cigar.purchase_date);
+        document.getElementById('reportCardPurchaseDate').textContent = date.toLocaleDateString();
+    } else {
+        document.getElementById('reportCardPurchaseDate').textContent = '-';
+    }
+    
+    document.getElementById('reportCardNotes').textContent = cigar.notes || 'No notes available';
+    
+    // Set up action buttons
+    const editBtn = document.getElementById('reportCardEditBtn');
+    const deleteBtn = document.getElementById('reportCardDeleteBtn');
+    
+    editBtn.onclick = () => {
+        closeReportCard();
+        editCigar(cigarId);
+    };
+    
+    deleteBtn.onclick = async () => {
+        closeReportCard();
+        await deleteCigar(cigarId);
+    };
+    
+    modal.classList.add('show');
+}
+
+function closeReportCard() {
+    const modal = document.getElementById('reportCardModal');
+    modal.classList.remove('show');
 }
 
 function openCigarModal(humidorId = null, cigar = null) {
@@ -2041,7 +2106,6 @@ function openCigarModal(humidorId = null, cigar = null) {
         
         // Set direct fields
         document.getElementById('cigarName').value = cigar.name || '';
-        document.getElementById('cigarWrapper').value = cigar.wrapper || '';
         document.getElementById('cigarQuantity').value = cigar.quantity || 1;
         document.getElementById('cigarPrice').value = cigar.price || '';
         document.getElementById('cigarNotes').value = cigar.notes || '';
@@ -2295,9 +2359,8 @@ async function saveCigar() {
         strength_id: document.getElementById('cigarStrength').value || null,
         ring_gauge_id: document.getElementById('cigarRingGauge').value || null,
         length: formData.get('length') ? parseFloat(formData.get('length')) : null,
-        wrapper: formData.get('wrapper') || null,
         quantity: parseInt(formData.get('quantity')) || 1,
-        purchase_date: formData.get('purchase_date') || null,
+        purchase_date: formData.get('purchase_date') ? new Date(formData.get('purchase_date')).toISOString() : null,
         price: formData.get('price') ? parseFloat(formData.get('price')) : null,
         notes: formData.get('notes') || null,
         image_url: imageUrl
