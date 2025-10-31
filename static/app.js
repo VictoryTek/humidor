@@ -205,7 +205,9 @@ const API = {
     },
 
     async getCigar(id) {
-        const response = await fetch(`/api/v1/cigars/${id}`);
+        const response = await makeAuthenticatedRequest(`/api/v1/cigars/${id}`, {
+            method: 'GET'
+        });
         if (!response.ok) throw new Error('Failed to fetch cigar');
         return response.json();
     },
@@ -594,34 +596,6 @@ function filterCigars() {
     renderCigars();
 }
 
-function openCigarModal(cigar = null) {
-    isEditing = !!cigar;
-    currentCigar = cigar;
-    
-    elements.modalTitle.textContent = isEditing ? 'Edit Cigar' : 'Add New Cigar';
-    elements.saveBtn.textContent = isEditing ? 'Update Cigar' : 'Save Cigar';
-    
-    // Reset form
-    elements.cigarForm.reset();
-    
-    // Populate form if editing
-    if (isEditing && cigar) {
-        Object.keys(cigar).forEach(key => {
-            const input = document.getElementById(key);
-            if (input) {
-                if (key === 'purchase_date' && cigar[key]) {
-                    input.value = cigar[key].split('T')[0];
-                } else {
-                    input.value = cigar[key] || '';
-                }
-            }
-        });
-    }
-    
-    elements.cigarModal.classList.add('show');
-    document.body.style.overflow = 'hidden';
-}
-
 function closeCigarModal() {
     elements.cigarModal.classList.remove('show');
     document.body.style.overflow = 'auto';
@@ -676,7 +650,7 @@ async function handleFormSubmit(event) {
 async function editCigar(id) {
     try {
         const cigar = await API.getCigar(id);
-        openCigarModal(cigar);
+        openCigarModal(cigar.humidor_id, cigar);
     } catch (error) {
         console.error('Error fetching cigar:', error);
         showToast('Failed to load cigar details', 'error');
@@ -1912,6 +1886,14 @@ function renderHumidorSections() {
             const matches = cigar.humidor_id === humidor.id;
             console.log(`  Comparing cigar.humidor_id="${cigar.humidor_id}" (${typeof cigar.humidor_id}) with humidor.id="${humidor.id}" (${typeof humidor.id}) = ${matches}`);
             return matches;
+        }).sort((a, b) => {
+            // Sort by brand name alphabetically
+            const brandA = getBrandName(a.brand_id).toLowerCase();
+            const brandB = getBrandName(b.brand_id).toLowerCase();
+            if (brandA < brandB) return -1;
+            if (brandA > brandB) return 1;
+            // If brands are the same, sort by cigar name
+            return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
         });
         console.log(`→ Rendering humidor "${humidor.name}" (${humidor.id}) with ${humidorCigars.length} cigars`, humidorCigars);
         return createHumidorSection(humidor, humidorCigars);
@@ -1954,6 +1936,8 @@ function createHumidorSection(humidor, humidorCigars) {
 function createCigarCard(cigar) {
     // Use helper functions to resolve IDs to names
     const brandName = getBrandName(cigar.brand_id);
+    
+    console.log(`→ Creating card for "${cigar.name}" with image_url:`, cigar.image_url);
     
     // Determine image source or use placeholder
     const imageHtml = cigar.image_url 
@@ -2061,7 +2045,6 @@ function openCigarModal(humidorId = null, cigar = null) {
         document.getElementById('cigarQuantity').value = cigar.quantity || 1;
         document.getElementById('cigarPrice').value = cigar.price || '';
         document.getElementById('cigarNotes').value = cigar.notes || '';
-        document.getElementById('cigarLength').value = cigar.length || '';
         document.getElementById('cigarImageUrl').value = cigar.image_url || '';
         
         if (cigar.purchase_date) {
@@ -2276,12 +2259,31 @@ async function saveCigar() {
     let imageUrl = formData.get('image_url') || null;
     const imageFile = document.getElementById('cigarImageUpload').files[0];
     
-    // If a file was uploaded, we'll need to handle it (TODO: implement backend endpoint for file upload)
-    if (imageFile && !imageUrl) {
-        console.log('Image file selected:', imageFile.name);
-        // For now, we'll just note that a file was selected
-        // In the future, this should upload to the backend or convert to base64
-        showToast('Image upload not yet implemented. Please use Image URL for now.', 'warning');
+    console.log('→ Image URL from form:', imageUrl);
+    console.log('→ Image file selected:', imageFile ? imageFile.name : 'none');
+    
+    // If a file was uploaded, convert it to base64
+    if (imageFile) {
+        // Check file size (max 5MB)
+        const maxSize = 5 * 1024 * 1024; // 5MB in bytes
+        if (imageFile.size > maxSize) {
+            showToast('Image file is too large. Maximum size is 5MB.', 'error');
+            return;
+        }
+        
+        try {
+            imageUrl = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(imageFile);
+            });
+            console.log('✓ Image file converted to base64, length:', imageUrl.length);
+        } catch (error) {
+            console.error('✗ Failed to read image file:', error);
+            showToast('Failed to read image file', 'error');
+            return;
+        }
     }
     
     const cigarData = {
@@ -2343,6 +2345,10 @@ async function saveCigar() {
             const savedCigar = await response.json();
             console.log('✓ Cigar saved successfully:', savedCigar);
             console.log('→ Reloading humidors and cigars...');
+            
+            // Clear the file input
+            document.getElementById('cigarImageUpload').value = '';
+            
             await loadHumidors();
             showToast(isEditingCigar ? 'Cigar updated successfully!' : 'Cigar added successfully!', 'success');
             closeCigarModal();
@@ -2368,11 +2374,6 @@ function createCigar(cigarData) {
     renderHumidorSections();
     showToast('Cigar added successfully!');
     closeCigarModal();
-}
-
-function editCigar(id) {
-    const cigar = cigars.find(c => c.id === id);
-    if (cigar) openCigarModal(null, cigar);
 }
 
 function updateCigar(id, cigarData) {
