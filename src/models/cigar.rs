@@ -22,6 +22,7 @@ pub struct Cigar {
     pub ring_gauge_id: Option<Uuid>,
     pub length: Option<f64>,
     pub image_url: Option<String>,
+    pub is_active: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

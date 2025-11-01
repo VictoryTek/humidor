@@ -18,8 +18,11 @@ pub async fn get_cigars(
     db: DbPool
 ) -> Result<impl Reply, Rejection> {
     // Build query based on parameters
-    let mut query = String::from("SELECT id, humidor_id, brand_id, name, size_id, strength_id, origin_id, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge_id, length, image_url, created_at, updated_at FROM cigars");
+    let mut query = String::from("SELECT id, humidor_id, brand_id, name, size_id, strength_id, origin_id, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge_id, length, image_url, is_active, created_at, updated_at FROM cigars");
     let mut conditions = Vec::new();
+    
+    // By default, show all cigars (both active and inactive/out of stock)
+    // This allows users to see their full inventory including out of stock items
     
     // Check for humidor_id filter
     if let Some(humidor_id) = params.get("humidor_id") {
@@ -49,7 +52,7 @@ pub async fn get_cigars(
         query.push_str(&conditions.join(" AND "));
     }
     
-    query.push_str(" ORDER BY created_at DESC LIMIT 50");
+    query.push_str(" ORDER BY is_active DESC, created_at DESC LIMIT 50");
     
     match db.query(&query, &[]).await {
         Ok(rows) => {
@@ -73,8 +76,9 @@ pub async fn get_cigars(
                     ring_gauge_id: row.get(14),
                     length: row.get(15),
                     image_url: row.get(16),
-                    created_at: row.get(17),
-                    updated_at: row.get(18),
+                    is_active: row.get(17),
+                    created_at: row.get(18),
+                    updated_at: row.get(19),
                 };
                 cigars.push(cigar);
             }
@@ -102,9 +106,9 @@ pub async fn create_cigar(create_cigar: CreateCigar, _auth: AuthContext, db: DbP
     let now = Utc::now();
     
     match db.query_one(
-        "INSERT INTO cigars (id, humidor_id, brand_id, name, size_id, strength_id, origin_id, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge_id, length, image_url, created_at, updated_at) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) 
-         RETURNING id, humidor_id, brand_id, name, size_id, strength_id, origin_id, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge_id, length, image_url, created_at, updated_at",
+        "INSERT INTO cigars (id, humidor_id, brand_id, name, size_id, strength_id, origin_id, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge_id, length, image_url, is_active, created_at, updated_at) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, true, $18, $19) 
+         RETURNING id, humidor_id, brand_id, name, size_id, strength_id, origin_id, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge_id, length, image_url, is_active, created_at, updated_at",
         &[&id, &create_cigar.humidor_id, &create_cigar.brand_id, &create_cigar.name, &create_cigar.size_id, &create_cigar.strength_id, &create_cigar.origin_id, 
           &create_cigar.wrapper, &create_cigar.binder, &create_cigar.filler, &create_cigar.price, &create_cigar.purchase_date, 
           &create_cigar.notes, &create_cigar.quantity, &create_cigar.ring_gauge_id, &create_cigar.length, &create_cigar.image_url, &now, &now]
@@ -128,8 +132,9 @@ pub async fn create_cigar(create_cigar: CreateCigar, _auth: AuthContext, db: DbP
                 ring_gauge_id: row.get(14),
                 length: row.get(15),
                 image_url: row.get(16),
-                created_at: row.get(17),
-                updated_at: row.get(18),
+                is_active: row.get(17),
+                created_at: row.get(18),
+                updated_at: row.get(19),
             };
             Ok(warp::reply::json(&cigar))
         }
@@ -142,7 +147,7 @@ pub async fn create_cigar(create_cigar: CreateCigar, _auth: AuthContext, db: DbP
 
 pub async fn get_cigar(id: Uuid, _auth: AuthContext, db: DbPool) -> Result<impl Reply, Rejection> {
     match db.query_one(
-        "SELECT id, humidor_id, brand_id, name, size_id, strength_id, origin_id, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge_id, length, image_url, created_at, updated_at FROM cigars WHERE id = $1",
+        "SELECT id, humidor_id, brand_id, name, size_id, strength_id, origin_id, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge_id, length, image_url, is_active, created_at, updated_at FROM cigars WHERE id = $1",
         &[&id]
     ).await {
         Ok(row) => {
@@ -164,8 +169,9 @@ pub async fn get_cigar(id: Uuid, _auth: AuthContext, db: DbPool) -> Result<impl 
                 ring_gauge_id: row.get(14),
                 length: row.get(15),
                 image_url: row.get(16),
-                created_at: row.get(17),
-                updated_at: row.get(18),
+                is_active: row.get(17),
+                created_at: row.get(18),
+                updated_at: row.get(19),
             };
             Ok(warp::reply::json(&cigar))
         }
@@ -200,9 +206,10 @@ pub async fn update_cigar(id: Uuid, update_cigar: UpdateCigar, _auth: AuthContex
          ring_gauge_id = COALESCE($15, ring_gauge_id),
          length = COALESCE($16, length),
          image_url = COALESCE($17, image_url),
+         is_active = CASE WHEN $14 IS NOT NULL AND $14 > 0 THEN true ELSE is_active END,
          updated_at = $18
          WHERE id = $1
-         RETURNING id, humidor_id, brand_id, name, size_id, strength_id, origin_id, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge_id, length, image_url, created_at, updated_at",
+         RETURNING id, humidor_id, brand_id, name, size_id, strength_id, origin_id, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge_id, length, image_url, is_active, created_at, updated_at",
         &[&id, &update_cigar.humidor_id, &update_cigar.brand_id, &update_cigar.name, &update_cigar.size_id, &update_cigar.strength_id, &update_cigar.origin_id,
           &update_cigar.wrapper, &update_cigar.binder, &update_cigar.filler, &update_cigar.price, &update_cigar.purchase_date,
           &update_cigar.notes, &update_cigar.quantity, &update_cigar.ring_gauge_id, &update_cigar.length, &update_cigar.image_url, &now]
@@ -226,8 +233,9 @@ pub async fn update_cigar(id: Uuid, update_cigar: UpdateCigar, _auth: AuthContex
                 ring_gauge_id: row.get(14),
                 length: row.get(15),
                 image_url: row.get(16),
-                created_at: row.get(17),
-                updated_at: row.get(18),
+                is_active: row.get(17),
+                created_at: row.get(18),
+                updated_at: row.get(19),
             };
             Ok(warp::reply::json(&cigar))
         }
@@ -239,17 +247,21 @@ pub async fn update_cigar(id: Uuid, update_cigar: UpdateCigar, _auth: AuthContex
 }
 
 pub async fn delete_cigar(id: Uuid, _auth: AuthContext, db: DbPool) -> Result<impl Reply, Rejection> {
-    match db.execute("DELETE FROM cigars WHERE id = $1", &[&id]).await {
+    // Soft delete: set is_active to false instead of deleting the record
+    match db.execute(
+        "UPDATE cigars SET is_active = false, quantity = 0, updated_at = NOW() WHERE id = $1",
+        &[&id]
+    ).await {
         Ok(rows_affected) => {
             if rows_affected > 0 {
-                Ok(warp::reply::json(&json!({"message": "Cigar deleted successfully"})))
+                Ok(warp::reply::json(&json!({"message": "Cigar marked as out of stock"})))
             } else {
                 Ok(warp::reply::json(&json!({"error": "Cigar not found"})))
             }
         }
         Err(e) => {
             eprintln!("Database error: {}", e);
-            Ok(warp::reply::json(&json!({"error": "Failed to delete cigar"})))
+            Ok(warp::reply::json(&json!({"error": "Failed to mark cigar as out of stock"})))
         }
     }
 }

@@ -28,9 +28,12 @@ pub async fn get_favorites(
                 c.id as c_id, c.humidor_id, c.brand_id, c.name, c.size_id, c.strength_id, 
                 c.origin_id, c.wrapper, c.binder, c.filler, c.price, c.purchase_date, 
                 c.notes, c.quantity, c.ring_gauge_id, c.length, c.image_url, 
-                c.created_at as c_created_at, c.updated_at as c_updated_at
+                c.created_at as c_created_at, c.updated_at as c_updated_at,
+                f.snapshot_name, f.snapshot_brand_id, f.snapshot_size_id,
+                f.snapshot_strength_id, f.snapshot_origin_id, 
+                f.snapshot_ring_gauge_id, f.snapshot_image_url
          FROM favorites f
-         JOIN cigars c ON f.cigar_id = c.id
+         LEFT JOIN cigars c ON f.cigar_id = c.id
          WHERE f.user_id = $1
          ORDER BY f.created_at DESC",
         &[&auth.user_id]
@@ -40,31 +43,62 @@ pub async fn get_favorites(
     })?;
 
     let favorites: Vec<serde_json::Value> = rows.iter().map(|row| {
+        let cigar_id: Option<Uuid> = row.get(2);
+        let cigar_exists: Option<Uuid> = row.get(4); // c.id will be null if cigar doesn't exist
+        
         serde_json::json!({
             "id": row.get::<_, Uuid>(0),
             "user_id": row.get::<_, Uuid>(1),
-            "cigar_id": row.get::<_, Uuid>(2),
+            "cigar_id": cigar_id,
             "created_at": row.get::<_, chrono::DateTime<Utc>>(3),
-            "cigar": {
-                "id": row.get::<_, Uuid>(4),
-                "humidor_id": row.get::<_, Option<Uuid>>(5),
-                "brand_id": row.get::<_, Option<Uuid>>(6),
-                "name": row.get::<_, String>(7),
-                "size_id": row.get::<_, Option<Uuid>>(8),
-                "strength_id": row.get::<_, Option<Uuid>>(9),
-                "origin_id": row.get::<_, Option<Uuid>>(10),
-                "wrapper": row.get::<_, Option<String>>(11),
-                "binder": row.get::<_, Option<String>>(12),
-                "filler": row.get::<_, Option<String>>(13),
-                "price": row.get::<_, Option<f64>>(14),
-                "purchase_date": row.get::<_, Option<chrono::DateTime<Utc>>>(15),
-                "notes": row.get::<_, Option<String>>(16),
-                "quantity": row.get::<_, i32>(17),
-                "ring_gauge_id": row.get::<_, Option<Uuid>>(18),
-                "length": row.get::<_, Option<f64>>(19),
-                "image_url": row.get::<_, Option<String>>(20),
-                "created_at": row.get::<_, chrono::DateTime<Utc>>(21),
-                "updated_at": row.get::<_, chrono::DateTime<Utc>>(22),
+            "cigar": if cigar_exists.is_some() {
+                // Cigar still exists, return live data
+                serde_json::json!({
+                    "id": row.get::<_, Uuid>(4),
+                    "humidor_id": row.get::<_, Option<Uuid>>(5),
+                    "brand_id": row.get::<_, Option<Uuid>>(6),
+                    "name": row.get::<_, String>(7),
+                    "size_id": row.get::<_, Option<Uuid>>(8),
+                    "strength_id": row.get::<_, Option<Uuid>>(9),
+                    "origin_id": row.get::<_, Option<Uuid>>(10),
+                    "wrapper": row.get::<_, Option<String>>(11),
+                    "binder": row.get::<_, Option<String>>(12),
+                    "filler": row.get::<_, Option<String>>(13),
+                    "price": row.get::<_, Option<f64>>(14),
+                    "purchase_date": row.get::<_, Option<chrono::DateTime<Utc>>>(15),
+                    "notes": row.get::<_, Option<String>>(16),
+                    "quantity": row.get::<_, i32>(17),
+                    "ring_gauge_id": row.get::<_, Option<Uuid>>(18),
+                    "length": row.get::<_, Option<f64>>(19),
+                    "image_url": row.get::<_, Option<String>>(20),
+                    "created_at": row.get::<_, chrono::DateTime<Utc>>(21),
+                    "updated_at": row.get::<_, chrono::DateTime<Utc>>(22),
+                    "out_of_stock": false
+                })
+            } else {
+                // Cigar deleted, return snapshot data
+                serde_json::json!({
+                    "id": cigar_id,
+                    "humidor_id": serde_json::Value::Null,
+                    "brand_id": row.get::<_, Option<Uuid>>(24),
+                    "name": row.get::<_, Option<String>>(23).unwrap_or_else(|| "Unknown Cigar".to_string()),
+                    "size_id": row.get::<_, Option<Uuid>>(25),
+                    "strength_id": row.get::<_, Option<Uuid>>(26),
+                    "origin_id": row.get::<_, Option<Uuid>>(27),
+                    "wrapper": serde_json::Value::Null,
+                    "binder": serde_json::Value::Null,
+                    "filler": serde_json::Value::Null,
+                    "price": serde_json::Value::Null,
+                    "purchase_date": serde_json::Value::Null,
+                    "notes": serde_json::Value::Null,
+                    "quantity": 0,
+                    "ring_gauge_id": row.get::<_, Option<Uuid>>(28),
+                    "length": serde_json::Value::Null,
+                    "image_url": row.get::<_, Option<String>>(29),
+                    "created_at": serde_json::Value::Null,
+                    "updated_at": serde_json::Value::Null,
+                    "out_of_stock": true
+                })
             }
         })
     }).collect();
@@ -81,12 +115,42 @@ pub async fn add_favorite(
     let id = Uuid::new_v4();
     let now = Utc::now();
     
+    // First, get the cigar data to create a snapshot
+    let cigar = db.query_opt(
+        "SELECT name, brand_id, size_id, strength_id, origin_id, ring_gauge_id, image_url
+         FROM cigars WHERE id = $1",
+        &[&request.cigar_id]
+    ).await.map_err(|e| {
+        eprintln!("Database error fetching cigar for snapshot: {}", e);
+        warp::reject::reject()
+    })?;
+    
+    if cigar.is_none() {
+        eprintln!("Cigar not found: {}", request.cigar_id);
+        return Err(warp::reject::reject());
+    }
+    
+    let cigar = cigar.unwrap();
+    let snapshot_name: String = cigar.get(0);
+    let snapshot_brand_id: Option<Uuid> = cigar.get(1);
+    let snapshot_size_id: Option<Uuid> = cigar.get(2);
+    let snapshot_strength_id: Option<Uuid> = cigar.get(3);
+    let snapshot_origin_id: Option<Uuid> = cigar.get(4);
+    let snapshot_ring_gauge_id: Option<Uuid> = cigar.get(5);
+    let snapshot_image_url: Option<String> = cigar.get(6);
+    
     match db.query_one(
-        "INSERT INTO favorites (id, user_id, cigar_id, created_at)
-         VALUES ($1, $2, $3, $4)
+        "INSERT INTO favorites (id, user_id, cigar_id, created_at, 
+                                snapshot_name, snapshot_brand_id, snapshot_size_id, 
+                                snapshot_strength_id, snapshot_origin_id, 
+                                snapshot_ring_gauge_id, snapshot_image_url)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          ON CONFLICT (user_id, cigar_id) DO NOTHING
          RETURNING id, user_id, cigar_id, created_at",
-        &[&id, &auth.user_id, &request.cigar_id, &now]
+        &[&id, &auth.user_id, &request.cigar_id, &now,
+          &snapshot_name, &snapshot_brand_id, &snapshot_size_id,
+          &snapshot_strength_id, &snapshot_origin_id,
+          &snapshot_ring_gauge_id, &snapshot_image_url]
     ).await {
         Ok(row) => {
             let favorite = FavoriteResponse {
@@ -105,21 +169,33 @@ pub async fn add_favorite(
 }
 
 // Remove a cigar from favorites
+// Accepts either cigar_id or favorite_id (for deleted cigars)
 pub async fn remove_favorite(
-    cigar_id: Uuid,
+    id: Uuid,
     auth: AuthContext,
     db: DbPool
 ) -> Result<impl Reply, Rejection> {
-    match db.execute(
+    // Try to delete by cigar_id first
+    let rows_deleted = db.execute(
         "DELETE FROM favorites WHERE user_id = $1 AND cigar_id = $2",
-        &[&auth.user_id, &cigar_id]
-    ).await {
-        Ok(_) => Ok(warp::reply::with_status(json(&serde_json::json!({"message": "Favorite removed"})), warp::http::StatusCode::OK)),
-        Err(e) => {
-            eprintln!("Database error removing favorite: {}", e);
-            Err(warp::reject::reject())
-        }
+        &[&auth.user_id, &id]
+    ).await.map_err(|e| {
+        eprintln!("Database error removing favorite by cigar_id: {}", e);
+        warp::reject::reject()
+    })?;
+    
+    // If no rows deleted, try deleting by favorite id (for orphaned favorites)
+    if rows_deleted == 0 {
+        db.execute(
+            "DELETE FROM favorites WHERE user_id = $1 AND id = $2",
+            &[&auth.user_id, &id]
+        ).await.map_err(|e| {
+            eprintln!("Database error removing favorite by id: {}", e);
+            warp::reject::reject()
+        })?;
     }
+    
+    Ok(warp::reply::with_status(json(&serde_json::json!({"message": "Favorite removed"})), warp::http::StatusCode::OK))
 }
 
 // Check if a cigar is favorited

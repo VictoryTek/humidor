@@ -308,11 +308,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     client.execute("CREATE INDEX IF NOT EXISTS idx_cigars_ring_gauge_id ON cigars(ring_gauge_id)", &[]).await?;
 
     // Create favorites table
+    // Note: cigar_id is nullable and uses ON DELETE SET NULL so favorites persist even when cigars are deleted
     client.execute(
         "CREATE TABLE IF NOT EXISTS favorites (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-            cigar_id UUID NOT NULL REFERENCES cigars(id) ON DELETE CASCADE,
+            cigar_id UUID REFERENCES cigars(id) ON DELETE SET NULL,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             UNIQUE(user_id, cigar_id)
         )",
@@ -321,6 +322,71 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     client.execute("CREATE INDEX IF NOT EXISTS idx_favorites_user_id ON favorites(user_id)", &[]).await?;
     client.execute("CREATE INDEX IF NOT EXISTS idx_favorites_cigar_id ON favorites(cigar_id)", &[]).await?;
+    
+    // Migrate existing favorites table to allow null cigar_id with ON DELETE SET NULL
+    // Drop the old constraint and add the new one
+    client.execute(
+        "ALTER TABLE favorites DROP CONSTRAINT IF EXISTS favorites_cigar_id_fkey",
+        &[],
+    ).await.ok(); // Ignore error if constraint doesn't exist
+    
+    client.execute(
+        "ALTER TABLE favorites ALTER COLUMN cigar_id DROP NOT NULL",
+        &[],
+    ).await.ok(); // Ignore error if already nullable
+    
+    client.execute(
+        "ALTER TABLE favorites ADD CONSTRAINT favorites_cigar_id_fkey 
+         FOREIGN KEY (cigar_id) REFERENCES cigars(id) ON DELETE SET NULL",
+        &[],
+    ).await.ok(); // Ignore error if constraint already exists
+    
+    // Add snapshot columns to favorites table to preserve cigar data when cigars are deleted
+    client.execute(
+        "ALTER TABLE favorites ADD COLUMN IF NOT EXISTS snapshot_name TEXT",
+        &[],
+    ).await.ok();
+    
+    client.execute(
+        "ALTER TABLE favorites ADD COLUMN IF NOT EXISTS snapshot_brand_id UUID",
+        &[],
+    ).await.ok();
+    
+    client.execute(
+        "ALTER TABLE favorites ADD COLUMN IF NOT EXISTS snapshot_size_id UUID",
+        &[],
+    ).await.ok();
+    
+    client.execute(
+        "ALTER TABLE favorites ADD COLUMN IF NOT EXISTS snapshot_strength_id UUID",
+        &[],
+    ).await.ok();
+    
+    client.execute(
+        "ALTER TABLE favorites ADD COLUMN IF NOT EXISTS snapshot_origin_id UUID",
+        &[],
+    ).await.ok();
+    
+    client.execute(
+        "ALTER TABLE favorites ADD COLUMN IF NOT EXISTS snapshot_ring_gauge_id UUID",
+        &[],
+    ).await.ok();
+    
+    client.execute(
+        "ALTER TABLE favorites ADD COLUMN IF NOT EXISTS snapshot_image_url TEXT",
+        &[],
+    ).await.ok();
+    
+    // Add is_active column to cigars table for soft deletes
+    client.execute(
+        "ALTER TABLE cigars ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true",
+        &[],
+    ).await.ok();
+    
+    client.execute(
+        "CREATE INDEX IF NOT EXISTS idx_cigars_is_active ON cigars(is_active)",
+        &[],
+    ).await.ok();
 
     let db_pool = Arc::new(client);
     

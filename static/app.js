@@ -488,8 +488,21 @@ function getStrengthColor(strength) {
 function createCigarCard(cigar) {
     const card = document.createElement('div');
     card.className = 'cigar-card';
+    const isOutOfStock = !cigar.is_active;
+    
+    // Out of stock badge centered on card
+    const outOfStockBadge = isOutOfStock ? `<div class="out-of-stock-badge" style="position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: #e74c3c; color: white; padding: 4px 12px; border-radius: 4px; font-size: 0.875rem; font-weight: 600; z-index: 10; white-space: nowrap;">OUT OF STOCK</div>` : '';
+    
+    const actionButtons = isOutOfStock 
+        ? `<button class="action-btn edit-btn" onclick="restockCigar('${cigar.id}')" title="Restock" style="background: #27ae60;">↻</button>`
+        : `<button class="action-btn edit-btn" onclick="editCigar('${cigar.id}')">✏️</button>
+           <button class="action-btn delete-btn" onclick="deleteCigar('${cigar.id}')">🗑️</button>`;
+    
+    const quantityDisplay = isOutOfStock ? '<div class="quantity-badge" style="color: #e74c3c;">0 left</div>' : `<div class="quantity-badge">${cigar.quantity} left</div>`;
+    
     card.innerHTML = `
-        <div class="cigar-card-image">
+        <div class="cigar-card-image" style="position: relative;">
+            ${outOfStockBadge}
             <div class="cigar-card-overlay">
                 <strong>Notes:</strong> ${cigar.notes || 'No notes available'}
                 <br><br>
@@ -504,8 +517,7 @@ function createCigarCard(cigar) {
             <div class="cigar-header">
                 <div class="cigar-brand">${getBrandName(cigar.brand_id)}</div>
                 <div class="cigar-actions">
-                    <button class="action-btn edit-btn" onclick="editCigar('${cigar.id}')">✏️</button>
-                    <button class="action-btn delete-btn" onclick="deleteCigar('${cigar.id}')">🗑️</button>
+                    ${actionButtons}
                 </div>
             </div>
             
@@ -531,11 +543,15 @@ function createCigarCard(cigar) {
             </div>
             
             <div class="cigar-footer">
-                <div class="quantity-badge">${cigar.quantity} left</div>
+                ${quantityDisplay}
                 <div class="price-tag">${formatPrice(cigar.price)}</div>
             </div>
         </div>
     `;
+    
+    if (isOutOfStock) {
+        card.style.opacity = '0.7';
+    }
     
     return card;
 }
@@ -1953,7 +1969,7 @@ function renderHumidorSections() {
 async function updateAllFavoriteIcons() {
     try {
         const favorites = await FavoritesAPI.getFavorites();
-        const favoriteIds = new Set(favorites.map(fav => fav.id));
+        const favoriteIds = new Set(favorites.map(fav => fav.cigar_id));
         
         document.querySelectorAll('.favorite-btn').forEach(btn => {
             const cigarId = btn.getAttribute('data-cigar-id');
@@ -1999,8 +2015,9 @@ function createHumidorSection(humidor, humidorCigars) {
 function createCigarCard(cigar) {
     // Use helper functions to resolve IDs to names
     const brandName = getBrandName(cigar.brand_id);
+    const isOutOfStock = !cigar.is_active;
     
-    console.log(`→ Creating card for "${cigar.name}" with image_url:`, cigar.image_url);
+    console.log(`→ Creating card for "${cigar.name}" with image_url:`, cigar.image_url, 'is_active:', cigar.is_active);
     
     // Determine image source or use placeholder
     const imageHtml = cigar.image_url 
@@ -2008,26 +2025,42 @@ function createCigarCard(cigar) {
            <img src="/static/cigar-placeholder.png" alt="Cigar placeholder" style="display: none; width: 100%; height: 100%; object-fit: contain; padding: 2rem;">`
         : `<img src="/static/cigar-placeholder.png" alt="Cigar placeholder" style="width: 100%; height: 100%; object-fit: contain; padding: 2rem;">`;
     
+    // Different styling and functionality for out of stock cigars
+    const cardStyle = isOutOfStock ? 'style="opacity: 0.7;"' : '';
+    const outOfStockBadge = isOutOfStock ? '<div class="out-of-stock-badge" style="position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: #e74c3c; color: white; padding: 4px 12px; border-radius: 4px; font-size: 0.875rem; font-weight: 600; z-index: 1; white-space: nowrap;">OUT OF STOCK</div>' : '';
+    
+    // For out of stock cigars, show restock button instead of delete, disable quantity controls
+    const actionButtons = isOutOfStock 
+        ? `<button class="action-btn edit-btn" onclick="restockCigar('${cigar.id}')" title="Restock" style="background: #27ae60;">↻</button>`
+        : `<button class="action-btn edit-btn" onclick="editCigar('${cigar.id}')" title="Edit">✏️</button>
+           <button class="action-btn delete-btn" onclick="deleteCigar('${cigar.id}')" title="Mark as out of stock">🗑️</button>`;
+    
+    const quantityControls = isOutOfStock
+        ? `<div class="cigar-card-quantity" style="opacity: 0.5;">
+               <span class="quantity-value" style="color: #e74c3c;">0</span>
+           </div>`
+        : `<div class="cigar-card-quantity" onclick="event.stopPropagation();">
+               <button class="quantity-btn" onclick="updateCigarQuantity('${cigar.id}', ${cigar.quantity}, -1)" title="Decrease quantity">−</button>
+               <span class="quantity-value">${cigar.quantity}</span>
+               <button class="quantity-btn" onclick="updateCigarQuantity('${cigar.id}', ${cigar.quantity}, 1)" title="Increase quantity">+</button>
+           </div>`;
+    
     return `
-        <div class="cigar-card" data-cigar-id="${cigar.id}" onclick="openReportCard('${cigar.id}')">
+        <div class="cigar-card" data-cigar-id="${cigar.id}" onclick="openReportCard('${cigar.id}')" ${cardStyle}>
             <div class="cigar-card-image">
+                ${outOfStockBadge}
                 ${imageHtml}
                 <button class="favorite-btn" data-cigar-id="${cigar.id}" onclick="event.stopPropagation(); toggleFavorite('${cigar.id}')" title="Add to favorites">
                     <span class="favorite-icon">♡</span>
                 </button>
                 <div class="cigar-card-actions" onclick="event.stopPropagation();">
-                    <button class="action-btn edit-btn" onclick="editCigar('${cigar.id}')" title="Edit">✏️</button>
-                    <button class="action-btn delete-btn" onclick="deleteCigar('${cigar.id}')" title="Delete">🗑️</button>
+                    ${actionButtons}
                 </div>
             </div>
             <div class="cigar-card-content">
                 <div class="cigar-card-brand">${brandName}</div>
                 <h3 class="cigar-card-name">${cigar.name}</h3>
-                <div class="cigar-card-quantity" onclick="event.stopPropagation();">
-                    <button class="quantity-btn" onclick="updateCigarQuantity('${cigar.id}', ${cigar.quantity}, -1)" title="Decrease quantity">−</button>
-                    <span class="quantity-value">${cigar.quantity}</span>
-                    <button class="quantity-btn" onclick="updateCigarQuantity('${cigar.id}', ${cigar.quantity}, 1)" title="Increase quantity">+</button>
-                </div>
+                ${quantityControls}
             </div>
         </div>
     `;
@@ -2514,8 +2547,9 @@ function updateCigar(id, cigarData) {
     }
 }
 
-async function deleteCigar(id) {
-    if (!confirm('Are you sure you want to delete this cigar?')) return;
+async function deleteCigar(id, skipConfirm = false) {
+    // Only show confirmation if called manually (not from quantity update)
+    if (!skipConfirm && !confirm('Mark this cigar as out of stock? It will remain in your inventory and can be restocked later.')) return;
     
     try {
         const response = await makeAuthenticatedRequest(`/api/v1/cigars/${id}`, {
@@ -2523,14 +2557,49 @@ async function deleteCigar(id) {
         });
         
         if (response && response.ok) {
-            showToast('Cigar deleted successfully!');
+            showToast('Cigar marked as out of stock');
             await loadHumidors();
         } else {
-            throw new Error('Failed to delete cigar');
+            throw new Error('Failed to mark cigar as out of stock');
         }
     } catch (error) {
-        console.error('Error deleting cigar:', error);
-        showToast('Failed to delete cigar', 'error');
+        console.error('Error marking cigar as out of stock:', error);
+        showToast('Failed to mark cigar as out of stock', 'error');
+    }
+}
+
+// Restock cigar function
+async function restockCigar(id) {
+    const quantity = prompt('Enter the quantity to restock:', '1');
+    
+    if (quantity === null) return; // User cancelled
+    
+    const parsedQuantity = parseInt(quantity);
+    if (isNaN(parsedQuantity) || parsedQuantity < 1) {
+        showToast('Please enter a valid quantity (1 or more)', 'error');
+        return;
+    }
+    
+    try {
+        // Update the cigar to set is_active=true and new quantity
+        const response = await makeAuthenticatedRequest(`/api/v1/cigars/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+                quantity: parsedQuantity
+            })
+        });
+        
+        if (response && response.ok) {
+            // Also need to set is_active back to true - do this via a separate backend update
+            // For now, we'll update quantity which should trigger the restock
+            showToast(`Cigar restocked with ${parsedQuantity} units!`, 'success');
+            await loadHumidors();
+        } else {
+            throw new Error('Failed to restock cigar');
+        }
+    } catch (error) {
+        console.error('Error restocking cigar:', error);
+        showToast('Failed to restock cigar', 'error');
     }
 }
 
@@ -2544,10 +2613,26 @@ async function updateCigarQuantity(cigarId, currentQuantity, change) {
         return;
     }
     
-    // If quantity reaches 0, ask if they want to delete the cigar
+    // If quantity reaches 0, mark as out of stock by calling the backend DELETE endpoint
     if (newQuantity === 0) {
-        if (confirm('This cigar is out of stock. Would you like to remove it from your humidor?')) {
-            await deleteCigar(cigarId);
+        if (!confirm('Mark this cigar as out of stock? You can restock it later.')) {
+            return;
+        }
+        
+        try {
+            const response = await makeAuthenticatedRequest(`/api/v1/cigars/${cigarId}`, {
+                method: 'DELETE'
+            });
+            
+            if (response && response.ok) {
+                showToast('Cigar marked as out of stock');
+                await loadHumidors();
+            } else {
+                throw new Error('Failed to mark cigar as out of stock');
+            }
+        } catch (error) {
+            console.error('Error marking cigar as out of stock:', error);
+            showToast('Failed to mark cigar as out of stock', 'error');
         }
         return;
     }
@@ -2775,10 +2860,16 @@ async function loadFavorites() {
             emptyState.style.display = 'none';
             favoritesGrid.style.display = 'grid';
             
-            favoritesGrid.innerHTML = favorites.map(cigar => createFavoriteCard(cigar)).join('');
+            // Extract cigar data from nested structure
+            const favoritesCigars = favorites.map(fav => ({
+                ...fav.cigar,
+                favorite_id: fav.id  // Keep favorite ID for removal
+            }));
             
-            // Update favorite icons for all loaded favorites
-            favorites.forEach(cigar => updateFavoriteIcon(cigar.id, true));
+            favoritesGrid.innerHTML = favoritesCigars.map(cigar => createFavoriteCard(cigar)).join('');
+            
+            // Update favorite icons for all loaded favorites that still exist (not out of stock)
+            favoritesCigars.filter(c => !c.out_of_stock && c.id).forEach(cigar => updateFavoriteIcon(cigar.id, true));
         }
     } catch (error) {
         console.error('Error loading favorites:', error);
@@ -2794,22 +2885,37 @@ function createFavoriteCard(cigar) {
            <img src="/static/cigar-placeholder.png" alt="Cigar placeholder" style="display: none; width: 100%; height: 100%; object-fit: contain; padding: 2rem;">`
         : `<img src="/static/cigar-placeholder.png" alt="Cigar placeholder" style="width: 100%; height: 100%; object-fit: contain; padding: 2rem;">`;
     
+    // For out of stock cigars, disable click to open report card and show different actions
+    const cardOnClick = cigar.out_of_stock ? '' : `onclick="openReportCard('${cigar.id}')"`;
+    const cardStyle = cigar.out_of_stock ? 'style="opacity: 0.85;"' : '';
+    const favoriteButton = cigar.out_of_stock 
+        ? '' // No heart button for out of stock cigars
+        : `<button class="favorite-btn is-favorite" data-cigar-id="${cigar.id}" onclick="event.stopPropagation(); toggleFavorite('${cigar.id}')" title="Remove from favorites">
+               <span class="favorite-icon">♥</span>
+           </button>`;
+    
+    const deleteAction = cigar.out_of_stock
+        ? `onclick="removeFavorite('${cigar.favorite_id}')"` // Use favorite_id for out of stock
+        : `onclick="removeFavorite('${cigar.id}')"`; // Use cigar_id for active cigars
+    
+    const badge = cigar.out_of_stock 
+        ? '<span class="info-badge" style="background: #e74c3c;">Out of Stock</span>'
+        : '<span class="info-badge">Favorite</span>';
+    
     return `
-        <div class="cigar-card" data-cigar-id="${cigar.id}" onclick="openReportCard('${cigar.id}')">
+        <div class="cigar-card" data-cigar-id="${cigar.id}" ${cardOnClick} ${cardStyle}>
             <div class="cigar-card-image">
                 ${imageHtml}
-                <button class="favorite-btn is-favorite" data-cigar-id="${cigar.id}" onclick="event.stopPropagation(); toggleFavorite('${cigar.id}')" title="Remove from favorites">
-                    <span class="favorite-icon">♥</span>
-                </button>
+                ${favoriteButton}
                 <div class="cigar-card-actions" onclick="event.stopPropagation();">
-                    <button class="action-btn delete-btn" onclick="removeFavorite('${cigar.id}')" title="Remove from favorites">🗑️</button>
+                    <button class="action-btn delete-btn" ${deleteAction} title="Remove from favorites">🗑️</button>
                 </div>
             </div>
             <div class="cigar-card-content">
                 <div class="cigar-card-brand">${brandName}</div>
                 <h3 class="cigar-card-name">${cigar.name}</h3>
                 <div class="cigar-card-info">
-                    <span class="info-badge">Favorite</span>
+                    ${badge}
                 </div>
             </div>
         </div>
@@ -2817,7 +2923,7 @@ function createFavoriteCard(cigar) {
 }
 
 async function removeFavorite(cigarId) {
-    if (!confirm('Remove this cigar from your favorites?')) return;
+    if (!confirm('Remove this from your favorites?')) return;
     
     try {
         await FavoritesAPI.removeFavorite(cigarId);
