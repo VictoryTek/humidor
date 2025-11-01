@@ -2578,9 +2578,8 @@ function updateCigar(id, cigarData) {
     }
 }
 
-async function deleteCigar(id, skipConfirm = false) {
-    // Only show confirmation if called manually (not from quantity update)
-    if (!skipConfirm && !confirm('Mark this cigar as out of stock? It will remain in your inventory and can be restocked later.')) return;
+async function deleteCigar(id) {
+    if (!confirm('Are you sure you want to permanently delete this cigar from your humidor? It will remain in favorites if favorited.')) return;
     
     try {
         const response = await makeAuthenticatedRequest(`/api/v1/cigars/${id}`, {
@@ -2588,14 +2587,14 @@ async function deleteCigar(id, skipConfirm = false) {
         });
         
         if (response && response.ok) {
-            showToast('Cigar marked as out of stock');
+            showToast('Cigar deleted from humidor');
             await loadHumidors();
         } else {
-            throw new Error('Failed to mark cigar as out of stock');
+            throw new Error('Failed to delete cigar');
         }
     } catch (error) {
-        console.error('Error marking cigar as out of stock:', error);
-        showToast('Failed to mark cigar as out of stock', 'error');
+        console.error('Error deleting cigar:', error);
+        showToast('Failed to delete cigar', 'error');
     }
 }
 
@@ -2644,15 +2643,22 @@ async function updateCigarQuantity(cigarId, currentQuantity, change) {
         return;
     }
     
-    // If quantity reaches 0, mark as out of stock by calling the backend DELETE endpoint
+    // If quantity reaches 0, mark as out of stock by setting is_active=false
     if (newQuantity === 0) {
         if (!confirm('Mark this cigar as out of stock? You can restock it later.')) {
             return;
         }
         
         try {
+            // Update with quantity 0, which will set is_active=false on the backend
             const response = await makeAuthenticatedRequest(`/api/v1/cigars/${cigarId}`, {
-                method: 'DELETE'
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    quantity: 0
+                })
             });
             
             if (response && response.ok) {

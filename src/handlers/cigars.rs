@@ -247,21 +247,22 @@ pub async fn update_cigar(id: Uuid, update_cigar: UpdateCigar, _auth: AuthContex
 }
 
 pub async fn delete_cigar(id: Uuid, _auth: AuthContext, db: DbPool) -> Result<impl Reply, Rejection> {
-    // Soft delete: set is_active to false instead of deleting the record
+    // Hard delete: actually remove the cigar from the database
+    // Note: favorites will keep snapshot data due to ON DELETE SET NULL on cigar_id
     match db.execute(
-        "UPDATE cigars SET is_active = false, quantity = 0, updated_at = NOW() WHERE id = $1",
+        "DELETE FROM cigars WHERE id = $1",
         &[&id]
     ).await {
         Ok(rows_affected) => {
             if rows_affected > 0 {
-                Ok(warp::reply::json(&json!({"message": "Cigar marked as out of stock"})))
+                Ok(warp::reply::json(&json!({"message": "Cigar deleted successfully"})))
             } else {
                 Ok(warp::reply::json(&json!({"error": "Cigar not found"})))
             }
         }
         Err(e) => {
             eprintln!("Database error: {}", e);
-            Ok(warp::reply::json(&json!({"error": "Failed to mark cigar as out of stock"})))
+            Ok(warp::reply::json(&json!({"error": "Failed to delete cigar"})))
         }
     }
 }
