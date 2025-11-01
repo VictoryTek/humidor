@@ -461,9 +461,10 @@ function showToast(message, type = 'success') {
     
     elements.toastContainer.appendChild(toast);
     
+    // Remove toast after 8 seconds (increased from 5 for better readability)
     setTimeout(() => {
         toast.remove();
-    }, 5000);
+    }, 8000);
 }
 
 function formatPrice(price) {
@@ -2887,7 +2888,13 @@ function createFavoriteCard(cigar) {
     
     // For out of stock cigars, disable click to open report card and show different actions
     const cardOnClick = cigar.out_of_stock ? '' : `onclick="openReportCard('${cigar.id}')"`;
-    const cardStyle = cigar.out_of_stock ? 'style="opacity: 0.85;"' : '';
+    const cardStyle = cigar.out_of_stock ? 'style="opacity: 0.7;"' : '';
+    
+    // OUT OF STOCK badge centered on card (same style as humidor cards)
+    const outOfStockBadge = cigar.out_of_stock 
+        ? '<div class="out-of-stock-badge" style="position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: #e74c3c; color: white; padding: 4px 12px; border-radius: 4px; font-size: 0.875rem; font-weight: 600; z-index: 10; white-space: nowrap;">OUT OF STOCK</div>'
+        : '';
+    
     const favoriteButton = cigar.out_of_stock 
         ? '' // No heart button for out of stock cigars
         : `<button class="favorite-btn is-favorite" data-cigar-id="${cigar.id}" onclick="event.stopPropagation(); toggleFavorite('${cigar.id}')" title="Remove from favorites">
@@ -2898,13 +2905,10 @@ function createFavoriteCard(cigar) {
         ? `onclick="removeFavorite('${cigar.favorite_id}')"` // Use favorite_id for out of stock
         : `onclick="removeFavorite('${cigar.id}')"`; // Use cigar_id for active cigars
     
-    const badge = cigar.out_of_stock 
-        ? '<span class="info-badge" style="background: #e74c3c;">Out of Stock</span>'
-        : '<span class="info-badge">Favorite</span>';
-    
     return `
         <div class="cigar-card" data-cigar-id="${cigar.id}" ${cardOnClick} ${cardStyle}>
-            <div class="cigar-card-image">
+            <div class="cigar-card-image" style="position: relative;">
+                ${outOfStockBadge}
                 ${imageHtml}
                 ${favoriteButton}
                 <div class="cigar-card-actions" onclick="event.stopPropagation();">
@@ -2914,9 +2918,6 @@ function createFavoriteCard(cigar) {
             <div class="cigar-card-content">
                 <div class="cigar-card-brand">${brandName}</div>
                 <h3 class="cigar-card-name">${cigar.name}</h3>
-                <div class="cigar-card-info">
-                    ${badge}
-                </div>
             </div>
         </div>
     `;

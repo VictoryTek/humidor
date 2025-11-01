@@ -28,7 +28,7 @@ pub async fn get_favorites(
                 c.id as c_id, c.humidor_id, c.brand_id, c.name, c.size_id, c.strength_id, 
                 c.origin_id, c.wrapper, c.binder, c.filler, c.price, c.purchase_date, 
                 c.notes, c.quantity, c.ring_gauge_id, c.length, c.image_url, 
-                c.created_at as c_created_at, c.updated_at as c_updated_at,
+                c.created_at as c_created_at, c.updated_at as c_updated_at, c.is_active,
                 f.snapshot_name, f.snapshot_brand_id, f.snapshot_size_id,
                 f.snapshot_strength_id, f.snapshot_origin_id, 
                 f.snapshot_ring_gauge_id, f.snapshot_image_url
@@ -53,6 +53,7 @@ pub async fn get_favorites(
             "created_at": row.get::<_, chrono::DateTime<Utc>>(3),
             "cigar": if cigar_exists.is_some() {
                 // Cigar still exists, return live data
+                let is_active: bool = row.get(23);
                 serde_json::json!({
                     "id": row.get::<_, Uuid>(4),
                     "humidor_id": row.get::<_, Option<Uuid>>(5),
@@ -73,18 +74,18 @@ pub async fn get_favorites(
                     "image_url": row.get::<_, Option<String>>(20),
                     "created_at": row.get::<_, chrono::DateTime<Utc>>(21),
                     "updated_at": row.get::<_, chrono::DateTime<Utc>>(22),
-                    "out_of_stock": false
+                    "out_of_stock": !is_active
                 })
             } else {
                 // Cigar deleted, return snapshot data
                 serde_json::json!({
                     "id": cigar_id,
                     "humidor_id": serde_json::Value::Null,
-                    "brand_id": row.get::<_, Option<Uuid>>(24),
-                    "name": row.get::<_, Option<String>>(23).unwrap_or_else(|| "Unknown Cigar".to_string()),
-                    "size_id": row.get::<_, Option<Uuid>>(25),
-                    "strength_id": row.get::<_, Option<Uuid>>(26),
-                    "origin_id": row.get::<_, Option<Uuid>>(27),
+                    "brand_id": row.get::<_, Option<Uuid>>(25),
+                    "name": row.get::<_, Option<String>>(24).unwrap_or_else(|| "Unknown Cigar".to_string()),
+                    "size_id": row.get::<_, Option<Uuid>>(26),
+                    "strength_id": row.get::<_, Option<Uuid>>(27),
+                    "origin_id": row.get::<_, Option<Uuid>>(28),
                     "wrapper": serde_json::Value::Null,
                     "binder": serde_json::Value::Null,
                     "filler": serde_json::Value::Null,
@@ -92,9 +93,9 @@ pub async fn get_favorites(
                     "purchase_date": serde_json::Value::Null,
                     "notes": serde_json::Value::Null,
                     "quantity": 0,
-                    "ring_gauge_id": row.get::<_, Option<Uuid>>(28),
+                    "ring_gauge_id": row.get::<_, Option<Uuid>>(29),
                     "length": serde_json::Value::Null,
-                    "image_url": row.get::<_, Option<String>>(29),
+                    "image_url": row.get::<_, Option<String>>(30),
                     "created_at": serde_json::Value::Null,
                     "updated_at": serde_json::Value::Null,
                     "out_of_stock": true
