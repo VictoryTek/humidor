@@ -2331,7 +2331,7 @@ body {
     margin-bottom: 0.5rem;
     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
     min-width: 300px;
-    animation: toastSlideIn 0.3s ease-out;
+    animation: toastSlideIn 0.3s ease-out forwards;
     color: #2d3748;
     font-weight: 500;
 }

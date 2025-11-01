@@ -455,16 +455,46 @@ const FavoritesAPI = {
 
 // Utility Functions
 function showToast(message, type = 'success') {
+    console.log('[TOAST] Creating toast:', message, 'type:', type);
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
-    toast.innerHTML = `<div class="toast-message">${message}</div>`;
+    toast.innerHTML = `
+        <div class="toast-message">${message}</div>
+        <button class="toast-close" style="background: none; border: none; color: inherit; font-size: 1.25rem; cursor: pointer; padding: 0 0.5rem; margin-left: 1rem; opacity: 0.7;">×</button>
+    `;
+    toast.style.display = 'flex';
+    toast.style.alignItems = 'center';
+    toast.style.justifyContent = 'space-between';
+    
+    if (!elements.toastContainer) {
+        console.error('[TOAST] toastContainer element not found!');
+        return;
+    }
     
     elements.toastContainer.appendChild(toast);
+    console.log('[TOAST] Toast appended to DOM, will remove in 5 seconds');
     
-    // Remove toast after 8 seconds (increased from 5 for better readability)
-    setTimeout(() => {
-        toast.remove();
-    }, 8000);
+    // Remove toast after 5 seconds with smooth fade-out
+    const timeoutId = setTimeout(() => {
+        console.log('[TOAST] 5 seconds elapsed, removing toast:', message);
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%)';
+        toast.style.transition = 'all 0.3s ease-out';
+        setTimeout(() => {
+            console.log('[TOAST] Toast removed from DOM');
+            toast.remove();
+        }, 300);
+    }, 5000);
+    
+    // Allow manual dismissal
+    toast.querySelector('.toast-close').addEventListener('click', () => {
+        console.log('[TOAST] Manual close clicked');
+        clearTimeout(timeoutId);
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%)';
+        toast.style.transition = 'all 0.3s ease-out';
+        setTimeout(() => toast.remove(), 300);
+    });
 }
 
 function formatPrice(price) {
