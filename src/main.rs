@@ -387,6 +387,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "CREATE INDEX IF NOT EXISTS idx_cigars_is_active ON cigars(is_active)",
         &[],
     ).await.ok();
+    
+    // Add is_wishlist column to humidors table
+    client.execute(
+        "ALTER TABLE humidors ADD COLUMN IF NOT EXISTS is_wishlist BOOLEAN NOT NULL DEFAULT false",
+        &[],
+    ).await.ok();
 
     let db_pool = Arc::new(client);
     

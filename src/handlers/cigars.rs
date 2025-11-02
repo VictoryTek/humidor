@@ -206,7 +206,11 @@ pub async fn update_cigar(id: Uuid, update_cigar: UpdateCigar, _auth: AuthContex
          ring_gauge_id = COALESCE($15, ring_gauge_id),
          length = COALESCE($16, length),
          image_url = COALESCE($17, image_url),
-         is_active = CASE WHEN $14 IS NOT NULL AND $14 > 0 THEN true ELSE is_active END,
+         is_active = CASE 
+             WHEN $14 IS NOT NULL AND $14 = 0 THEN false
+             WHEN $14 IS NOT NULL AND $14 > 0 THEN true 
+             ELSE is_active 
+         END,
          updated_at = $18
          WHERE id = $1
          RETURNING id, humidor_id, brand_id, name, size_id, strength_id, origin_id, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge_id, length, image_url, is_active, created_at, updated_at",

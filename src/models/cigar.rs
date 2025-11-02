@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use crate::validation::{Validate, ValidationResult, validate_length, validate_positive};
+use crate::validation::{Validate, ValidationResult, validate_length, validate_positive, validate_non_negative};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Cigar {
@@ -96,7 +96,7 @@ impl Validate for UpdateCigar {
             validate_length(name, "Name", 1, 100)?;
         }
         if let Some(quantity) = self.quantity {
-            validate_positive(quantity, "Quantity")?;
+            validate_non_negative(quantity, "Quantity")?;
         }
         // UUIDs don't need string length validation
         

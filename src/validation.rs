@@ -66,6 +66,17 @@ pub fn validate_positive(value: i32, field_name: &str) -> ValidationResult<()> {
     }
 }
 
+/// Validate that a value is non-negative (allows 0)
+pub fn validate_non_negative(value: i32, field_name: &str) -> ValidationResult<()> {
+    if value >= 0 {
+        Ok(())
+    } else {
+        Err(AppError::ValidationError(
+            format!("{} must be 0 or greater", field_name)
+        ))
+    }
+}
+
 /// Validate range
 pub fn validate_range(value: i32, field_name: &str, min: i32, max: i32) -> ValidationResult<()> {
     if value >= min && value <= max {

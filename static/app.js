@@ -619,25 +619,38 @@ function updateNavigationCounts() {
 }
 
 function updateFilters() {
-    // Update brand filter
-    const brands = [...new Set(cigars.map(cigar => cigar.brand))].sort();
-    elements.brandFilter.innerHTML = '<option value="">All Brands</option>';
-    brands.forEach(brand => {
-        const option = document.createElement('option');
-        option.value = brand;
-        option.textContent = brand;
-        elements.brandFilter.appendChild(option);
-    });
+    // Update brand filter using the global brands array
+    if (brands && brands.length > 0) {
+        elements.brandFilter.innerHTML = '<option value="">All Brands</option>';
+        brands.forEach(brand => {
+            const option = document.createElement('option');
+            option.value = brand.id;
+            option.textContent = brand.name;
+            elements.brandFilter.appendChild(option);
+        });
+    }
 
-    // Update origin filter
-    const origins = [...new Set(cigars.map(cigar => cigar.origin))].sort();
-    elements.originFilter.innerHTML = '<option value="">All Origins</option>';
-    origins.forEach(origin => {
-        const option = document.createElement('option');
-        option.value = origin;
-        option.textContent = origin;
-        elements.originFilter.appendChild(option);
-    });
+    // Update origin filter using the global origins array
+    if (origins && origins.length > 0) {
+        elements.originFilter.innerHTML = '<option value="">All Origins</option>';
+        origins.forEach(origin => {
+            const option = document.createElement('option');
+            option.value = origin.id;
+            option.textContent = origin.name;
+            elements.originFilter.appendChild(option);
+        });
+    }
+
+    // Update strength filter using the global strengths array
+    if (strengths && strengths.length > 0) {
+        elements.strengthFilter.innerHTML = '<option value="">All Strengths</option>';
+        strengths.forEach(strength => {
+            const option = document.createElement('option');
+            option.value = strength.id;
+            option.textContent = strength.name;
+            elements.strengthFilter.appendChild(option);
+        });
+    }
 }
 
 function renderCigars() {
@@ -659,9 +672,9 @@ function renderCigars() {
 
 function filterCigars() {
     const searchTerm = elements.searchInput.value.toLowerCase();
-    const brandFilter = elements.brandFilter.value;
-    const strengthFilter = elements.strengthFilter.value;
-    const originFilter = elements.originFilter.value;
+    const brandFilter = elements.brandFilter.value ? parseInt(elements.brandFilter.value) : null;
+    const strengthFilter = elements.strengthFilter.value ? parseInt(elements.strengthFilter.value) : null;
+    const originFilter = elements.originFilter.value ? parseInt(elements.originFilter.value) : null;
 
     filteredCigars = cigars.filter(cigar => {
         const matchesSearch = !searchTerm || 
@@ -1587,7 +1600,7 @@ function navigateToPage(page) {
     });
 
     // Hide all sections
-    document.querySelectorAll('.humidors-section, .organizer-section, .profile-section, .favorites-section').forEach(section => {
+    document.querySelectorAll('.humidors-section, .organizer-section, .profile-section, .favorites-section, .wishlist-section').forEach(section => {
         section.style.display = 'none';
     });
 
@@ -1600,6 +1613,10 @@ function navigateToPage(page) {
         case 'favorites':
             document.getElementById('favoritesSection').style.display = 'block';
             loadFavorites();
+            break;
+        case 'wishlist':
+            document.getElementById('wishlistSection').style.display = 'block';
+            loadWishList();
             break;
         case 'brands':
             document.getElementById('brandsSection').style.display = 'block';
@@ -1684,6 +1701,12 @@ async function loadHumidors() {
         if (response.ok) {
             humidors = await response.json();
             console.log('✓ Humidors loaded:', humidors.length, humidors);
+            
+            // Find wish list humidor
+            wishListHumidor = humidors.find(h => h.is_wishlist === true);
+            if (wishListHumidor) {
+                console.log('✓ Wish list humidor found:', wishListHumidor.name);
+            }
             // Load cigars for each humidor
             cigars = [];
             for (const humidor of humidors) {
@@ -1749,47 +1772,47 @@ function applySearchAndFilters() {
     if (searchQuery) {
         const query = searchQuery.toLowerCase();
         filteredCigars = filteredCigars.filter(cigar => 
-            cigar.brand?.toLowerCase().includes(query) ||
+            getBrandName(cigar.brand_id)?.toLowerCase().includes(query) ||
             cigar.name?.toLowerCase().includes(query) ||
-            cigar.size?.toLowerCase().includes(query) ||
-            cigar.origin?.toLowerCase().includes(query) ||
+            getSizeName(cigar.size_id)?.toLowerCase().includes(query) ||
+            getOriginName(cigar.origin_id)?.toLowerCase().includes(query) ||
             cigar.wrapper?.toLowerCase().includes(query) ||
             cigar.notes?.toLowerCase().includes(query)
         );
     }
     
-    // Apply brand filter
+    // Apply brand filter (comparing brand names)
     if (selectedBrands.length > 0) {
         filteredCigars = filteredCigars.filter(cigar => 
-            selectedBrands.includes(cigar.brand)
+            selectedBrands.includes(getBrandName(cigar.brand_id))
         );
     }
     
-    // Apply size filter
+    // Apply size filter (comparing size names)
     if (selectedSizes.length > 0) {
         filteredCigars = filteredCigars.filter(cigar => 
-            selectedSizes.includes(cigar.size)
+            selectedSizes.includes(getSizeName(cigar.size_id))
         );
     }
     
-    // Apply origin filter
+    // Apply origin filter (comparing origin names)
     if (selectedOrigins.length > 0) {
         filteredCigars = filteredCigars.filter(cigar => 
-            selectedOrigins.includes(cigar.origin)
+            selectedOrigins.includes(getOriginName(cigar.origin_id))
         );
     }
     
-    // Apply strength filter
+    // Apply strength filter (comparing strength names)
     if (selectedStrengths.length > 0) {
         filteredCigars = filteredCigars.filter(cigar => 
-            selectedStrengths.includes(cigar.strength)
+            selectedStrengths.includes(getStrengthName(cigar.strength_id))
         );
     }
     
-    // Apply ring gauge filter
+    // Apply ring gauge filter (comparing ring gauge values as strings)
     if (selectedRingGauges.length > 0) {
         filteredCigars = filteredCigars.filter(cigar => 
-            selectedRingGauges.includes(cigar.ring_gauge)
+            selectedRingGauges.includes(getRingGaugeName(cigar.ring_gauge_id))
         );
     }
     
@@ -1851,27 +1874,27 @@ function openFilterModal(filterType) {
     };
     title.textContent = titles[filterType] || 'Select Filters';
     
-    // Get unique values for the current filter type from all cigars
+    // Get values from the organizer arrays instead of extracting from cigars
     let uniqueValues = [];
     switch(filterType) {
         case 'brand':
-            uniqueValues = [...new Set(cigars.map(c => c.brand).filter(Boolean))].sort();
+            uniqueValues = brands.map(b => b.name).sort();
             tempSelectedItems = [...selectedBrands];
             break;
         case 'size':
-            uniqueValues = [...new Set(cigars.map(c => c.size).filter(Boolean))].sort();
+            uniqueValues = sizes.map(s => s.name).sort();
             tempSelectedItems = [...selectedSizes];
             break;
         case 'origin':
-            uniqueValues = [...new Set(cigars.map(c => c.origin).filter(Boolean))].sort();
+            uniqueValues = origins.map(o => o.name).sort();
             tempSelectedItems = [...selectedOrigins];
             break;
         case 'strength':
-            uniqueValues = [...new Set(cigars.map(c => c.strength).filter(Boolean))].sort();
+            uniqueValues = strengths.map(s => s.name).sort();
             tempSelectedItems = [...selectedStrengths];
             break;
         case 'ringGauge':
-            uniqueValues = [...new Set(cigars.map(c => c.ring_gauge).filter(Boolean))].sort();
+            uniqueValues = ringGauges.map(rg => rg.gauge.toString()).sort((a, b) => parseInt(a) - parseInt(b));
             tempSelectedItems = [...selectedRingGauges];
             break;
     }
@@ -1965,6 +1988,15 @@ function renderHumidorSections() {
         return;
     }
     
+    // Filter out wish list humidor from display - it has its own page
+    const regularHumidors = humidors.filter(h => !h.is_wishlist);
+    
+    if (regularHumidors.length === 0) {
+        console.log('✗ No regular humidors to render (only wish list exists)');
+        container.innerHTML = '';
+        return;
+    }
+    
     // Use filtered cigars if any filters are active, otherwise use all cigars
     const cigarsToDisplay = (searchQuery || selectedBrands.length > 0 || selectedSizes.length > 0 || 
                             selectedOrigins.length > 0 || selectedStrengths.length > 0 || 
@@ -1973,7 +2005,7 @@ function renderHumidorSections() {
     console.log(`→ Total cigars available: ${cigars.length}`);
     console.log(`→ Cigars to display (after filters): ${cigarsToDisplay.length}`);
     
-    container.innerHTML = humidors.map(humidor => {
+    container.innerHTML = regularHumidors.map(humidor => {
         const humidorCigars = cigarsToDisplay.filter(cigar => {
             const matches = cigar.humidor_id === humidor.id;
             console.log(`  Comparing cigar.humidor_id="${cigar.humidor_id}" (${typeof cigar.humidor_id}) with humidor.id="${humidor.id}" (${typeof humidor.id}) = ${matches}`);
@@ -2165,9 +2197,33 @@ function openReportCard(cigarId) {
     
     document.getElementById('reportCardNotes').textContent = cigar.notes || 'No notes available';
     
+    // Check if this cigar is in the wish list
+    const isInWishList = humidor && humidor.is_wishlist;
+    
     // Set up action buttons
+    const actionsContainer = document.querySelector('.report-card-actions');
     const editBtn = document.getElementById('reportCardEditBtn');
     const deleteBtn = document.getElementById('reportCardDeleteBtn');
+    
+    // Remove any existing "Move to Humidor" button
+    const existingMoveBtn = document.getElementById('reportCardMoveBtn');
+    if (existingMoveBtn) {
+        existingMoveBtn.remove();
+    }
+    
+    // Add "Move to Humidor" button if in wish list
+    if (isInWishList) {
+        const moveBtn = document.createElement('button');
+        moveBtn.id = 'reportCardMoveBtn';
+        moveBtn.className = 'btn-primary';
+        moveBtn.innerHTML = '📦 MOVE TO HUMIDOR';
+        moveBtn.onclick = async () => {
+            closeReportCard();
+            await moveCigarToHumidor(cigarId);
+        };
+        // Insert before the edit button
+        actionsContainer.insertBefore(moveBtn, editBtn);
+    }
     
     editBtn.onclick = () => {
         closeReportCard();
@@ -2208,9 +2264,11 @@ function openCigarModal(humidorId = null, cigar = null) {
     
     title.textContent = isEditingCigar ? 'Edit Cigar' : 'Add New Cigar';
     
-    // Populate humidor dropdown
+    // Populate humidor dropdown (wish list appears last)
     humidorSelect.innerHTML = '<option value="">Select Humidor</option>';
-    humidors.forEach(humidor => {
+    
+    // Add regular humidors first
+    humidors.filter(h => !h.is_wishlist).forEach(humidor => {
         const option = document.createElement('option');
         option.value = humidor.id;
         option.textContent = humidor.name;
@@ -2219,6 +2277,18 @@ function openCigarModal(humidorId = null, cigar = null) {
         }
         humidorSelect.appendChild(option);
     });
+    
+    // Add wish list option last if it exists (check both global variable and humidors array)
+    const wishListOption = wishListHumidor || humidors.find(h => h.is_wishlist === true);
+    if (wishListOption) {
+        const option = document.createElement('option');
+        option.value = wishListOption.id;
+        option.textContent = '📝 ' + wishListOption.name;
+        if (humidorId && wishListOption.id === humidorId) {
+            option.selected = true;
+        }
+        humidorSelect.appendChild(option);
+    }
     
     console.log(`✓ Humidor dropdown populated with ${humidors.length} options`);
     
@@ -2538,6 +2608,24 @@ async function saveCigar() {
             document.getElementById('cigarImageUpload').value = '';
             
             await loadHumidors();
+            
+            // Check if the cigar was added to the wish list
+            const wishList = humidors.find(h => h.is_wishlist === true);
+            const addedToWishList = wishList && savedCigar.humidor_id === wishList.id;
+            
+            console.log('→ Checking if cigar was added to wish list...');
+            console.log('  - Current page:', currentPage);
+            console.log('  - Wish list exists:', !!wishList);
+            console.log('  - Saved cigar humidor_id:', savedCigar.humidor_id);
+            console.log('  - Wish list humidor_id:', wishList ? wishList.id : 'N/A');
+            console.log('  - Added to wish list:', addedToWishList);
+            
+            // If we're on the wish list page and the cigar was added to the wish list, reload it
+            if (currentPage === 'wishlist' && addedToWishList) {
+                console.log('→ Cigar was added to wish list, reloading wish list page...');
+                await loadWishList();
+            }
+            
             showToast(isEditingCigar ? 'Cigar updated successfully!' : 'Cigar added successfully!', 'success');
             closeCigarModal();
         } else {
@@ -2974,6 +3062,222 @@ async function removeFavorite(cigarId) {
     } catch (error) {
         console.error('Error removing favorite:', error);
         showToast('Failed to remove favorite', 'error');
+    }
+}
+
+// Wish List Functions
+let wishListHumidor = null;
+
+async function getOrCreateWishListHumidor() {
+    try {
+        // Check if wish list humidor already exists
+        const response = await makeAuthenticatedRequest('/api/v1/humidors');
+        const allHumidors = await response.json();
+        
+        wishListHumidor = allHumidors.find(h => h.is_wishlist === true);
+        
+        // If not, create it
+        if (!wishListHumidor) {
+            const createResponse = await makeAuthenticatedRequest('/api/v1/humidors', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: 'Wish List',
+                    description: 'Cigars you want to add to your collection',
+                    capacity: null,
+                    target_humidity: null,
+                    location: null,
+                    is_wishlist: true
+                })
+            });
+            
+            wishListHumidor = await createResponse.json();
+            console.log('✓ Wish list humidor created:', wishListHumidor);
+        }
+        
+        return wishListHumidor;
+    } catch (error) {
+        console.error('Error creating wish list humidor:', error);
+        throw error;
+    }
+}
+
+async function loadWishList() {
+    try {
+        await getOrCreateWishListHumidor();
+        
+        if (!wishListHumidor) {
+            showToast('Failed to load wish list', 'error');
+            return;
+        }
+        
+        // Load cigars from wish list humidor
+        const response = await makeAuthenticatedRequest(`/api/v1/cigars?humidor_id=${wishListHumidor.id}`, {
+            method: 'GET'
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to fetch wish list cigars');
+        }
+        
+        const data = await response.json();
+        const wishListCigars = data.cigars || [];
+        console.log(`✓ Loaded ${wishListCigars.length} cigars for wish list:`, wishListCigars);
+        
+        const emptyState = document.getElementById('wishlistEmptyState');
+        const wishlistGrid = document.getElementById('wishlistGrid');
+        
+        if (wishListCigars.length === 0) {
+            emptyState.style.display = 'block';
+            wishlistGrid.style.display = 'none';
+        } else {
+            emptyState.style.display = 'none';
+            wishlistGrid.style.display = 'grid';
+            wishlistGrid.innerHTML = wishListCigars.map(cigar => createWishListCard(cigar)).join('');
+        }
+    } catch (error) {
+        console.error('Error loading wish list:', error);
+        showToast('Failed to load wish list', 'error');
+    }
+}
+
+function createWishListCard(cigar) {
+    const brandName = getBrandName(cigar.brand_id);
+    
+    const imageHtml = cigar.image_url 
+        ? `<img src="${cigar.image_url}" alt="${cigar.name}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+           <img src="/static/cigar-placeholder.png" alt="Cigar placeholder" style="display: none; width: 100%; height: 100%; object-fit: contain; padding: 2rem;">`
+        : `<img src="/static/cigar-placeholder.png" alt="Cigar placeholder" style="width: 100%; height: 100%; object-fit: contain; padding: 2rem;">`;
+    
+    return `
+        <div class="cigar-card wishlist-card" data-cigar-id="${cigar.id}" onclick="openReportCard('${cigar.id}')">
+            <div class="cigar-card-image">
+                ${imageHtml}
+                <div class="cigar-card-actions" onclick="event.stopPropagation();">
+                    <button class="action-btn edit-btn" onclick="editCigar('${cigar.id}')" title="Edit">✏️</button>
+                    <button class="action-btn delete-btn" onclick="deleteWishListCigar('${cigar.id}')" title="Delete">🗑️</button>
+                </div>
+            </div>
+            <div class="cigar-card-content">
+                <div class="cigar-card-brand">${brandName}</div>
+                <h3 class="cigar-card-name">${cigar.name}</h3>
+            </div>
+        </div>
+    `;
+}
+
+async function moveCigarToHumidor(cigarId, event) {
+    event?.stopPropagation();
+    
+    try {
+        // Get list of regular humidors (not wish list)
+        const response = await makeAuthenticatedRequest('/api/v1/humidors', {
+            method: 'GET'
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to fetch humidors');
+        }
+        
+        const allHumidors = await response.json();
+        const regularHumidors = allHumidors.filter(h => !h.is_wishlist);
+        
+        if (regularHumidors.length === 0) {
+            showToast('Please create a humidor first', 'error');
+            return;
+        }
+        
+        // Show selection modal
+        const humidorId = await showHumidorSelectionModal(regularHumidors);
+        
+        if (!humidorId) return; // User cancelled
+        
+        // Update the cigar's humidor_id
+        const updateResponse = await makeAuthenticatedRequest(`/api/v1/cigars/${cigarId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                humidor_id: humidorId
+            })
+        });
+        
+        if (!updateResponse.ok) {
+            throw new Error('Failed to update cigar');
+        }
+        
+        showToast('Cigar moved to humidor successfully!');
+        await loadHumidors(); // Reload all data
+        
+        // If we're on the wish list page, reload it
+        if (currentPage === 'wishlist') {
+            await loadWishList();
+        }
+    } catch (error) {
+        console.error('Error moving cigar:', error);
+        showToast('Failed to move cigar', 'error');
+    }
+}
+
+function showHumidorSelectionModal(humidors) {
+    return new Promise((resolve) => {
+        const modal = document.createElement('div');
+        modal.className = 'modal show';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 400px;">
+                <div class="modal-header">
+                    <h2>Select Humidor</h2>
+                    <button class="close-btn" onclick="this.closest('.modal').remove(); event.stopPropagation();">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Choose a humidor:</label>
+                        <select id="humidorSelect" class="form-control">
+                            ${humidors.map(h => `<option value="${h.id}">${h.name}</option>`).join('')}
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" onclick="this.closest('.modal').remove();">Cancel</button>
+                    <button class="btn-primary" id="confirmMoveBtn">Move</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        document.getElementById('confirmMoveBtn').addEventListener('click', () => {
+            const selectedId = document.getElementById('humidorSelect').value;
+            modal.remove();
+            resolve(selectedId);
+        });
+        
+        modal.querySelector('.close-btn').addEventListener('click', () => {
+            resolve(null);
+        });
+        
+        modal.querySelector('.btn-secondary').addEventListener('click', () => {
+            resolve(null);
+        });
+    });
+}
+
+async function deleteWishListCigar(cigarId, event) {
+    event?.stopPropagation();
+    
+    if (!confirm('Are you sure you want to remove this cigar from your wish list?')) {
+        return;
+    }
+    
+    try {
+        await makeAuthenticatedRequest(`/api/v1/cigars/${cigarId}`, {
+            method: 'DELETE'
+        });
+        
+        showToast('Cigar removed from wish list');
+        await loadWishList();
+    } catch (error) {
+        console.error('Error deleting cigar:', error);
+        showToast('Failed to delete cigar', 'error');
     }
 }
 

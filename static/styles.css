@@ -694,9 +694,13 @@ body {
     border-radius: 0.5rem;
     font-size: 1rem;
     font-family: 'Inter', system-ui, sans-serif;
-    background: var(--surface-color);
-    color: var(--text-primary);
+    background: #ffffff !important;
+    color: #000000 !important;
     transition: all 0.2s ease;
+}
+
+.cigar-search-section .search-input::placeholder {
+    color: #666666 !important;
 }
 
 .cigar-search-section .search-input:focus {
@@ -846,10 +850,10 @@ body {
 .filter-search .search-input {
     width: 100%;
     padding: 0.75rem 1rem;
-    background: rgba(0, 0, 0, 0.3);
+    background: rgba(255, 255, 255, 0.9);
     border: 1px solid rgba(212, 175, 55, 0.2);
     border-radius: 0.5rem;
-    color: var(--text-primary);
+    color: #000000;
     font-size: 0.95rem;
 }
 
@@ -3316,14 +3320,17 @@ body {
 /* Report Card Modal */
 .report-card-content {
     max-width: 1000px;
-    width: fit-content;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
 }
 
 .report-card-body {
     display: grid;
-    grid-template-columns: 360px auto;
+    grid-template-columns: minmax(300px, 360px) 1fr;
     gap: 2rem;
     padding: 1.5rem 2.5rem 1.5rem 2rem;
+    overflow: hidden;
 }
 
 .report-card-image-section {
@@ -3378,7 +3385,7 @@ body {
 
 .report-card-grid {
     display: grid;
-    grid-template-columns: auto 1fr auto 1fr;
+    grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr);
     gap: 1.25rem 1.5rem;
     align-items: center;
 }
@@ -3539,6 +3546,31 @@ body {
 }
 
 .favorites-section .page-subtitle {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    margin-top: 0.5rem;
+}
+
+/* Wish List Section */
+.wishlist-section {
+    padding: 2rem 3rem;
+}
+
+.wishlist-empty-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 400px;
+}
+
+.wishlist-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin-top: 2rem;
+}
+
+.wishlist-section .page-subtitle {
     color: var(--text-secondary);
     font-size: 0.95rem;
     margin-top: 0.5rem;
