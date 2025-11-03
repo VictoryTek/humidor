@@ -4,6 +4,7 @@ use warp::Reply;
 use serde_json::json;
 use uuid::Uuid;
 use chrono::Utc;
+use std::env;
 
 // Authentication and JWT utilities
 use jsonwebtoken::{encode, decode, Header, Algorithm, Validation, EncodingKey, DecodingKey};
@@ -17,7 +18,13 @@ pub struct Claims {
     pub exp: usize, // expiration time
 }
 
-const JWT_SECRET: &str = "your-secret-key"; // In production, use environment variable
+/// Get JWT secret from environment variable
+/// This function will panic at startup if JWT_SECRET is not set, which is intentional
+/// to prevent running with an insecure default
+fn jwt_secret() -> String {
+    env::var("JWT_SECRET")
+        .expect("JWT_SECRET environment variable must be set. Generate one with: openssl rand -base64 32")
+}
 
 // Setup endpoints
 pub async fn get_setup_status(db: DbPool) -> Result<impl Reply, warp::Rejection> {
@@ -369,13 +376,15 @@ fn generate_token(user_id: &str, username: &str) -> Result<String, jsonwebtoken:
     };
     
     let header = Header::new(Algorithm::HS256);
-    let key = EncodingKey::from_secret(JWT_SECRET.as_ref());
+    let secret = jwt_secret();
+    let key = EncodingKey::from_secret(secret.as_bytes());
     
     encode(&header, &claims, &key)
 }
 
 pub fn verify_token(token: &str) -> Result<Claims, jsonwebtoken::errors::Error> {
-    let key = DecodingKey::from_secret(JWT_SECRET.as_ref());
+    let secret = jwt_secret();
+    let key = DecodingKey::from_secret(secret.as_bytes());
     let validation = Validation::new(Algorithm::HS256);
     
     decode::<Claims>(token, &key, &validation).map(|data| data.claims)

@@ -23,6 +23,7 @@ services:
       DATABASE_URL: postgresql://humidor_user:humidor_pass@db:5432/humidor_db
       RUST_LOG: info
       PORT: 9898
+      JWT_SECRET: ${JWT_SECRET:-please_change_this_to_a_secure_random_value_in_production}
     ports:
       - "9898:9898"
     depends_on:
