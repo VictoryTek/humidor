@@ -1,10 +1,10 @@
+use crate::errors::AppError;
 use crate::handlers::auth::verify_token;
 use crate::models::UserResponse;
 use crate::DbPool;
-use crate::errors::AppError;
 use std::convert::Infallible;
-use warp::{Filter, Rejection, reject};
 use uuid::Uuid;
+use warp::{reject, Filter, Rejection};
 
 // Authentication context that gets passed to handlers
 #[derive(Debug, Clone)]
@@ -23,7 +23,7 @@ impl AuthContext {
             user: None,
         }
     }
-    
+
     pub fn with_user(mut self, user: UserResponse) -> Self {
         self.user = Some(user);
         self
@@ -40,7 +40,7 @@ fn extract_token_from_headers(headers: &warp::http::HeaderMap) -> Option<String>
             }
         }
     }
-    
+
     // Then try cookie
     if let Some(cookie_header) = headers.get(warp::http::header::COOKIE) {
         if let Ok(cookie_str) = cookie_header.to_str() {
@@ -52,41 +52,48 @@ fn extract_token_from_headers(headers: &warp::http::HeaderMap) -> Option<String>
             }
         }
     }
-    
+
     None
 }
 
 // Middleware that extracts and validates JWT token
 pub fn with_auth() -> impl Filter<Extract = (AuthContext,), Error = Rejection> + Clone {
-    warp::header::headers_cloned()
-        .and_then(|headers: warp::http::HeaderMap| async move {
-            let token = extract_token_from_headers(&headers)
-                .ok_or_else(|| reject::custom(AppError::Unauthorized))?;
-            
-            let claims = verify_token(&token)
-                .map_err(|_| reject::custom(AppError::Unauthorized))?;
-            
-            let user_id = Uuid::parse_str(&claims.sub)
-                .map_err(|_| reject::custom(AppError::Unauthorized))?;
-            
-            Ok::<AuthContext, Rejection>(AuthContext::new(user_id, claims.username))
-        })
+    warp::header::headers_cloned().and_then(|headers: warp::http::HeaderMap| async move {
+        let token = extract_token_from_headers(&headers)
+            .ok_or_else(|| reject::custom(AppError::Unauthorized))?;
+
+        let claims = verify_token(&token).map_err(|_| reject::custom(AppError::Unauthorized))?;
+
+        let user_id =
+            Uuid::parse_str(&claims.sub).map_err(|_| reject::custom(AppError::Unauthorized))?;
+
+        Ok::<AuthContext, Rejection>(AuthContext::new(user_id, claims.username))
+    })
 }
 
 // Middleware that includes user data from database
 pub fn with_current_user(
-    db: DbPool,
+    pool: DbPool,
 ) -> impl Filter<Extract = (AuthContext,), Error = Rejection> + Clone {
     with_auth()
-        .and(warp::any().map(move || db.clone()))
-        .and_then(|auth_ctx: AuthContext, db: DbPool| async move {
+        .and(warp::any().map(move || pool.clone()))
+        .and_then(|auth_ctx: AuthContext, pool: DbPool| async move {
+            // Get connection from pool
+            let db = match pool.get().await {
+                Ok(conn) => conn,
+                Err(e) => {
+                    eprintln!("Failed to get database connection in auth middleware: {}", e);
+                    return Err(reject::custom(AppError::Unauthorized));
+                }
+            };
+            
             // Fetch user data from database
             let query = "
                 SELECT id, username, email, full_name, is_admin, is_active, created_at, updated_at
                 FROM users 
                 WHERE id = $1 AND is_active = true
             ";
-            
+
             match db.query_opt(query, &[&auth_ctx.user_id]).await {
                 Ok(Some(row)) => {
                     let user = UserResponse {
@@ -99,7 +106,7 @@ pub fn with_current_user(
                         created_at: row.get("created_at"),
                         updated_at: row.get("updated_at"),
                     };
-                    
+
                     Ok(auth_ctx.with_user(user))
                 }
                 Ok(None) => Err(reject::custom(AppError::Unauthorized)),
@@ -113,23 +120,20 @@ pub fn with_current_user(
 
 // Optional auth that doesn't fail if no token is present
 #[allow(dead_code)]
-pub fn with_optional_auth() -> impl Filter<Extract = (Option<AuthContext>,), Error = Infallible> + Clone {
-    warp::header::headers_cloned()
-        .map(|headers: warp::http::HeaderMap| {
-            let token = match extract_token_from_headers(&headers) {
-                Some(token) => token,
-                None => return None,
-            };
-            
-            match verify_token(&token) {
-                Ok(claims) => {
-                    match Uuid::parse_str(&claims.sub) {
-                        Ok(user_id) => Some(AuthContext::new(user_id, claims.username)),
-                        Err(_) => None,
-                    }
-                }
-                Err(_) => None,
-            }
-        })
-}
+pub fn with_optional_auth(
+) -> impl Filter<Extract = (Option<AuthContext>,), Error = Infallible> + Clone {
+    warp::header::headers_cloned().map(|headers: warp::http::HeaderMap| {
+        let token = match extract_token_from_headers(&headers) {
+            Some(token) => token,
+            None => return None,
+        };
 
+        match verify_token(&token) {
+            Ok(claims) => match Uuid::parse_str(&claims.sub) {
+                Ok(user_id) => Some(AuthContext::new(user_id, claims.username)),
+                Err(_) => None,
+            },
+            Err(_) => None,
+        }
+    })
+}

@@ -62,80 +62,134 @@ impl ErrorResponse {
     }
 }
 
-/// Convert AppError to HTTP response
-pub async fn handle_rejection(err: warp::Rejection) -> Result<impl Reply, std::convert::Infallible> {
-    let (code, error_type, message) = if err.is_not_found() {
-        (
-            StatusCode::NOT_FOUND,
-            "NOT_FOUND",
-            "Resource not found".to_string(),
-        )
-    } else if let Some(app_err) = err.find::<AppError>() {
-        match app_err {
-            AppError::DatabaseError(msg) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "DATABASE_ERROR",
-                msg.clone(),
-            ),
+impl AppError {
+    /// Convert AppError to HTTP response with proper error hiding
+    /// Internal errors are logged but never exposed to clients
+    pub fn to_http_response(&self) -> (StatusCode, ErrorResponse) {
+        match self {
             AppError::ValidationError(msg) => (
                 StatusCode::BAD_REQUEST,
-                "VALIDATION_ERROR",
-                msg.clone(),
+                ErrorResponse::new("VALIDATION_FAILED", msg),
             ),
             AppError::Unauthorized => (
                 StatusCode::UNAUTHORIZED,
-                "UNAUTHORIZED",
-                "Authentication required".to_string(),
+                ErrorResponse::new("UNAUTHORIZED", "Authentication required"),
             ),
-            AppError::Forbidden => (
-                StatusCode::FORBIDDEN,
-                "FORBIDDEN",
-                "Access denied".to_string(),
-            ),
-            AppError::NotFound(msg) => (
+            AppError::NotFound(resource) => (
                 StatusCode::NOT_FOUND,
-                "NOT_FOUND",
-                msg.clone(),
+                ErrorResponse::new("NOT_FOUND", &format!("{} not found", resource)),
             ),
             AppError::Conflict(msg) => (
                 StatusCode::CONFLICT,
-                "CONFLICT",
-                msg.clone(),
+                ErrorResponse::new("CONFLICT", msg),
             ),
+            // Never expose database errors externally
+            AppError::DatabaseError(internal_msg) => {
+                tracing::error!(
+                    error_type = "database_error",
+                    error = %internal_msg,
+                    "Database error occurred"
+                );
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    ErrorResponse::new("INTERNAL_ERROR", "An error occurred processing your request"),
+                )
+            },
+            // Never expose internal server errors externally
+            AppError::InternalServerError(internal_msg) => {
+                tracing::error!(
+                    error_type = "internal_server_error",
+                    error = %internal_msg,
+                    "Internal server error occurred"
+                );
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    ErrorResponse::new("INTERNAL_ERROR", "An error occurred"),
+                )
+            },
             AppError::BadRequest(msg) => (
                 StatusCode::BAD_REQUEST,
-                "BAD_REQUEST",
-                msg.clone(),
+                ErrorResponse::new("BAD_REQUEST", msg),
             ),
-            AppError::InternalServerError(msg) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "INTERNAL_SERVER_ERROR",
-                msg.clone(),
+            AppError::Forbidden => (
+                StatusCode::FORBIDDEN,
+                ErrorResponse::new("FORBIDDEN", "Access denied"),
             ),
         }
+    }
+}
+
+/// Convert rejection to HTTP response using standardized error handling
+/// This ensures internal errors are never exposed to clients
+pub async fn handle_rejection(
+    err: warp::Rejection,
+) -> Result<impl Reply, std::convert::Infallible> {
+    let (status, body) = if let Some(app_err) = err.find::<AppError>() {
+        // Use the standardized error converter
+        app_err.to_http_response()
+    } else if err.is_not_found() {
+        (
+            StatusCode::NOT_FOUND,
+            ErrorResponse::new("NOT_FOUND", "Resource not found"),
+        )
     } else if err.find::<warp::reject::MethodNotAllowed>().is_some() {
         (
             StatusCode::METHOD_NOT_ALLOWED,
-            "METHOD_NOT_ALLOWED",
-            "Method not allowed".to_string(),
+            ErrorResponse::new("METHOD_NOT_ALLOWED", "Method not allowed"),
         )
-    } else if err.find::<warp::body::BodyDeserializeError>().is_some() {
+    } else if let Some(e) = err.find::<warp::body::BodyDeserializeError>() {
+        tracing::warn!(
+            error_type = "body_deserialize_error",
+            error = %e,
+            "Failed to deserialize request body"
+        );
         (
             StatusCode::BAD_REQUEST,
-            "INVALID_BODY",
-            "Invalid request body".to_string(),
+            ErrorResponse::new("INVALID_BODY", "Invalid request body"),
+        )
+    } else if err.find::<warp::reject::InvalidQuery>().is_some() {
+        tracing::warn!(
+            error_type = "invalid_query",
+            "Invalid query parameters"
+        );
+        (
+            StatusCode::BAD_REQUEST,
+            ErrorResponse::new("INVALID_QUERY", "Invalid query parameters"),
+        )
+    } else if err.find::<warp::reject::MissingHeader>().is_some() {
+        (
+            StatusCode::BAD_REQUEST,
+            ErrorResponse::new("MISSING_HEADER", "Missing required header"),
+        )
+    } else if err.find::<warp::reject::InvalidHeader>().is_some() {
+        (
+            StatusCode::BAD_REQUEST,
+            ErrorResponse::new("INVALID_HEADER", "Invalid header value"),
+        )
+    } else if err.find::<warp::reject::PayloadTooLarge>().is_some() {
+        (
+            StatusCode::PAYLOAD_TOO_LARGE,
+            ErrorResponse::new("PAYLOAD_TOO_LARGE", "Request payload too large"),
+        )
+    } else if err.find::<warp::reject::UnsupportedMediaType>().is_some() {
+        (
+            StatusCode::UNSUPPORTED_MEDIA_TYPE,
+            ErrorResponse::new("UNSUPPORTED_MEDIA_TYPE", "Unsupported media type"),
         )
     } else {
-        eprintln!("Unhandled rejection: {:?}", err);
+        // Log unhandled rejections but don't expose details
+        tracing::error!(
+            error_type = "unhandled_rejection",
+            error = ?err,
+            "Unhandled rejection occurred"
+        );
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            "INTERNAL_ERROR",
-            "Internal server error".to_string(),
+            ErrorResponse::new("INTERNAL_ERROR", "An error occurred"),
         )
     };
 
-    let json = warp::reply::json(&ErrorResponse::new(error_type, &message));
-    Ok(warp::reply::with_status(json, code))
+    Ok(warp::reply::with_status(warp::reply::json(&body), status))
 }
 
 /// Helper macro to convert database errors

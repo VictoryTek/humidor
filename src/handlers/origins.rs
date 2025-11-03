@@ -1,11 +1,18 @@
 use chrono::Utc;
 use serde_json::json;
 use uuid::Uuid;
-use warp::{Reply, Rejection};
+use warp::{Rejection, Reply};
 
-use crate::{DbPool, models::*, validation::Validate};
+use crate::{errors::AppError, models::*, validation::Validate, DbPool};
 
-pub async fn get_origins(db: DbPool) -> Result<impl Reply, Rejection> {
+pub async fn get_origins(pool: DbPool) -> Result<impl Reply, Rejection> {
+    let db = pool.get().await.map_err(|e| {
+        eprintln!("Failed to get database connection: {}", e);
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
+    })?;
+
     match db.query(
         "SELECT id, name, country, region, description, created_at, updated_at FROM origins ORDER BY country ASC",
         &[]
@@ -33,19 +40,40 @@ pub async fn get_origins(db: DbPool) -> Result<impl Reply, Rejection> {
     }
 }
 
-pub async fn create_origin(create_origin: CreateOrigin, db: DbPool) -> Result<impl Reply, Rejection> {
+pub async fn create_origin(
+    create_origin: CreateOrigin,
+    pool: DbPool,
+) -> Result<impl Reply, Rejection> {
     // Validate input
     create_origin.validate().map_err(warp::reject::custom)?;
-    
+
     let id = Uuid::new_v4();
     let now = Utc::now();
-    
-    match db.query_one(
-        "INSERT INTO origins (id, name, country, region, description, created_at, updated_at) 
+
+    let db = pool.get().await.map_err(|e| {
+        eprintln!("Failed to get database connection: {}", e);
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
+    })?;
+
+    match db
+        .query_one(
+            "INSERT INTO origins (id, name, country, region, description, created_at, updated_at) 
          VALUES ($1, $2, $3, $4, $5, $6, $7) 
          RETURNING id, name, country, region, description, created_at, updated_at",
-        &[&id, &create_origin.name, &create_origin.country, &create_origin.region, &create_origin.description, &now, &now]
-    ).await {
+            &[
+                &id,
+                &create_origin.name,
+                &create_origin.country,
+                &create_origin.region,
+                &create_origin.description,
+                &now,
+                &now,
+            ],
+        )
+        .await
+    {
         Ok(row) => {
             let origin = Origin {
                 id: row.get(0),
@@ -60,19 +88,33 @@ pub async fn create_origin(create_origin: CreateOrigin, db: DbPool) -> Result<im
         }
         Err(e) => {
             eprintln!("Database error: {}", e);
-            Ok(warp::reply::json(&json!({"error": "Failed to create origin"})))
+            Ok(warp::reply::json(
+                &json!({"error": "Failed to create origin"}),
+            ))
         }
     }
 }
 
-pub async fn update_origin(id: Uuid, update_origin: UpdateOrigin, db: DbPool) -> Result<impl Reply, Rejection> {
+pub async fn update_origin(
+    id: Uuid,
+    update_origin: UpdateOrigin,
+    pool: DbPool,
+) -> Result<impl Reply, Rejection> {
     // Validate input
     update_origin.validate().map_err(warp::reject::custom)?;
-    
+
     let now = Utc::now();
-    
-    match db.query_one(
-        "UPDATE origins SET 
+
+    let db = pool.get().await.map_err(|e| {
+        eprintln!("Failed to get database connection: {}", e);
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
+    })?;
+
+    match db
+        .query_one(
+            "UPDATE origins SET 
          name = COALESCE($2, name),
          country = COALESCE($3, country),
          region = COALESCE($4, region),
@@ -80,8 +122,17 @@ pub async fn update_origin(id: Uuid, update_origin: UpdateOrigin, db: DbPool) ->
          updated_at = $6
          WHERE id = $1
          RETURNING id, name, country, region, description, created_at, updated_at",
-        &[&id, &update_origin.name, &update_origin.country, &update_origin.region, &update_origin.description, &now]
-    ).await {
+            &[
+                &id,
+                &update_origin.name,
+                &update_origin.country,
+                &update_origin.region,
+                &update_origin.description,
+                &now,
+            ],
+        )
+        .await
+    {
         Ok(row) => {
             let origin = Origin {
                 id: row.get(0),
@@ -96,23 +147,39 @@ pub async fn update_origin(id: Uuid, update_origin: UpdateOrigin, db: DbPool) ->
         }
         Err(e) => {
             eprintln!("Database error: {}", e);
-            Ok(warp::reply::json(&json!({"error": "Failed to update origin"})))
+            Ok(warp::reply::json(
+                &json!({"error": "Failed to update origin"}),
+            ))
         }
     }
 }
 
-pub async fn delete_origin(id: Uuid, db: DbPool) -> Result<impl Reply, Rejection> {
-    match db.execute("DELETE FROM origins WHERE id = $1", &[&id]).await {
+pub async fn delete_origin(id: Uuid, pool: DbPool) -> Result<impl Reply, Rejection> {
+    let db = pool.get().await.map_err(|e| {
+        eprintln!("Failed to get database connection: {}", e);
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
+    })?;
+
+    match db
+        .execute("DELETE FROM origins WHERE id = $1", &[&id])
+        .await
+    {
         Ok(rows_affected) => {
             if rows_affected > 0 {
-                Ok(warp::reply::json(&json!({"message": "Origin deleted successfully"})))
+                Ok(warp::reply::json(
+                    &json!({"message": "Origin deleted successfully"}),
+                ))
             } else {
                 Ok(warp::reply::json(&json!({"error": "Origin not found"})))
             }
         }
         Err(e) => {
             eprintln!("Database error: {}", e);
-            Ok(warp::reply::json(&json!({"error": "Failed to delete origin"})))
+            Ok(warp::reply::json(
+                &json!({"error": "Failed to delete origin"}),
+            ))
         }
     }
 }

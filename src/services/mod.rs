@@ -82,17 +82,11 @@ impl CigarScraper {
     fn extract_brand_and_name(&self, full_name: &str) -> (Option<String>, Option<String>) {
         // Try to split on common separators
         if let Some((brand, name)) = full_name.split_once(" - ") {
-            return (
-                self.clean_text(brand),
-                self.clean_text(name),
-            );
+            return (self.clean_text(brand), self.clean_text(name));
         }
 
         if let Some((brand, name)) = full_name.split_once(" by ") {
-            return (
-                self.clean_text(brand),
-                self.clean_text(name),
-            );
+            return (self.clean_text(brand), self.clean_text(name));
         }
 
         // Try splitting on first word
@@ -111,10 +105,7 @@ impl CigarScraper {
         // Look for size pattern like "6 x 52" or "6.5 x 52"
         let size_re = Regex::new(r"(\d+\.?\d*)\s*x\s*(\d+)").unwrap();
         if let Some(caps) = size_re.captures(text) {
-            return (
-                Some(caps[1].to_string()),
-                Some(caps[2].to_string()),
-            );
+            return (Some(caps[1].to_string()), Some(caps[2].to_string()));
         }
         (None, None)
     }
@@ -123,13 +114,16 @@ impl CigarScraper {
         let text_lower = text.to_lowercase();
         for strength in &["medium-full", "medium full", "full", "medium", "mild"] {
             if text_lower.contains(strength) {
-                return Some(match *strength {
-                    "medium-full" | "medium full" => "Medium-Full",
-                    "full" => "Full",
-                    "medium" => "Medium",
-                    "mild" => "Mild",
-                    _ => strength,
-                }.to_string());
+                return Some(
+                    match *strength {
+                        "medium-full" | "medium full" => "Medium-Full",
+                        "full" => "Full",
+                        "medium" => "Medium",
+                        "mild" => "Mild",
+                        _ => strength,
+                    }
+                    .to_string(),
+                );
             }
         }
         None
@@ -137,24 +131,39 @@ impl CigarScraper {
 
     fn extract_origin(&self, text: &str) -> Option<String> {
         let text_lower = text.to_lowercase();
-        for origin in &["nicaragua", "dominican republic", "honduras", "cuba", "ecuador", "connecticut", "mexico"] {
+        for origin in &[
+            "nicaragua",
+            "dominican republic",
+            "honduras",
+            "cuba",
+            "ecuador",
+            "connecticut",
+            "mexico",
+        ] {
             if text_lower.contains(origin) {
-                return Some(match *origin {
-                    "nicaragua" => "Nicaragua",
-                    "dominican republic" => "Dominican Republic",
-                    "honduras" => "Honduras",
-                    "cuba" => "Cuba",
-                    "ecuador" => "Ecuador",
-                    "connecticut" => "Connecticut",
-                    "mexico" => "Mexico",
-                    _ => origin,
-                }.to_string());
+                return Some(
+                    match *origin {
+                        "nicaragua" => "Nicaragua",
+                        "dominican republic" => "Dominican Republic",
+                        "honduras" => "Honduras",
+                        "cuba" => "Cuba",
+                        "ecuador" => "Ecuador",
+                        "connecticut" => "Connecticut",
+                        "mexico" => "Mexico",
+                        _ => origin,
+                    }
+                    .to_string(),
+                );
             }
         }
         None
     }
 
-    fn scrape_cigar_aficionado(&self, document: &Html, _url: &str) -> Result<ScrapedCigarData, Box<dyn std::error::Error>> {
+    fn scrape_cigar_aficionado(
+        &self,
+        document: &Html,
+        _url: &str,
+    ) -> Result<ScrapedCigarData, Box<dyn std::error::Error>> {
         let mut result = ScrapedCigarData::new();
 
         // Try to find title
@@ -169,11 +178,11 @@ impl CigarScraper {
 
         // Look through all text for details
         let body_text = document.root_element().text().collect::<String>();
-        
+
         let (length, ring_gauge) = self.extract_size_info(&body_text);
         result.length = length;
         result.ring_gauge = ring_gauge;
-        
+
         result.strength = self.extract_strength(&body_text);
         result.origin = self.extract_origin(&body_text);
 
@@ -181,14 +190,22 @@ impl CigarScraper {
         if let Some(pos) = body_text.to_lowercase().find("wrapper") {
             let wrapper_text = &body_text[pos..pos.saturating_add(100).min(body_text.len())];
             if let Some(line) = wrapper_text.lines().next() {
-                result.wrapper = self.clean_text(line.trim_start_matches("wrapper").trim_start_matches(":").trim());
+                result.wrapper = self.clean_text(
+                    line.trim_start_matches("wrapper")
+                        .trim_start_matches(":")
+                        .trim(),
+                );
             }
         }
 
         Ok(result)
     }
 
-    fn scrape_famous_smoke(&self, document: &Html, _url: &str) -> Result<ScrapedCigarData, Box<dyn std::error::Error>> {
+    fn scrape_famous_smoke(
+        &self,
+        document: &Html,
+        _url: &str,
+    ) -> Result<ScrapedCigarData, Box<dyn std::error::Error>> {
         let mut result = ScrapedCigarData::new();
 
         // Try to find product title
@@ -211,15 +228,27 @@ impl CigarScraper {
         Ok(result)
     }
 
-    fn scrape_cigars_international(&self, document: &Html, _url: &str) -> Result<ScrapedCigarData, Box<dyn std::error::Error>> {
+    fn scrape_cigars_international(
+        &self,
+        document: &Html,
+        _url: &str,
+    ) -> Result<ScrapedCigarData, Box<dyn std::error::Error>> {
         self.scrape_generic(document, _url)
     }
 
-    fn scrape_jr_cigars(&self, document: &Html, _url: &str) -> Result<ScrapedCigarData, Box<dyn std::error::Error>> {
+    fn scrape_jr_cigars(
+        &self,
+        document: &Html,
+        _url: &str,
+    ) -> Result<ScrapedCigarData, Box<dyn std::error::Error>> {
         self.scrape_generic(document, _url)
     }
 
-    fn scrape_generic(&self, document: &Html, _url: &str) -> Result<ScrapedCigarData, Box<dyn std::error::Error>> {
+    fn scrape_generic(
+        &self,
+        document: &Html,
+        _url: &str,
+    ) -> Result<ScrapedCigarData, Box<dyn std::error::Error>> {
         let mut result = ScrapedCigarData::new();
 
         // Try to find any h1 as product name

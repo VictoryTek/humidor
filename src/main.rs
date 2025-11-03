@@ -1,418 +1,197 @@
 #![recursion_limit = "256"]
 
-mod handlers;
-mod models;
-mod middleware;
 mod errors;
-mod validation;
+mod handlers;
+mod middleware;
+mod models;
 mod services;
+mod validation;
 
-use std::{env, sync::Arc};
-use tokio_postgres::{NoTls, Client};
+use deadpool_postgres::{Config, ManagerConfig, Pool, RecyclingMethod, Runtime};
+use middleware::{handle_rejection, with_current_user};
+use refinery::embed_migrations;
+use std::env;
+use std::fs;
+use tokio_postgres::NoTls;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 use warp::{Filter, Reply};
-use tracing_subscriber;
-use middleware::{with_current_user, handle_rejection};
+use warp::log;
 
-type DbPool = Arc<Client>;
+// Embed migrations from the migrations directory
+embed_migrations!("migrations");
+
+type DbPool = Pool;
 
 #[derive(Debug)]
 struct InvalidUuid;
 impl warp::reject::Reject for InvalidUuid {}
 
+/// Read a secret from Docker secrets or fall back to environment variable
+/// Docker secrets are mounted at /run/secrets/<secret_name>
+fn read_secret(secret_name: &str, env_var: &str) -> Option<String> {
+    let secret_path = format!("/run/secrets/{}", secret_name);
+    
+    // Try Docker secret file first
+    if let Ok(content) = fs::read_to_string(&secret_path) {
+        tracing::debug!(
+            secret_name = secret_name,
+            source = "docker_secret",
+            "Successfully read secret from file"
+        );
+        return Some(content.trim().to_string());
+    }
+    
+    // Fall back to environment variable
+    if let Ok(value) = env::var(env_var) {
+        tracing::debug!(
+            secret_name = secret_name,
+            env_var = env_var,
+            source = "environment",
+            "Successfully read secret from environment"
+        );
+        return Some(value);
+    }
+    
+    tracing::warn!(
+        secret_name = secret_name,
+        env_var = env_var,
+        "Failed to read secret from both Docker secrets and environment"
+    );
+    None
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenvy::dotenv().ok();
-    
-    tracing_subscriber::fmt::init();
 
-    let database_url = env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgresql://humidor_user:humidor_pass@localhost:5432/humidor_db".to_string());
+    // Enhanced structured logging with JSON format
+    tracing_subscriber::registry()
+        .with(
+            EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "humidor=info,warp=info,refinery=info".into())
+        )
+        .with(
+            tracing_subscriber::fmt::layer()
+                .with_target(true)
+                .with_thread_ids(true)
+                .with_line_number(true)
+                .json()
+        )
+        .init();
 
-    let (client, connection) = tokio_postgres::connect(&database_url, NoTls).await?;
+    tracing::info!(
+        app_name = "humidor",
+        version = env!("CARGO_PKG_VERSION"),
+        "Starting Humidor application"
+    );
+
+    // Build DATABASE_URL from secrets or environment
+    let database_url = if let Some(template) = env::var("DATABASE_URL_TEMPLATE").ok() {
+        // Using Docker secrets - read username and password from secret files
+        let db_user = read_secret("db_user", "DB_USER")
+            .unwrap_or_else(|| "humidor_user".to_string());
+        let db_password = read_secret("db_password", "DB_PASSWORD")
+            .unwrap_or_else(|| "humidor_pass".to_string());
+        
+        template
+            .replace("{{DB_USER}}", &db_user)
+            .replace("{{DB_PASSWORD}}", &db_password)
+    } else {
+        // Fall back to DATABASE_URL environment variable or default
+        env::var("DATABASE_URL").unwrap_or_else(|_| {
+            "postgresql://humidor_user:humidor_pass@localhost:5432/humidor_db".to_string()
+        })
+    };
+
+    // Create connection pool configuration
+    tracing::info!(
+        max_connections = 20,
+        recycling_method = "Fast",
+        "Creating database connection pool"
+    );
     
-    // Spawn the connection in a background task
-    tokio::spawn(async move {
-        if let Err(e) = connection.await {
-            eprintln!("Database connection error: {}", e);
-        }
+    let mut config = Config::new();
+    config.url = Some(database_url.clone());
+    config.manager = Some(ManagerConfig {
+        recycling_method: RecyclingMethod::Fast,
     });
 
-    // Run database migrations
-    // Create users table
-    client.execute(
-        "CREATE TABLE IF NOT EXISTS users (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            username VARCHAR(50) UNIQUE NOT NULL,
-            email VARCHAR(255) UNIQUE NOT NULL,
-            full_name VARCHAR(255) NOT NULL,
-            password_hash VARCHAR(255) NOT NULL,
-            is_admin BOOLEAN NOT NULL DEFAULT false,
-            is_active BOOLEAN NOT NULL DEFAULT true,
-            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )",
-        &[],
-    ).await?;
+    // Create the pool with a maximum of 20 connections
+    let pool = config.create_pool(Some(Runtime::Tokio1), NoTls)?;
 
-    // Create humidors table
-    client.execute(
-        "CREATE TABLE IF NOT EXISTS humidors (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-            name VARCHAR(255) NOT NULL,
-            description TEXT,
-            capacity INTEGER,
-            target_humidity INTEGER,
-            location VARCHAR(255),
-            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )",
-        &[],
-    ).await?;
+    // Test the connection and run migrations
+    let mut client = pool.get().await?;
+    tracing::info!(
+        pool_status = "connected",
+        "Database connection pool created successfully"
+    );
 
-    // Create organizer tables FIRST (before cigars table that references them)
-    // Brands table
-    client.execute(
-        "CREATE TABLE IF NOT EXISTS brands (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            name VARCHAR NOT NULL UNIQUE,
-            description TEXT,
-            country VARCHAR,
-            website VARCHAR,
-            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )",
-        &[],
-    ).await?;
-
-    // Sizes table
-    client.execute(
-        "CREATE TABLE IF NOT EXISTS sizes (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            name VARCHAR NOT NULL UNIQUE,
-            length_inches DOUBLE PRECISION,
-            ring_gauge INTEGER,
-            description TEXT,
-            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )",
-        &[],
-    ).await?;
-
-    // Origins table
-    client.execute(
-        "CREATE TABLE IF NOT EXISTS origins (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            name VARCHAR NOT NULL UNIQUE,
-            country VARCHAR NOT NULL,
-            region VARCHAR,
-            description TEXT,
-            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )",
-        &[],
-    ).await?;
-
-    // Strengths table
-    client.execute(
-        "CREATE TABLE IF NOT EXISTS strengths (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            name VARCHAR NOT NULL UNIQUE,
-            level INTEGER NOT NULL,
-            description TEXT,
-            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )",
-        &[],
-    ).await?;
-
-    // Ring Gauges table
-    client.execute(
-        "CREATE TABLE IF NOT EXISTS ring_gauges (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            gauge INTEGER NOT NULL UNIQUE,
-            description TEXT,
-            common_names VARCHAR[],
-            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )",
-        &[],
-    ).await?;
-
-    // Insert default strength values if the table is empty
-    let strength_count: i64 = client
-        .query_one("SELECT COUNT(*) FROM strengths", &[])
-        .await?
-        .get(0);
-    
-    if strength_count == 0 {
-        client.execute(
-            "INSERT INTO strengths (name, level, description) VALUES
-             ('Mild', 1, 'Light and smooth, perfect for beginners'),
-             ('Medium-Mild', 2, 'Slightly more body than mild, still approachable'),
-             ('Medium', 3, 'Balanced strength with good complexity'),
-             ('Medium-Full', 4, 'Strong flavor with substantial body'),
-             ('Full', 5, 'Bold and intense, for experienced smokers')",
-            &[],
-        ).await?;
+    // Run database migrations using refinery
+    tracing::info!("Running database migrations...");
+    match migrations::runner().run_async(&mut **client).await {
+        Ok(report) => {
+            tracing::info!(
+                applied_migrations = report.applied_migrations().len(),
+                "Database migrations completed successfully"
+            );
+        }
+        Err(e) => {
+            tracing::error!(
+                error = %e,
+                "Database migrations failed"
+            );
+            return Err(e.into());
+        }
     }
 
-    // Insert common ring gauges if the table is empty
-    let ring_gauge_count: i64 = client
-        .query_one("SELECT COUNT(*) FROM ring_gauges", &[])
-        .await?
-        .get(0);
-    
-    if ring_gauge_count == 0 {
-        client.execute(
-            "INSERT INTO ring_gauges (gauge, description, common_names) VALUES
-             (38, 'Very thin gauge, quick smoke', ARRAY['Lancero thin', 'Panetela']),
-             (42, 'Classic thin gauge', ARRAY['Corona', 'Petit Corona']),
-             (44, 'Standard corona size', ARRAY['Corona', 'Lonsdale']),
-             (46, 'Popular medium gauge', ARRAY['Corona Gorda', 'Petit Robusto']),
-             (48, 'Medium-thick gauge', ARRAY['Robusto thin']),
-             (50, 'Classic robusto gauge', ARRAY['Robusto', 'Rothschild']),
-             (52, 'Thick robusto gauge', ARRAY['Robusto Extra', 'Toro thin']),
-             (54, 'Toro gauge', ARRAY['Toro', 'Gordo']),
-             (56, 'Churchill gauge', ARRAY['Churchill', 'Double Corona']),
-             (58, 'Thick churchill', ARRAY['Churchill Extra']),
-             (60, 'Very thick gauge', ARRAY['Gordo', 'Double Toro'])",
-            &[],
-        ).await?;
-    }
+    // Drop the migration client back to the pool
+    drop(client);
 
-    // Insert common brands if the table is empty
-    let brand_count: i64 = client
-        .query_one("SELECT COUNT(*) FROM brands", &[])
-        .await?
-        .get(0);
-    
-    if brand_count == 0 {
-        client.execute(
-            "INSERT INTO brands (name, description, country) VALUES
-             ('Arturo Fuente', 'Premium Dominican cigars, known for OpusX and Hemingway lines', 'Dominican Republic'),
-             ('Davidoff', 'Luxury Swiss brand with premium tobacco', 'Switzerland'),
-             ('Padron', 'Family-owned Nicaraguan brand known for quality and consistency', 'Nicaragua'),
-             ('Cohiba', 'Iconic Cuban brand, flagship of Habanos', 'Cuba'),
-             ('Montecristo', 'One of the most recognized Cuban brands worldwide', 'Cuba'),
-             ('Romeo y Julieta', 'Classic Cuban brand with wide variety', 'Cuba'),
-             ('Partagas', 'Historic Cuban brand known for full-bodied cigars', 'Cuba'),
-             ('Hoyo de Monterrey', 'Cuban brand known for mild to medium strength', 'Cuba'),
-             ('Oliva', 'Nicaraguan family business with consistent quality', 'Nicaragua'),
-             ('My Father', 'Premium Nicaraguan brand by Jose ''Pepin'' Garcia', 'Nicaragua'),
-             ('Drew Estate', 'Innovative American brand, makers of Liga Privada and Acid', 'United States'),
-             ('Rocky Patel', 'Popular brand with wide range of blends', 'Honduras'),
-             ('Ashton', 'Premium brand with Dominican and Nicaraguan lines', 'United States'),
-             ('Alec Bradley', 'Honduran brand known for Prensado and Black Market', 'Honduras'),
-             ('La Flor Dominicana', 'Dominican brand known for powerful cigars', 'Dominican Republic'),
-             ('Perdomo', 'Nicaraguan brand with extensive aging program', 'Nicaragua'),
-             ('Tatuaje', 'Boutique brand known for Nicaraguan puros', 'Nicaragua'),
-             ('Liga Privada', 'Premium line from Drew Estate', 'United States'),
-             ('Punch', 'Cuban brand known for robust flavors', 'Cuba'),
-             ('H. Upmann', 'Historic Cuban brand dating to 1844', 'Cuba')",
-            &[],
-        ).await?;
-    }
+    // Use the pool for all handlers
+    let db_pool = pool;
 
-    // Insert common origins if the table is empty
-    let origin_count: i64 = client
-        .query_one("SELECT COUNT(*) FROM origins", &[])
-        .await?
-        .get(0);
-    
-    if origin_count == 0 {
-        client.execute(
-            "INSERT INTO origins (name, country, region, description) VALUES
-             ('Cuba', 'Cuba', NULL, 'Historic birthplace of premium cigars, known for rich flavor profiles'),
-             ('Dominican Republic', 'Dominican Republic', NULL, 'World''s largest cigar producer, known for smooth, mild to medium cigars'),
-             ('Nicaragua', 'Nicaragua', NULL, 'Produces full-bodied, peppery cigars with bold flavors'),
-             ('Honduras', 'Honduras', NULL, 'Known for robust, flavorful cigars with Cuban-seed tobacco'),
-             ('Mexico', 'Mexico', NULL, 'Produces rich, earthy cigars with quality wrapper tobacco'),
-             ('United States', 'United States', NULL, 'Home to premium brands and innovative blends'),
-             ('Ecuador', 'Ecuador', NULL, 'Famous for high-quality Connecticut Shade wrapper tobacco'),
-             ('Brazil', 'Brazil', NULL, 'Known for dark, sweet maduro wrapper leaves'),
-             ('Peru', 'Peru', NULL, 'Emerging origin with quality tobacco production'),
-             ('Costa Rica', 'Costa Rica', NULL, 'Produces mild, smooth cigars with balanced flavor'),
-             ('Panama', 'Panama', NULL, 'Small production of premium boutique cigars'),
-             ('Colombia', 'Colombia', NULL, 'Growing reputation for quality tobacco'),
-             ('Philippines', 'Philippines', NULL, 'Historic cigar production, value-priced offerings'),
-             ('Indonesia', 'Indonesia', NULL, 'Known for Sumatra wrapper tobacco')",
-            &[],
-        ).await?;
-    }
+    // Get server port from environment
+    let port: u16 = env::var("PORT")
+        .ok()
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(9898);
 
-    // Insert common sizes if the table is empty
-    let size_count: i64 = client
-        .query_one("SELECT COUNT(*) FROM sizes", &[])
-        .await?
-        .get(0);
-    
-    if size_count == 0 {
-        client.execute(
-            "INSERT INTO sizes (name, length_inches, ring_gauge, description) VALUES
-             ('Petit Corona', 4.5, 42, 'Small classic size, 30-40 minute smoke'),
-             ('Corona', 5.5, 42, 'Traditional Cuban size, balanced proportions'),
-             ('Corona Gorda', 5.625, 46, 'Larger corona with more body'),
-             ('Petit Robusto', 4.0, 50, 'Short and thick, concentrated flavor'),
-             ('Robusto', 5.0, 50, 'Most popular size, 45-60 minute smoke'),
-             ('Robusto Extra', 5.5, 50, 'Longer robusto for extended enjoyment'),
-             ('Toro', 6.0, 50, 'Popular modern size, well-balanced'),
-             ('Gordo', 6.0, 60, 'Large ring gauge, cooler smoke'),
-             ('Churchill', 7.0, 47, 'Named after Winston Churchill, elegant size'),
-             ('Double Corona', 7.5, 50, 'Large premium size, 90+ minute smoke'),
-             ('Lancero', 7.5, 38, 'Long and thin, concentrated flavors'),
-             ('Panetela', 6.0, 34, 'Slim and elegant, quick smoke'),
-             ('Lonsdale', 6.5, 42, 'Classic thin vitola, refined smoke'),
-             ('Torpedo', 6.125, 52, 'Tapered head, concentrated flavors'),
-             ('Belicoso', 5.0, 52, 'Short pyramid shape with tapered head'),
-             ('Perfecto', 5.0, 48, 'Tapered at both ends, unique experience'),
-             ('Presidente', 8.0, 50, 'Extra-long premium size'),
-             ('Rothschild', 4.5, 50, 'Short robusto, rich and quick'),
-             ('Corona Extra', 5.5, 46, 'Medium size with good balance'),
-             ('Gigante', 9.0, 52, 'Exceptionally large, 2+ hour smoke')",
-            &[],
-        ).await?;
-    }
+    tracing::info!(
+        port = port,
+        environment = env::var("RUST_ENV").unwrap_or_else(|_| "development".to_string()),
+        "Configuring server"
+    );
 
-    // NOW create cigars table (using foreign keys to organizer tables created above)
-    client.execute(
-        "CREATE TABLE IF NOT EXISTS cigars (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            humidor_id UUID REFERENCES humidors(id) ON DELETE SET NULL,
-            brand_id UUID REFERENCES brands(id) ON DELETE SET NULL,
-            name VARCHAR NOT NULL,
-            size_id UUID REFERENCES sizes(id) ON DELETE SET NULL,
-            strength_id UUID REFERENCES strengths(id) ON DELETE SET NULL,
-            origin_id UUID REFERENCES origins(id) ON DELETE SET NULL,
-            wrapper VARCHAR,
-            binder VARCHAR,
-            filler VARCHAR,
-            price DOUBLE PRECISION,
-            purchase_date TIMESTAMPTZ,
-            notes TEXT,
-            quantity INTEGER NOT NULL DEFAULT 1,
-            ring_gauge_id UUID REFERENCES ring_gauges(id) ON DELETE SET NULL,
-            length DOUBLE PRECISION,
-            image_url TEXT,
-            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )",
-        &[],
-    ).await?;
-    
-    // Create indexes for better query performance
-    client.execute("CREATE INDEX IF NOT EXISTS idx_cigars_brand_id ON cigars(brand_id)", &[]).await?;
-    client.execute("CREATE INDEX IF NOT EXISTS idx_cigars_size_id ON cigars(size_id)", &[]).await?;
-    client.execute("CREATE INDEX IF NOT EXISTS idx_cigars_origin_id ON cigars(origin_id)", &[]).await?;
-    client.execute("CREATE INDEX IF NOT EXISTS idx_cigars_strength_id ON cigars(strength_id)", &[]).await?;
-    client.execute("CREATE INDEX IF NOT EXISTS idx_cigars_ring_gauge_id ON cigars(ring_gauge_id)", &[]).await?;
-
-    // Create favorites table
-    // Note: cigar_id is nullable and uses ON DELETE SET NULL so favorites persist even when cigars are deleted
-    client.execute(
-        "CREATE TABLE IF NOT EXISTS favorites (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-            cigar_id UUID REFERENCES cigars(id) ON DELETE SET NULL,
-            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            UNIQUE(user_id, cigar_id)
-        )",
-        &[],
-    ).await?;
-    
-    client.execute("CREATE INDEX IF NOT EXISTS idx_favorites_user_id ON favorites(user_id)", &[]).await?;
-    client.execute("CREATE INDEX IF NOT EXISTS idx_favorites_cigar_id ON favorites(cigar_id)", &[]).await?;
-    
-    // Migrate existing favorites table to allow null cigar_id with ON DELETE SET NULL
-    // Drop the old constraint and add the new one
-    client.execute(
-        "ALTER TABLE favorites DROP CONSTRAINT IF EXISTS favorites_cigar_id_fkey",
-        &[],
-    ).await.ok(); // Ignore error if constraint doesn't exist
-    
-    client.execute(
-        "ALTER TABLE favorites ALTER COLUMN cigar_id DROP NOT NULL",
-        &[],
-    ).await.ok(); // Ignore error if already nullable
-    
-    client.execute(
-        "ALTER TABLE favorites ADD CONSTRAINT favorites_cigar_id_fkey 
-         FOREIGN KEY (cigar_id) REFERENCES cigars(id) ON DELETE SET NULL",
-        &[],
-    ).await.ok(); // Ignore error if constraint already exists
-    
-    // Add snapshot columns to favorites table to preserve cigar data when cigars are deleted
-    client.execute(
-        "ALTER TABLE favorites ADD COLUMN IF NOT EXISTS snapshot_name TEXT",
-        &[],
-    ).await.ok();
-    
-    client.execute(
-        "ALTER TABLE favorites ADD COLUMN IF NOT EXISTS snapshot_brand_id UUID",
-        &[],
-    ).await.ok();
-    
-    client.execute(
-        "ALTER TABLE favorites ADD COLUMN IF NOT EXISTS snapshot_size_id UUID",
-        &[],
-    ).await.ok();
-    
-    client.execute(
-        "ALTER TABLE favorites ADD COLUMN IF NOT EXISTS snapshot_strength_id UUID",
-        &[],
-    ).await.ok();
-    
-    client.execute(
-        "ALTER TABLE favorites ADD COLUMN IF NOT EXISTS snapshot_origin_id UUID",
-        &[],
-    ).await.ok();
-    
-    client.execute(
-        "ALTER TABLE favorites ADD COLUMN IF NOT EXISTS snapshot_ring_gauge_id UUID",
-        &[],
-    ).await.ok();
-    
-    client.execute(
-        "ALTER TABLE favorites ADD COLUMN IF NOT EXISTS snapshot_image_url TEXT",
-        &[],
-    ).await.ok();
-    
-    // Add is_active column to cigars table for soft deletes
-    client.execute(
-        "ALTER TABLE cigars ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true",
-        &[],
-    ).await.ok();
-    
-    client.execute(
-        "CREATE INDEX IF NOT EXISTS idx_cigars_is_active ON cigars(is_active)",
-        &[],
-    ).await.ok();
-    
-    // Add is_wishlist column to humidors table
-    client.execute(
-        "ALTER TABLE humidors ADD COLUMN IF NOT EXISTS is_wishlist BOOLEAN NOT NULL DEFAULT false",
-        &[],
-    ).await.ok();
-
-    let db_pool = Arc::new(client);
-    
-    // Helper function to pass database to handlers
-    fn with_db(db: DbPool) -> impl Filter<Extract = (DbPool,), Error = std::convert::Infallible> + Clone {
+    // Helper function to pass database pool to handlers
+    fn with_db(
+        db: DbPool,
+    ) -> impl Filter<Extract = (DbPool,), Error = std::convert::Infallible> + Clone {
         warp::any().map(move || db.clone())
     }
 
     // Helper function to extract UUID from path
     fn with_uuid() -> impl Filter<Extract = (uuid::Uuid,), Error = warp::Rejection> + Copy {
-        warp::path::param::<String>()
-            .and_then(|id: String| async move {
-                uuid::Uuid::parse_str(&id)
-                    .map_err(|_| warp::reject::custom(InvalidUuid))
-            })
+        warp::path::param::<String>().and_then(|id: String| async move {
+            uuid::Uuid::parse_str(&id).map_err(|_| warp::reject::custom(InvalidUuid))
+        })
+    }
+
+    // Request logging middleware with structured logging
+    fn log_requests() -> log::Log<impl Fn(log::Info) + Copy> {
+        warp::log::custom(|info| {
+            tracing::info!(
+                method = %info.method(),
+                path = %info.path(),
+                status = %info.status().as_u16(),
+                duration_ms = %info.elapsed().as_millis(),
+                remote_addr = ?info.remote_addr(),
+                "request completed"
+            );
+        })
     }
 
     // Serve static files
-    let static_files = warp::path("static")
-        .and(warp::fs::dir("static"));
+    let static_files = warp::path("static").and(warp::fs::dir("static"));
 
     // Cigar API routes (authenticated)
     let get_cigars = warp::path("api")
@@ -830,20 +609,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .or(update_current_user)
         .or(change_password)
         .or(get_humidors)
-        .or(get_humidor_cigars)  // Must come before get_humidor (more specific route)
+        .or(get_humidor_cigars) // Must come before get_humidor (more specific route)
         .or(create_humidor)
         .or(update_humidor)
         .or(delete_humidor)
-        .or(get_humidor)  // Less specific, should be last
-        .or(check_favorite)  // Must come before remove_favorite (more specific route)
+        .or(get_humidor) // Less specific, should be last
+        .or(check_favorite) // Must come before remove_favorite (more specific route)
         .or(get_favorites)
         .or(add_favorite)
         .or(remove_favorite);
 
-    // Root route
-    let root = warp::path::end()
+    // Health check endpoint (no auth required)
+    let health = warp::path("health")
         .and(warp::get())
-        .and_then(serve_index);
+        .map(|| {
+            warp::reply::json(&serde_json::json!({
+                "status": "ok",
+                "service": "humidor"
+            }))
+        });
+
+    // Root route
+    let root = warp::path::end().and(warp::get()).and_then(serve_index);
 
     // Setup route
     let setup = warp::path("setup.html")
@@ -855,16 +642,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and(warp::get())
         .and_then(serve_login);
 
-    let cors = warp::cors()
-        .allow_any_origin()
-        .allow_headers(vec!["content-type", "authorization"])
-        .allow_methods(vec!["GET", "POST", "PUT", "DELETE"]);
+    // Configure CORS - restrictive by default for security
+    // Use ALLOWED_ORIGINS env var for production (comma-separated list)
+    let allowed_origins: Vec<String> = env::var("ALLOWED_ORIGINS")
+        .unwrap_or_else(|_| "http://localhost:9898,http://127.0.0.1:9898".to_string())
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
 
-    let routes = root
+    println!("CORS: Allowing origins: {:?}", allowed_origins);
+
+    let cors = warp::cors()
+        .allow_origins(allowed_origins.iter().map(|s| s.as_str()))
+        .allow_headers(vec!["content-type", "authorization"])
+        .allow_methods(vec!["GET", "POST", "PUT", "DELETE"])
+        .allow_credentials(true); // Required for cookie-based auth
+
+    let routes = health
+        .or(root)
         .or(setup)
         .or(login)
         .or(static_files)
         .or(api)
+        .with(log_requests())
         .recover(handle_rejection)
         .with(cors);
 
@@ -873,11 +674,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .parse::<u16>()
         .unwrap_or(3000);
 
-    println!("Server running on http://0.0.0.0:{}", port);
+    tracing::info!(
+        addr = %format!("0.0.0.0:{}", port),
+        port = port,
+        "Server started successfully, listening for connections"
+    );
     
-    warp::serve(routes)
-        .run(([0, 0, 0, 0], port))
-        .await;
+    println!("Server running on http://0.0.0.0:{}", port);
+
+    warp::serve(routes).run(([0, 0, 0, 0], port)).await;
 
     Ok(())
 }
@@ -904,11 +709,11 @@ fetch('/api/v1/setup/status')
     });
 </script>
 "#;
-            
+
             // Insert the script before the closing </body> tag
             let modified_content = content.replace("</body>", &format!("{}</body>", setup_script));
             Ok(warp::reply::html(modified_content))
-        },
+        }
         Err(_) => {
             // Fallback content with setup check
             let fallback_html = r#"
@@ -946,7 +751,8 @@ async fn serve_setup() -> Result<impl Reply, warp::Rejection> {
         Err(_) => Ok(warp::reply::with_status(
             warp::reply::html("<h1>Setup Not Found</h1>".to_string()),
             warp::http::StatusCode::NOT_FOUND,
-        ).into_response()),
+        )
+        .into_response()),
     }
 }
 
@@ -956,6 +762,7 @@ async fn serve_login() -> Result<impl Reply, warp::Rejection> {
         Err(_) => Ok(warp::reply::with_status(
             warp::reply::html("<h1>Login Not Found</h1>".to_string()),
             warp::http::StatusCode::NOT_FOUND,
-        ).into_response()),
+        )
+        .into_response()),
     }
 }

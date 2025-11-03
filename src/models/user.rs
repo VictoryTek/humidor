@@ -1,7 +1,7 @@
+use crate::models::humidor::CreateHumidorRequest;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
-use crate::models::humidor::CreateHumidorRequest;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {

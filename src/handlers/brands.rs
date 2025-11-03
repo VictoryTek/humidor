@@ -1,11 +1,18 @@
 use chrono::Utc;
 use serde_json::json;
 use uuid::Uuid;
-use warp::{Reply, Rejection};
+use warp::{Rejection, Reply};
 
-use crate::{DbPool, models::*, validation::Validate};
+use crate::{errors::AppError, models::*, validation::Validate, DbPool};
 
-pub async fn get_brands(db: DbPool) -> Result<impl Reply, Rejection> {
+pub async fn get_brands(pool: DbPool) -> Result<impl Reply, Rejection> {
+    let db = pool.get().await.map_err(|e| {
+        eprintln!("Failed to get database connection: {}", e);
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
+    })?;
+
     match db.query(
         "SELECT id, name, description, country, website, created_at, updated_at FROM brands ORDER BY name ASC",
         &[]
@@ -33,19 +40,40 @@ pub async fn get_brands(db: DbPool) -> Result<impl Reply, Rejection> {
     }
 }
 
-pub async fn create_brand(create_brand: CreateBrand, db: DbPool) -> Result<impl Reply, Rejection> {
+pub async fn create_brand(
+    create_brand: CreateBrand,
+    pool: DbPool,
+) -> Result<impl Reply, Rejection> {
     // Validate input
     create_brand.validate().map_err(warp::reject::custom)?;
-    
+
+    let db = pool.get().await.map_err(|e| {
+        eprintln!("Failed to get database connection: {}", e);
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
+    })?;
+
     let id = Uuid::new_v4();
     let now = Utc::now();
-    
-    match db.query_one(
-        "INSERT INTO brands (id, name, description, country, website, created_at, updated_at) 
+
+    match db
+        .query_one(
+            "INSERT INTO brands (id, name, description, country, website, created_at, updated_at) 
          VALUES ($1, $2, $3, $4, $5, $6, $7) 
          RETURNING id, name, description, country, website, created_at, updated_at",
-        &[&id, &create_brand.name, &create_brand.description, &create_brand.country, &create_brand.website, &now, &now]
-    ).await {
+            &[
+                &id,
+                &create_brand.name,
+                &create_brand.description,
+                &create_brand.country,
+                &create_brand.website,
+                &now,
+                &now,
+            ],
+        )
+        .await
+    {
         Ok(row) => {
             let brand = Brand {
                 id: row.get(0),
@@ -60,19 +88,33 @@ pub async fn create_brand(create_brand: CreateBrand, db: DbPool) -> Result<impl 
         }
         Err(e) => {
             eprintln!("Database error: {}", e);
-            Ok(warp::reply::json(&json!({"error": "Failed to create brand"})))
+            Ok(warp::reply::json(
+                &json!({"error": "Failed to create brand"}),
+            ))
         }
     }
 }
 
-pub async fn update_brand(id: Uuid, update_brand: UpdateBrand, db: DbPool) -> Result<impl Reply, Rejection> {
+pub async fn update_brand(
+    id: Uuid,
+    update_brand: UpdateBrand,
+    pool: DbPool,
+) -> Result<impl Reply, Rejection> {
     // Validate input
     update_brand.validate().map_err(warp::reject::custom)?;
-    
+
+    let db = pool.get().await.map_err(|e| {
+        eprintln!("Failed to get database connection: {}", e);
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
+    })?;
+
     let now = Utc::now();
-    
-    match db.query_one(
-        "UPDATE brands SET 
+
+    match db
+        .query_one(
+            "UPDATE brands SET 
          name = COALESCE($2, name),
          description = COALESCE($3, description),
          country = COALESCE($4, country),
@@ -80,8 +122,17 @@ pub async fn update_brand(id: Uuid, update_brand: UpdateBrand, db: DbPool) -> Re
          updated_at = $6
          WHERE id = $1
          RETURNING id, name, description, country, website, created_at, updated_at",
-        &[&id, &update_brand.name, &update_brand.description, &update_brand.country, &update_brand.website, &now]
-    ).await {
+            &[
+                &id,
+                &update_brand.name,
+                &update_brand.description,
+                &update_brand.country,
+                &update_brand.website,
+                &now,
+            ],
+        )
+        .await
+    {
         Ok(row) => {
             let brand = Brand {
                 id: row.get(0),
@@ -96,23 +147,36 @@ pub async fn update_brand(id: Uuid, update_brand: UpdateBrand, db: DbPool) -> Re
         }
         Err(e) => {
             eprintln!("Database error: {}", e);
-            Ok(warp::reply::json(&json!({"error": "Failed to update brand"})))
+            Ok(warp::reply::json(
+                &json!({"error": "Failed to update brand"}),
+            ))
         }
     }
 }
 
-pub async fn delete_brand(id: Uuid, db: DbPool) -> Result<impl Reply, Rejection> {
+pub async fn delete_brand(id: Uuid, pool: DbPool) -> Result<impl Reply, Rejection> {
+    let db = pool.get().await.map_err(|e| {
+        eprintln!("Failed to get database connection: {}", e);
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
+    })?;
+
     match db.execute("DELETE FROM brands WHERE id = $1", &[&id]).await {
         Ok(rows_affected) => {
             if rows_affected > 0 {
-                Ok(warp::reply::json(&json!({"message": "Brand deleted successfully"})))
+                Ok(warp::reply::json(
+                    &json!({"message": "Brand deleted successfully"}),
+                ))
             } else {
                 Ok(warp::reply::json(&json!({"error": "Brand not found"})))
             }
         }
         Err(e) => {
             eprintln!("Database error: {}", e);
-            Ok(warp::reply::json(&json!({"error": "Failed to delete brand"})))
+            Ok(warp::reply::json(
+                &json!({"error": "Failed to delete brand"}),
+            ))
         }
     }
 }

@@ -1,7 +1,9 @@
+use crate::validation::{
+    validate_length, validate_non_negative, validate_positive, Validate, ValidationResult,
+};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use crate::validation::{Validate, ValidationResult, validate_length, validate_positive, validate_non_negative};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Cigar {
@@ -71,7 +73,7 @@ impl Validate for CreateCigar {
     fn validate(&self) -> ValidationResult<()> {
         validate_length(&self.name, "Name", 1, 100)?;
         validate_positive(self.quantity, "Quantity")?;
-        
+
         if let Some(wrapper) = &self.wrapper {
             validate_length(wrapper, "Wrapper", 1, 100)?;
         }
@@ -85,7 +87,7 @@ impl Validate for CreateCigar {
             validate_length(notes, "Notes", 0, 1000)?;
         }
         // UUIDs don't need string length validation
-        
+
         Ok(())
     }
 }
@@ -99,7 +101,7 @@ impl Validate for UpdateCigar {
             validate_non_negative(quantity, "Quantity")?;
         }
         // UUIDs don't need string length validation
-        
+
         Ok(())
     }
 }

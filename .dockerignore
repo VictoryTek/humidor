@@ -1,13 +1,45 @@
 # Docker ignore file
+
+# Rust build artifacts
 target/
-Dockerfile
-.dockerignore
-README.md
-.git/
-.github/
+**/*.rs.bk
+*.pdb
+
+# IDE and editor files
 .vscode/
-analysis/
-screenshots/
-migrations/
-backups/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
 .history/
+
+# Git
+.git/
+.gitignore
+.github/
+
+# Documentation (except README)
+*.md
+!README.md
+screenshots/
+docs/
+
+# Analysis and temporary files
+analysis/
+backups/
+
+# Docker files (will be added via build context)
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Environment files (should be set at runtime)
+.env
+.env.*
+
+# Logs
+*.log
+
+# Test files
+tests/

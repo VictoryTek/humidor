@@ -1,7 +1,9 @@
+use crate::validation::{
+    validate_length, validate_positive, validate_range, Validate, ValidationResult,
+};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use crate::validation::{Validate, ValidationResult, validate_length, validate_positive, validate_range};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RingGauge {
@@ -31,13 +33,13 @@ impl Validate for CreateRingGauge {
     fn validate(&self) -> ValidationResult<()> {
         validate_positive(self.gauge, "gauge")?;
         validate_range(self.gauge, "gauge", 20, 100)?;
-        
+
         if let Some(desc) = &self.description {
             if !desc.is_empty() {
                 validate_length(desc, "description", 1, 500)?;
             }
         }
-        
+
         Ok(())
     }
 }
@@ -48,13 +50,13 @@ impl Validate for UpdateRingGauge {
             validate_positive(gauge, "gauge")?;
             validate_range(gauge, "gauge", 20, 100)?;
         }
-        
+
         if let Some(desc) = &self.description {
             if !desc.is_empty() {
                 validate_length(desc, "description", 1, 500)?;
             }
         }
-        
+
         Ok(())
     }
 }

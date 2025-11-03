@@ -1,64 +1,34 @@
 pub mod auth;
-pub mod cigars;
-pub mod humidors;
 pub mod brands;
-pub mod sizes;
-pub mod origins;
-pub mod strengths;
-pub mod ring_gauges;
+pub mod cigars;
 pub mod favorites;
+pub mod humidors;
+pub mod origins;
+pub mod ring_gauges;
+pub mod sizes;
+pub mod strengths;
 
 // Re-export handler functions with specific names to avoid conflicts
-pub use auth::{get_setup_status, create_setup_user, login_user, get_current_user, update_current_user, change_password};
-pub use cigars::{get_cigars, get_cigar, create_cigar, update_cigar, delete_cigar, scrape_cigar_url};
-
-pub use brands::{
-    get_brands, 
-    create_brand, 
-    update_brand, 
-    delete_brand
+pub use auth::{
+    change_password, create_setup_user, get_current_user, get_setup_status, login_user,
+    update_current_user,
+};
+pub use cigars::{
+    create_cigar, delete_cigar, get_cigar, get_cigars, scrape_cigar_url, update_cigar,
 };
 
-pub use sizes::{
-    get_sizes, 
-    create_size, 
-    update_size, 
-    delete_size
-};
+pub use brands::{create_brand, delete_brand, get_brands, update_brand};
 
-pub use origins::{
-    get_origins, 
-    create_origin, 
-    update_origin, 
-    delete_origin
-};
+pub use sizes::{create_size, delete_size, get_sizes, update_size};
 
-pub use strengths::{
-    get_strengths, 
-    create_strength, 
-    update_strength, 
-    delete_strength
-};
+pub use origins::{create_origin, delete_origin, get_origins, update_origin};
 
-pub use ring_gauges::{
-    get_ring_gauges, 
-    create_ring_gauge, 
-    update_ring_gauge, 
-    delete_ring_gauge
-};
+pub use strengths::{create_strength, delete_strength, get_strengths, update_strength};
+
+pub use ring_gauges::{create_ring_gauge, delete_ring_gauge, get_ring_gauges, update_ring_gauge};
 
 pub use humidors::{
-    get_humidors,
-    get_humidor,
-    create_humidor,
-    update_humidor,
-    delete_humidor,
-    get_humidor_cigars
+    create_humidor, delete_humidor, get_humidor, get_humidor_cigars, get_humidors, update_humidor,
 };
 
-pub use favorites::{
-    get_favorites,
-    add_favorite,
-    remove_favorite,
-    is_favorite
-};
+pub use favorites::{add_favorite, get_favorites, is_favorite, remove_favorite};
