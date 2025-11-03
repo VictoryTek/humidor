@@ -17,44 +17,75 @@ pub async fn get_cigars(
     _auth: AuthContext,
     db: DbPool
 ) -> Result<impl Reply, Rejection> {
-    // Build query based on parameters
-    let mut query = String::from("SELECT id, humidor_id, brand_id, name, size_id, strength_id, origin_id, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge_id, length, image_url, is_active, created_at, updated_at FROM cigars");
-    let mut conditions = Vec::new();
+    use tokio_postgres::types::ToSql;
     
-    // By default, show all cigars (both active and inactive/out of stock)
-    // This allows users to see their full inventory including out of stock items
+    // Build query with parameterized conditions to prevent SQL injection
+    let base_query = "SELECT id, humidor_id, brand_id, name, size_id, strength_id, origin_id, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge_id, length, image_url, is_active, created_at, updated_at FROM cigars";
+    let mut conditions = Vec::new();
+    let mut param_values: Vec<Box<dyn ToSql + Sync + Send>> = Vec::new();
+    let mut param_counter = 1;
     
     // Check for humidor_id filter
-    if let Some(humidor_id) = params.get("humidor_id") {
-        conditions.push(format!("humidor_id::text = '{}'", humidor_id));
+    if let Some(humidor_id_str) = params.get("humidor_id") {
+        if let Ok(humidor_uuid) = Uuid::parse_str(humidor_id_str) {
+            conditions.push(format!("humidor_id = ${}", param_counter));
+            param_values.push(Box::new(humidor_uuid));
+            param_counter += 1;
+        }
     }
     
     // Check for organizer filters (brand, size, origin, strength, ring_gauge)
-    if let Some(brand_id) = params.get("brand_id") {
-        conditions.push(format!("brand_id::text = '{}'", brand_id));
+    if let Some(brand_id_str) = params.get("brand_id") {
+        if let Ok(brand_uuid) = Uuid::parse_str(brand_id_str) {
+            conditions.push(format!("brand_id = ${}", param_counter));
+            param_values.push(Box::new(brand_uuid));
+            param_counter += 1;
+        }
     }
-    if let Some(size_id) = params.get("size_id") {
-        conditions.push(format!("size_id::text = '{}'", size_id));
+    if let Some(size_id_str) = params.get("size_id") {
+        if let Ok(size_uuid) = Uuid::parse_str(size_id_str) {
+            conditions.push(format!("size_id = ${}", param_counter));
+            param_values.push(Box::new(size_uuid));
+            param_counter += 1;
+        }
     }
-    if let Some(origin_id) = params.get("origin_id") {
-        conditions.push(format!("origin_id::text = '{}'", origin_id));
+    if let Some(origin_id_str) = params.get("origin_id") {
+        if let Ok(origin_uuid) = Uuid::parse_str(origin_id_str) {
+            conditions.push(format!("origin_id = ${}", param_counter));
+            param_values.push(Box::new(origin_uuid));
+            param_counter += 1;
+        }
     }
-    if let Some(strength_id) = params.get("strength_id") {
-        conditions.push(format!("strength_id::text = '{}'", strength_id));
+    if let Some(strength_id_str) = params.get("strength_id") {
+        if let Ok(strength_uuid) = Uuid::parse_str(strength_id_str) {
+            conditions.push(format!("strength_id = ${}", param_counter));
+            param_values.push(Box::new(strength_uuid));
+            param_counter += 1;
+        }
     }
-    if let Some(ring_gauge_id) = params.get("ring_gauge_id") {
-        conditions.push(format!("ring_gauge_id::text = '{}'", ring_gauge_id));
+    if let Some(ring_gauge_id_str) = params.get("ring_gauge_id") {
+        if let Ok(ring_gauge_uuid) = Uuid::parse_str(ring_gauge_id_str) {
+            conditions.push(format!("ring_gauge_id = ${}", param_counter));
+            param_values.push(Box::new(ring_gauge_uuid));
+            // param_counter would be incremented here if we had more parameters
+        }
     }
     
-    // Add WHERE clause if there are conditions
-    if !conditions.is_empty() {
-        query.push_str(" WHERE ");
-        query.push_str(&conditions.join(" AND "));
-    }
+    // Build the final query with WHERE clause if there are conditions
+    let query = if conditions.is_empty() {
+        format!("{} ORDER BY is_active DESC, created_at DESC LIMIT 50", base_query)
+    } else {
+        format!("{} WHERE {} ORDER BY is_active DESC, created_at DESC LIMIT 50", 
+            base_query, conditions.join(" AND "))
+    };
     
-    query.push_str(" ORDER BY is_active DESC, created_at DESC LIMIT 50");
+    // Convert boxed parameters to references for query execution
+    let param_refs: Vec<&(dyn ToSql + Sync)> = param_values
+        .iter()
+        .map(|b| &**b as &(dyn ToSql + Sync))
+        .collect();
     
-    match db.query(&query, &[]).await {
+    match db.query(&query, &param_refs[..]).await {
         Ok(rows) => {
             let mut cigars = Vec::new();
             for row in rows {
