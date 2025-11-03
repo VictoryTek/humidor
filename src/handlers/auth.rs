@@ -36,9 +36,10 @@ async fn verify_password(password: String, hash_str: String) -> Result<bool, bcr
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
-    pub sub: String, // user id
+    pub sub: String,      // user id
     pub username: String,
-    pub exp: usize, // expiration time
+    pub exp: usize,       // expiration time (required)
+    pub iat: usize,       // issued at time (for tracking)
 }
 
 /// Get JWT secret from environment variable
@@ -428,8 +429,16 @@ pub async fn create_humidor_for_setup(
 
 // JWT token utilities
 fn generate_token(user_id: &str, username: &str) -> Result<String, jsonwebtoken::errors::Error> {
-    let expiration = chrono::Utc::now()
-        .checked_add_signed(chrono::Duration::hours(24))
+    // Get token lifetime from environment or use default of 2 hours
+    let token_lifetime_hours: i64 = env::var("JWT_TOKEN_LIFETIME_HOURS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(2); // Default: 2 hours (more secure than 24)
+
+    let now = chrono::Utc::now();
+    let iat = now.timestamp() as usize;
+    let expiration = now
+        .checked_add_signed(chrono::Duration::hours(token_lifetime_hours))
         .expect("valid timestamp")
         .timestamp() as usize;
 
@@ -437,6 +446,7 @@ fn generate_token(user_id: &str, username: &str) -> Result<String, jsonwebtoken:
         sub: user_id.to_owned(),
         username: username.to_owned(),
         exp: expiration,
+        iat,
     };
 
     let header = Header::new(Algorithm::HS256);

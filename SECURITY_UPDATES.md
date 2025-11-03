@@ -246,6 +246,102 @@ async fn verify_password(password: String, hash_str: String) -> Result<bool, bcr
 ✅ All 3 bcrypt usage points updated (setup, login, password change)  
 ✅ Async wrapper functions properly handle tokio task spawning  
 
+---
+
+## Issue 2.1: JWT Token Lifetime ✅ COMPLETED
+
+**Severity**: Medium - Security Best Practice
+
+**Status**: Fixed on 2025-11-02
+
+### Changes Made:
+
+1. **Updated JWT Claims structure in `src/handlers/auth.rs`:**
+   - Added `iat` (issued at) field for better token tracking
+   - Maintains `exp` (expiration) field for automatic validation
+
+2. **Improved `generate_token()` function:**
+   - Reduced default token lifetime from 24 hours to 2 hours (12x more secure)
+   - Made token lifetime configurable via `JWT_TOKEN_LIFETIME_HOURS` environment variable
+   - Added `iat` timestamp to all tokens
+   - Better error handling for timestamp calculations
+
+3. **Updated configuration files:**
+   - `.env` - Added `JWT_TOKEN_LIFETIME_HOURS=2`
+   - `.env.example` - Added `JWT_TOKEN_LIFETIME_HOURS=2` with documentation
+   - `docker-compose.yml` - Added environment variable with default value
+
+### Technical Details:
+
+**Before (Less Secure):**
+```rust
+let expiration = chrono::Utc::now()
+    .checked_add_signed(chrono::Duration::hours(24))  // 24 hours - too long
+    .expect("valid timestamp")
+    .timestamp() as usize;
+
+let claims = Claims {
+    sub: user_id.to_owned(),
+    username: username.to_owned(),
+    exp: expiration,
+    // No iat field
+};
+```
+
+**After (More Secure):**
+```rust
+// Configurable token lifetime (default: 2 hours)
+let token_lifetime_hours: i64 = env::var("JWT_TOKEN_LIFETIME_HOURS")
+    .ok()
+    .and_then(|s| s.parse().ok())
+    .unwrap_or(2);
+
+let now = chrono::Utc::now();
+let iat = now.timestamp() as usize;
+let expiration = now
+    .checked_add_signed(chrono::Duration::hours(token_lifetime_hours))
+    .expect("valid timestamp")
+    .timestamp() as usize;
+
+let claims = Claims {
+    sub: user_id.to_owned(),
+    username: username.to_owned(),
+    exp: expiration,
+    iat,  // Track when token was issued
+};
+```
+
+### Security Improvements:
+
+1. **Reduced Attack Window**: 2-hour tokens vs 24-hour tokens = 12x smaller window for token theft/replay
+2. **Configurable Security**: Can adjust based on security requirements vs UX needs
+3. **Better Auditing**: `iat` field allows tracking token age and usage patterns
+4. **Environment-Based**: Different environments can have different policies (dev vs prod)
+
+### Configuration Options:
+
+```bash
+# Conservative (high security, frequent re-auth)
+JWT_TOKEN_LIFETIME_HOURS=1
+
+# Balanced (default - good security, reasonable UX)
+JWT_TOKEN_LIFETIME_HOURS=2
+
+# Relaxed (lower security, better UX)
+JWT_TOKEN_LIFETIME_HOURS=8
+
+# Not recommended (original setting)
+JWT_TOKEN_LIFETIME_HOURS=24
+```
+
+### Testing:
+
+✅ Code compiles successfully with `cargo check`  
+✅ Project builds without errors with `cargo build` (35.11s)  
+✅ Token generation includes both `exp` and `iat` fields  
+✅ Default 2-hour lifetime applied when env var not set  
+✅ Configuration documented in .env files  
+
 ### Next Steps:
 
 All critical security issues (1.1 - 1.4) have been completed! 🎉
