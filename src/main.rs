@@ -12,8 +12,9 @@ use middleware::{handle_rejection, with_current_user};
 use refinery::embed_migrations;
 use std::env;
 use tokio_postgres::NoTls;
-use tracing_subscriber;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 use warp::{Filter, Reply};
+use warp::log;
 
 // Embed migrations from the migrations directory
 embed_migrations!("migrations");
@@ -28,13 +29,38 @@ impl warp::reject::Reject for InvalidUuid {}
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenvy::dotenv().ok();
 
-    tracing_subscriber::fmt::init();
+    // Enhanced structured logging with JSON format
+    tracing_subscriber::registry()
+        .with(
+            EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "humidor=info,warp=info,refinery=info".into())
+        )
+        .with(
+            tracing_subscriber::fmt::layer()
+                .with_target(true)
+                .with_thread_ids(true)
+                .with_line_number(true)
+                .json()
+        )
+        .init();
+
+    tracing::info!(
+        app_name = "humidor",
+        version = env!("CARGO_PKG_VERSION"),
+        "Starting Humidor application"
+    );
 
     let database_url = env::var("DATABASE_URL").unwrap_or_else(|_| {
         "postgresql://humidor_user:humidor_pass@localhost:5432/humidor_db".to_string()
     });
 
     // Create connection pool configuration
+    tracing::info!(
+        max_connections = 20,
+        recycling_method = "Fast",
+        "Creating database connection pool"
+    );
+    
     let mut config = Config::new();
     config.url = Some(database_url.clone());
     config.manager = Some(ManagerConfig {
@@ -46,12 +72,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Test the connection and run migrations
     let mut client = pool.get().await?;
-    tracing::info!("✓ Database connection pool created successfully");
+    tracing::info!(
+        pool_status = "connected",
+        "Database connection pool created successfully"
+    );
 
     // Run database migrations using refinery
     tracing::info!("Running database migrations...");
-    migrations::runner().run_async(&mut **client).await?;
-    tracing::info!("✓ Database migrations completed successfully");
+    match migrations::runner().run_async(&mut **client).await {
+        Ok(report) => {
+            tracing::info!(
+                applied_migrations = report.applied_migrations().len(),
+                "Database migrations completed successfully"
+            );
+        }
+        Err(e) => {
+            tracing::error!(
+                error = %e,
+                "Database migrations failed"
+            );
+            return Err(e.into());
+        }
+    }
 
     // Drop the migration client back to the pool
     drop(client);
@@ -65,7 +107,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and_then(|p| p.parse().ok())
         .unwrap_or(9898);
 
-    tracing::info!("Starting server on port {}...", port);
+    tracing::info!(
+        port = port,
+        environment = env::var("RUST_ENV").unwrap_or_else(|_| "development".to_string()),
+        "Configuring server"
+    );
 
     // Helper function to pass database pool to handlers
     fn with_db(
@@ -78,6 +124,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     fn with_uuid() -> impl Filter<Extract = (uuid::Uuid,), Error = warp::Rejection> + Copy {
         warp::path::param::<String>().and_then(|id: String| async move {
             uuid::Uuid::parse_str(&id).map_err(|_| warp::reject::custom(InvalidUuid))
+        })
+    }
+
+    // Request logging middleware with structured logging
+    fn log_requests() -> log::Log<impl Fn(log::Info) + Copy> {
+        warp::log::custom(|info| {
+            tracing::info!(
+                method = %info.method(),
+                path = %info.path(),
+                status = %info.status().as_u16(),
+                duration_ms = %info.elapsed().as_millis(),
+                remote_addr = ?info.remote_addr(),
+                "request completed"
+            );
         })
     }
 
@@ -545,6 +605,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .or(login)
         .or(static_files)
         .or(api)
+        .with(log_requests())
         .recover(handle_rejection)
         .with(cors);
 
@@ -553,6 +614,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .parse::<u16>()
         .unwrap_or(3000);
 
+    tracing::info!(
+        addr = %format!("0.0.0.0:{}", port),
+        port = port,
+        "Server started successfully, listening for connections"
+    );
+    
     println!("Server running on http://0.0.0.0:{}", port);
 
     warp::serve(routes).run(([0, 0, 0, 0], port)).await;

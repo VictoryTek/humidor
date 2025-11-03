@@ -74,11 +74,18 @@ pub async fn handle_rejection(
         )
     } else if let Some(app_err) = err.find::<AppError>() {
         match app_err {
-            AppError::DatabaseError(msg) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "DATABASE_ERROR",
-                msg.clone(),
-            ),
+            AppError::DatabaseError(msg) => {
+                tracing::error!(
+                    error_type = "database_error",
+                    error = %msg,
+                    "Database error occurred"
+                );
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "DATABASE_ERROR",
+                    "An error occurred processing your request".to_string(), // Don't expose internal details
+                )
+            },
             AppError::ValidationError(msg) => {
                 (StatusCode::BAD_REQUEST, "VALIDATION_ERROR", msg.clone())
             }
@@ -95,11 +102,18 @@ pub async fn handle_rejection(
             AppError::NotFound(msg) => (StatusCode::NOT_FOUND, "NOT_FOUND", msg.clone()),
             AppError::Conflict(msg) => (StatusCode::CONFLICT, "CONFLICT", msg.clone()),
             AppError::BadRequest(msg) => (StatusCode::BAD_REQUEST, "BAD_REQUEST", msg.clone()),
-            AppError::InternalServerError(msg) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "INTERNAL_SERVER_ERROR",
-                msg.clone(),
-            ),
+            AppError::InternalServerError(msg) => {
+                tracing::error!(
+                    error_type = "internal_server_error",
+                    error = %msg,
+                    "Internal server error occurred"
+                );
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "INTERNAL_SERVER_ERROR",
+                    "An error occurred".to_string(), // Don't expose internal details
+                )
+            },
         }
     } else if err.find::<warp::reject::MethodNotAllowed>().is_some() {
         (
@@ -108,13 +122,21 @@ pub async fn handle_rejection(
             "Method not allowed".to_string(),
         )
     } else if err.find::<warp::body::BodyDeserializeError>().is_some() {
+        tracing::warn!(
+            error_type = "body_deserialize_error",
+            "Failed to deserialize request body"
+        );
         (
             StatusCode::BAD_REQUEST,
             "INVALID_BODY",
             "Invalid request body".to_string(),
         )
     } else {
-        eprintln!("Unhandled rejection: {:?}", err);
+        tracing::error!(
+            error_type = "unhandled_rejection",
+            error = ?err,
+            "Unhandled rejection occurred"
+        );
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             "INTERNAL_ERROR",
