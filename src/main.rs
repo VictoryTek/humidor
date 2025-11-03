@@ -570,6 +570,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .or(add_favorite)
         .or(remove_favorite);
 
+    // Health check endpoint (no auth required)
+    let health = warp::path("health")
+        .and(warp::get())
+        .map(|| {
+            warp::reply::json(&serde_json::json!({
+                "status": "ok",
+                "service": "humidor"
+            }))
+        });
+
     // Root route
     let root = warp::path::end().and(warp::get()).and_then(serve_index);
 
@@ -600,7 +610,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .allow_methods(vec!["GET", "POST", "PUT", "DELETE"])
         .allow_credentials(true); // Required for cookie-based auth
 
-    let routes = root
+    let routes = health
+        .or(root)
         .or(setup)
         .or(login)
         .or(static_files)
