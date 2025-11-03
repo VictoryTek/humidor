@@ -1,19 +1,20 @@
 #![recursion_limit = "256"]
 
-mod handlers;
-mod models;
-mod middleware;
 mod errors;
-mod validation;
+mod handlers;
+mod middleware;
+mod models;
 mod services;
+mod validation;
 
-use std::{env, sync::Arc};
-use tokio_postgres::{NoTls, Client};
-use warp::{Filter, Reply};
+use deadpool_postgres::{Config, ManagerConfig, Pool, RecyclingMethod, Runtime};
+use middleware::{handle_rejection, with_current_user};
+use std::env;
+use tokio_postgres::NoTls;
 use tracing_subscriber;
-use middleware::{with_current_user, handle_rejection};
+use warp::{Filter, Reply};
 
-type DbPool = Arc<Client>;
+type DbPool = Pool;
 
 #[derive(Debug)]
 struct InvalidUuid;
@@ -22,25 +23,32 @@ impl warp::reject::Reject for InvalidUuid {}
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenvy::dotenv().ok();
-    
+
     tracing_subscriber::fmt::init();
 
-    let database_url = env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgresql://humidor_user:humidor_pass@localhost:5432/humidor_db".to_string());
-
-    let (client, connection) = tokio_postgres::connect(&database_url, NoTls).await?;
-    
-    // Spawn the connection in a background task
-    tokio::spawn(async move {
-        if let Err(e) = connection.await {
-            eprintln!("Database connection error: {}", e);
-        }
+    let database_url = env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgresql://humidor_user:humidor_pass@localhost:5432/humidor_db".to_string()
     });
+
+    // Create connection pool configuration
+    let mut config = Config::new();
+    config.url = Some(database_url.clone());
+    config.manager = Some(ManagerConfig {
+        recycling_method: RecyclingMethod::Fast,
+    });
+
+    // Create the pool with a maximum of 20 connections
+    let pool = config.create_pool(Some(Runtime::Tokio1), NoTls)?;
+
+    // Test the connection and get a client for migrations
+    let client = pool.get().await?;
+    tracing::info!("✓ Database connection pool created successfully");
 
     // Run database migrations
     // Create users table
-    client.execute(
-        "CREATE TABLE IF NOT EXISTS users (
+    client
+        .execute(
+            "CREATE TABLE IF NOT EXISTS users (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             username VARCHAR(50) UNIQUE NOT NULL,
             email VARCHAR(255) UNIQUE NOT NULL,
@@ -51,12 +59,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )",
-        &[],
-    ).await?;
+            &[],
+        )
+        .await?;
 
     // Create humidors table
-    client.execute(
-        "CREATE TABLE IF NOT EXISTS humidors (
+    client
+        .execute(
+            "CREATE TABLE IF NOT EXISTS humidors (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             name VARCHAR(255) NOT NULL,
@@ -67,13 +77,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )",
-        &[],
-    ).await?;
+            &[],
+        )
+        .await?;
 
     // Create organizer tables FIRST (before cigars table that references them)
     // Brands table
-    client.execute(
-        "CREATE TABLE IF NOT EXISTS brands (
+    client
+        .execute(
+            "CREATE TABLE IF NOT EXISTS brands (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             name VARCHAR NOT NULL UNIQUE,
             description TEXT,
@@ -82,12 +94,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )",
-        &[],
-    ).await?;
+            &[],
+        )
+        .await?;
 
     // Sizes table
-    client.execute(
-        "CREATE TABLE IF NOT EXISTS sizes (
+    client
+        .execute(
+            "CREATE TABLE IF NOT EXISTS sizes (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             name VARCHAR NOT NULL UNIQUE,
             length_inches DOUBLE PRECISION,
@@ -96,12 +110,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )",
-        &[],
-    ).await?;
+            &[],
+        )
+        .await?;
 
     // Origins table
-    client.execute(
-        "CREATE TABLE IF NOT EXISTS origins (
+    client
+        .execute(
+            "CREATE TABLE IF NOT EXISTS origins (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             name VARCHAR NOT NULL UNIQUE,
             country VARCHAR NOT NULL,
@@ -110,12 +126,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )",
-        &[],
-    ).await?;
+            &[],
+        )
+        .await?;
 
     // Strengths table
-    client.execute(
-        "CREATE TABLE IF NOT EXISTS strengths (
+    client
+        .execute(
+            "CREATE TABLE IF NOT EXISTS strengths (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             name VARCHAR NOT NULL UNIQUE,
             level INTEGER NOT NULL,
@@ -123,12 +141,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )",
-        &[],
-    ).await?;
+            &[],
+        )
+        .await?;
 
     // Ring Gauges table
-    client.execute(
-        "CREATE TABLE IF NOT EXISTS ring_gauges (
+    client
+        .execute(
+            "CREATE TABLE IF NOT EXISTS ring_gauges (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             gauge INTEGER NOT NULL UNIQUE,
             description TEXT,
@@ -136,25 +156,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )",
-        &[],
-    ).await?;
+            &[],
+        )
+        .await?;
 
     // Insert default strength values if the table is empty
     let strength_count: i64 = client
         .query_one("SELECT COUNT(*) FROM strengths", &[])
         .await?
         .get(0);
-    
+
     if strength_count == 0 {
-        client.execute(
-            "INSERT INTO strengths (name, level, description) VALUES
+        client
+            .execute(
+                "INSERT INTO strengths (name, level, description) VALUES
              ('Mild', 1, 'Light and smooth, perfect for beginners'),
              ('Medium-Mild', 2, 'Slightly more body than mild, still approachable'),
              ('Medium', 3, 'Balanced strength with good complexity'),
              ('Medium-Full', 4, 'Strong flavor with substantial body'),
              ('Full', 5, 'Bold and intense, for experienced smokers')",
-            &[],
-        ).await?;
+                &[],
+            )
+            .await?;
     }
 
     // Insert common ring gauges if the table is empty
@@ -162,10 +185,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .query_one("SELECT COUNT(*) FROM ring_gauges", &[])
         .await?
         .get(0);
-    
+
     if ring_gauge_count == 0 {
-        client.execute(
-            "INSERT INTO ring_gauges (gauge, description, common_names) VALUES
+        client
+            .execute(
+                "INSERT INTO ring_gauges (gauge, description, common_names) VALUES
              (38, 'Very thin gauge, quick smoke', ARRAY['Lancero thin', 'Panetela']),
              (42, 'Classic thin gauge', ARRAY['Corona', 'Petit Corona']),
              (44, 'Standard corona size', ARRAY['Corona', 'Lonsdale']),
@@ -177,8 +201,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
              (56, 'Churchill gauge', ARRAY['Churchill', 'Double Corona']),
              (58, 'Thick churchill', ARRAY['Churchill Extra']),
              (60, 'Very thick gauge', ARRAY['Gordo', 'Double Toro'])",
-            &[],
-        ).await?;
+                &[],
+            )
+            .await?;
     }
 
     // Insert common brands if the table is empty
@@ -186,7 +211,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .query_one("SELECT COUNT(*) FROM brands", &[])
         .await?
         .get(0);
-    
+
     if brand_count == 0 {
         client.execute(
             "INSERT INTO brands (name, description, country) VALUES
@@ -219,7 +244,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .query_one("SELECT COUNT(*) FROM origins", &[])
         .await?
         .get(0);
-    
+
     if origin_count == 0 {
         client.execute(
             "INSERT INTO origins (name, country, region, description) VALUES
@@ -246,10 +271,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .query_one("SELECT COUNT(*) FROM sizes", &[])
         .await?
         .get(0);
-    
+
     if size_count == 0 {
-        client.execute(
-            "INSERT INTO sizes (name, length_inches, ring_gauge, description) VALUES
+        client
+            .execute(
+                "INSERT INTO sizes (name, length_inches, ring_gauge, description) VALUES
              ('Petit Corona', 4.5, 42, 'Small classic size, 30-40 minute smoke'),
              ('Corona', 5.5, 42, 'Traditional Cuban size, balanced proportions'),
              ('Corona Gorda', 5.625, 46, 'Larger corona with more body'),
@@ -270,13 +296,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
              ('Rothschild', 4.5, 50, 'Short robusto, rich and quick'),
              ('Corona Extra', 5.5, 46, 'Medium size with good balance'),
              ('Gigante', 9.0, 52, 'Exceptionally large, 2+ hour smoke')",
-            &[],
-        ).await?;
+                &[],
+            )
+            .await?;
     }
 
     // NOW create cigars table (using foreign keys to organizer tables created above)
-    client.execute(
-        "CREATE TABLE IF NOT EXISTS cigars (
+    client
+        .execute(
+            "CREATE TABLE IF NOT EXISTS cigars (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             humidor_id UUID REFERENCES humidors(id) ON DELETE SET NULL,
             brand_id UUID REFERENCES brands(id) ON DELETE SET NULL,
@@ -297,122 +325,199 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )",
-        &[],
-    ).await?;
-    
+            &[],
+        )
+        .await?;
+
     // Create indexes for better query performance
-    client.execute("CREATE INDEX IF NOT EXISTS idx_cigars_brand_id ON cigars(brand_id)", &[]).await?;
-    client.execute("CREATE INDEX IF NOT EXISTS idx_cigars_size_id ON cigars(size_id)", &[]).await?;
-    client.execute("CREATE INDEX IF NOT EXISTS idx_cigars_origin_id ON cigars(origin_id)", &[]).await?;
-    client.execute("CREATE INDEX IF NOT EXISTS idx_cigars_strength_id ON cigars(strength_id)", &[]).await?;
-    client.execute("CREATE INDEX IF NOT EXISTS idx_cigars_ring_gauge_id ON cigars(ring_gauge_id)", &[]).await?;
+    client
+        .execute(
+            "CREATE INDEX IF NOT EXISTS idx_cigars_brand_id ON cigars(brand_id)",
+            &[],
+        )
+        .await?;
+    client
+        .execute(
+            "CREATE INDEX IF NOT EXISTS idx_cigars_size_id ON cigars(size_id)",
+            &[],
+        )
+        .await?;
+    client
+        .execute(
+            "CREATE INDEX IF NOT EXISTS idx_cigars_origin_id ON cigars(origin_id)",
+            &[],
+        )
+        .await?;
+    client
+        .execute(
+            "CREATE INDEX IF NOT EXISTS idx_cigars_strength_id ON cigars(strength_id)",
+            &[],
+        )
+        .await?;
+    client
+        .execute(
+            "CREATE INDEX IF NOT EXISTS idx_cigars_ring_gauge_id ON cigars(ring_gauge_id)",
+            &[],
+        )
+        .await?;
 
     // Create favorites table
     // Note: cigar_id is nullable and uses ON DELETE SET NULL so favorites persist even when cigars are deleted
-    client.execute(
-        "CREATE TABLE IF NOT EXISTS favorites (
+    client
+        .execute(
+            "CREATE TABLE IF NOT EXISTS favorites (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             cigar_id UUID REFERENCES cigars(id) ON DELETE SET NULL,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             UNIQUE(user_id, cigar_id)
         )",
-        &[],
-    ).await?;
-    
-    client.execute("CREATE INDEX IF NOT EXISTS idx_favorites_user_id ON favorites(user_id)", &[]).await?;
-    client.execute("CREATE INDEX IF NOT EXISTS idx_favorites_cigar_id ON favorites(cigar_id)", &[]).await?;
-    
+            &[],
+        )
+        .await?;
+
+    client
+        .execute(
+            "CREATE INDEX IF NOT EXISTS idx_favorites_user_id ON favorites(user_id)",
+            &[],
+        )
+        .await?;
+    client
+        .execute(
+            "CREATE INDEX IF NOT EXISTS idx_favorites_cigar_id ON favorites(cigar_id)",
+            &[],
+        )
+        .await?;
+
     // Migrate existing favorites table to allow null cigar_id with ON DELETE SET NULL
     // Drop the old constraint and add the new one
-    client.execute(
-        "ALTER TABLE favorites DROP CONSTRAINT IF EXISTS favorites_cigar_id_fkey",
-        &[],
-    ).await.ok(); // Ignore error if constraint doesn't exist
-    
-    client.execute(
-        "ALTER TABLE favorites ALTER COLUMN cigar_id DROP NOT NULL",
-        &[],
-    ).await.ok(); // Ignore error if already nullable
-    
-    client.execute(
-        "ALTER TABLE favorites ADD CONSTRAINT favorites_cigar_id_fkey 
+    client
+        .execute(
+            "ALTER TABLE favorites DROP CONSTRAINT IF EXISTS favorites_cigar_id_fkey",
+            &[],
+        )
+        .await
+        .ok(); // Ignore error if constraint doesn't exist
+
+    client
+        .execute(
+            "ALTER TABLE favorites ALTER COLUMN cigar_id DROP NOT NULL",
+            &[],
+        )
+        .await
+        .ok(); // Ignore error if already nullable
+
+    client
+        .execute(
+            "ALTER TABLE favorites ADD CONSTRAINT favorites_cigar_id_fkey 
          FOREIGN KEY (cigar_id) REFERENCES cigars(id) ON DELETE SET NULL",
-        &[],
-    ).await.ok(); // Ignore error if constraint already exists
-    
+            &[],
+        )
+        .await
+        .ok(); // Ignore error if constraint already exists
+
     // Add snapshot columns to favorites table to preserve cigar data when cigars are deleted
-    client.execute(
-        "ALTER TABLE favorites ADD COLUMN IF NOT EXISTS snapshot_name TEXT",
-        &[],
-    ).await.ok();
-    
-    client.execute(
-        "ALTER TABLE favorites ADD COLUMN IF NOT EXISTS snapshot_brand_id UUID",
-        &[],
-    ).await.ok();
-    
-    client.execute(
-        "ALTER TABLE favorites ADD COLUMN IF NOT EXISTS snapshot_size_id UUID",
-        &[],
-    ).await.ok();
-    
-    client.execute(
-        "ALTER TABLE favorites ADD COLUMN IF NOT EXISTS snapshot_strength_id UUID",
-        &[],
-    ).await.ok();
-    
-    client.execute(
-        "ALTER TABLE favorites ADD COLUMN IF NOT EXISTS snapshot_origin_id UUID",
-        &[],
-    ).await.ok();
-    
-    client.execute(
-        "ALTER TABLE favorites ADD COLUMN IF NOT EXISTS snapshot_ring_gauge_id UUID",
-        &[],
-    ).await.ok();
-    
-    client.execute(
-        "ALTER TABLE favorites ADD COLUMN IF NOT EXISTS snapshot_image_url TEXT",
-        &[],
-    ).await.ok();
-    
+    client
+        .execute(
+            "ALTER TABLE favorites ADD COLUMN IF NOT EXISTS snapshot_name TEXT",
+            &[],
+        )
+        .await
+        .ok();
+
+    client
+        .execute(
+            "ALTER TABLE favorites ADD COLUMN IF NOT EXISTS snapshot_brand_id UUID",
+            &[],
+        )
+        .await
+        .ok();
+
+    client
+        .execute(
+            "ALTER TABLE favorites ADD COLUMN IF NOT EXISTS snapshot_size_id UUID",
+            &[],
+        )
+        .await
+        .ok();
+
+    client
+        .execute(
+            "ALTER TABLE favorites ADD COLUMN IF NOT EXISTS snapshot_strength_id UUID",
+            &[],
+        )
+        .await
+        .ok();
+
+    client
+        .execute(
+            "ALTER TABLE favorites ADD COLUMN IF NOT EXISTS snapshot_origin_id UUID",
+            &[],
+        )
+        .await
+        .ok();
+
+    client
+        .execute(
+            "ALTER TABLE favorites ADD COLUMN IF NOT EXISTS snapshot_ring_gauge_id UUID",
+            &[],
+        )
+        .await
+        .ok();
+
+    client
+        .execute(
+            "ALTER TABLE favorites ADD COLUMN IF NOT EXISTS snapshot_image_url TEXT",
+            &[],
+        )
+        .await
+        .ok();
+
     // Add is_active column to cigars table for soft deletes
-    client.execute(
-        "ALTER TABLE cigars ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true",
-        &[],
-    ).await.ok();
-    
-    client.execute(
-        "CREATE INDEX IF NOT EXISTS idx_cigars_is_active ON cigars(is_active)",
-        &[],
-    ).await.ok();
-    
+    client
+        .execute(
+            "ALTER TABLE cigars ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true",
+            &[],
+        )
+        .await
+        .ok();
+
+    client
+        .execute(
+            "CREATE INDEX IF NOT EXISTS idx_cigars_is_active ON cigars(is_active)",
+            &[],
+        )
+        .await
+        .ok();
+
     // Add is_wishlist column to humidors table
     client.execute(
         "ALTER TABLE humidors ADD COLUMN IF NOT EXISTS is_wishlist BOOLEAN NOT NULL DEFAULT false",
         &[],
     ).await.ok();
 
-    let db_pool = Arc::new(client);
-    
-    // Helper function to pass database to handlers
-    fn with_db(db: DbPool) -> impl Filter<Extract = (DbPool,), Error = std::convert::Infallible> + Clone {
+    // Drop the temporary migration client back to the pool
+    drop(client);
+
+    // Use the pool for all handlers
+    let db_pool = pool;
+
+    // Helper function to pass database pool to handlers
+    fn with_db(
+        db: DbPool,
+    ) -> impl Filter<Extract = (DbPool,), Error = std::convert::Infallible> + Clone {
         warp::any().map(move || db.clone())
     }
 
     // Helper function to extract UUID from path
     fn with_uuid() -> impl Filter<Extract = (uuid::Uuid,), Error = warp::Rejection> + Copy {
-        warp::path::param::<String>()
-            .and_then(|id: String| async move {
-                uuid::Uuid::parse_str(&id)
-                    .map_err(|_| warp::reject::custom(InvalidUuid))
-            })
+        warp::path::param::<String>().and_then(|id: String| async move {
+            uuid::Uuid::parse_str(&id).map_err(|_| warp::reject::custom(InvalidUuid))
+        })
     }
 
     // Serve static files
-    let static_files = warp::path("static")
-        .and(warp::fs::dir("static"));
+    let static_files = warp::path("static").and(warp::fs::dir("static"));
 
     // Cigar API routes (authenticated)
     let get_cigars = warp::path("api")
@@ -830,20 +935,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .or(update_current_user)
         .or(change_password)
         .or(get_humidors)
-        .or(get_humidor_cigars)  // Must come before get_humidor (more specific route)
+        .or(get_humidor_cigars) // Must come before get_humidor (more specific route)
         .or(create_humidor)
         .or(update_humidor)
         .or(delete_humidor)
-        .or(get_humidor)  // Less specific, should be last
-        .or(check_favorite)  // Must come before remove_favorite (more specific route)
+        .or(get_humidor) // Less specific, should be last
+        .or(check_favorite) // Must come before remove_favorite (more specific route)
         .or(get_favorites)
         .or(add_favorite)
         .or(remove_favorite);
 
     // Root route
-    let root = warp::path::end()
-        .and(warp::get())
-        .and_then(serve_index);
+    let root = warp::path::end().and(warp::get()).and_then(serve_index);
 
     // Setup route
     let setup = warp::path("setup.html")
@@ -874,10 +977,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap_or(3000);
 
     println!("Server running on http://0.0.0.0:{}", port);
-    
-    warp::serve(routes)
-        .run(([0, 0, 0, 0], port))
-        .await;
+
+    warp::serve(routes).run(([0, 0, 0, 0], port)).await;
 
     Ok(())
 }
@@ -904,11 +1005,11 @@ fetch('/api/v1/setup/status')
     });
 </script>
 "#;
-            
+
             // Insert the script before the closing </body> tag
             let modified_content = content.replace("</body>", &format!("{}</body>", setup_script));
             Ok(warp::reply::html(modified_content))
-        },
+        }
         Err(_) => {
             // Fallback content with setup check
             let fallback_html = r#"
@@ -946,7 +1047,8 @@ async fn serve_setup() -> Result<impl Reply, warp::Rejection> {
         Err(_) => Ok(warp::reply::with_status(
             warp::reply::html("<h1>Setup Not Found</h1>".to_string()),
             warp::http::StatusCode::NOT_FOUND,
-        ).into_response()),
+        )
+        .into_response()),
     }
 }
 
@@ -956,6 +1058,7 @@ async fn serve_login() -> Result<impl Reply, warp::Rejection> {
         Err(_) => Ok(warp::reply::with_status(
             warp::reply::html("<h1>Login Not Found</h1>".to_string()),
             warp::http::StatusCode::NOT_FOUND,
-        ).into_response()),
+        )
+        .into_response()),
     }
 }

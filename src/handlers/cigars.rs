@@ -2,9 +2,11 @@ use chrono::Utc;
 use serde::Serialize;
 use serde_json::json;
 use uuid::Uuid;
-use warp::{Reply, Rejection};
+use warp::{Rejection, Reply};
 
-use crate::{DbPool, models::*, validation::Validate, middleware::auth::AuthContext};
+use crate::{
+    errors::AppError, middleware::auth::AuthContext, models::*, validation::Validate, DbPool,
+};
 
 #[derive(Debug, Serialize)]
 pub struct CigarResponse {
@@ -15,16 +17,25 @@ pub struct CigarResponse {
 pub async fn get_cigars(
     params: std::collections::HashMap<String, String>,
     _auth: AuthContext,
-    db: DbPool
+    pool: DbPool,
 ) -> Result<impl Reply, Rejection> {
+    use crate::errors::AppError;
     use tokio_postgres::types::ToSql;
-    
+
+    // Acquire a connection from the pool
+    let db = pool.get().await.map_err(|e| {
+        warp::reject::custom(AppError::DatabaseError(format!(
+            "Connection pool error: {}",
+            e
+        )))
+    })?;
+
     // Build query with parameterized conditions to prevent SQL injection
     let base_query = "SELECT id, humidor_id, brand_id, name, size_id, strength_id, origin_id, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge_id, length, image_url, is_active, created_at, updated_at FROM cigars";
     let mut conditions = Vec::new();
     let mut param_values: Vec<Box<dyn ToSql + Sync + Send>> = Vec::new();
     let mut param_counter = 1;
-    
+
     // Check for humidor_id filter
     if let Some(humidor_id_str) = params.get("humidor_id") {
         if let Ok(humidor_uuid) = Uuid::parse_str(humidor_id_str) {
@@ -33,7 +44,7 @@ pub async fn get_cigars(
             param_counter += 1;
         }
     }
-    
+
     // Check for organizer filters (brand, size, origin, strength, ring_gauge)
     if let Some(brand_id_str) = params.get("brand_id") {
         if let Ok(brand_uuid) = Uuid::parse_str(brand_id_str) {
@@ -70,21 +81,27 @@ pub async fn get_cigars(
             // param_counter would be incremented here if we had more parameters
         }
     }
-    
+
     // Build the final query with WHERE clause if there are conditions
     let query = if conditions.is_empty() {
-        format!("{} ORDER BY is_active DESC, created_at DESC LIMIT 50", base_query)
+        format!(
+            "{} ORDER BY is_active DESC, created_at DESC LIMIT 50",
+            base_query
+        )
     } else {
-        format!("{} WHERE {} ORDER BY is_active DESC, created_at DESC LIMIT 50", 
-            base_query, conditions.join(" AND "))
+        format!(
+            "{} WHERE {} ORDER BY is_active DESC, created_at DESC LIMIT 50",
+            base_query,
+            conditions.join(" AND ")
+        )
     };
-    
+
     // Convert boxed parameters to references for query execution
     let param_refs: Vec<&(dyn ToSql + Sync)> = param_values
         .iter()
         .map(|b| &**b as &(dyn ToSql + Sync))
         .collect();
-    
+
     match db.query(&query, &param_refs[..]).await {
         Ok(rows) => {
             let mut cigars = Vec::new();
@@ -113,35 +130,45 @@ pub async fn get_cigars(
                 };
                 cigars.push(cigar);
             }
-            
+
             let total = cigars.len() as i64;
-            let response = CigarResponse {
-                cigars,
-                total,
-            };
-            
+            let response = CigarResponse { cigars, total };
+
             Ok(warp::reply::json(&response))
         }
         Err(e) => {
             eprintln!("Database error: {}", e);
-            Ok(warp::reply::json(&json!({"error": "Failed to fetch cigars"})))
+            Ok(warp::reply::json(
+                &json!({"error": "Failed to fetch cigars"}),
+            ))
         }
     }
 }
 
-pub async fn create_cigar(create_cigar: CreateCigar, _auth: AuthContext, db: DbPool) -> Result<impl Reply, Rejection> {
+pub async fn create_cigar(
+    create_cigar: CreateCigar,
+    _auth: AuthContext,
+    pool: DbPool,
+) -> Result<impl Reply, Rejection> {
     // Validate input
     create_cigar.validate().map_err(warp::reject::custom)?;
-    
+
+    let db = pool.get().await.map_err(|e| {
+        eprintln!("Failed to get database connection: {}", e);
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
+    })?;
+
     let id = Uuid::new_v4();
     let now = Utc::now();
-    
+
     match db.query_one(
-        "INSERT INTO cigars (id, humidor_id, brand_id, name, size_id, strength_id, origin_id, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge_id, length, image_url, is_active, created_at, updated_at) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, true, $18, $19) 
+        "INSERT INTO cigars (id, humidor_id, brand_id, name, size_id, strength_id, origin_id, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge_id, length, image_url, is_active, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, true, $18, $19)
          RETURNING id, humidor_id, brand_id, name, size_id, strength_id, origin_id, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge_id, length, image_url, is_active, created_at, updated_at",
-        &[&id, &create_cigar.humidor_id, &create_cigar.brand_id, &create_cigar.name, &create_cigar.size_id, &create_cigar.strength_id, &create_cigar.origin_id, 
-          &create_cigar.wrapper, &create_cigar.binder, &create_cigar.filler, &create_cigar.price, &create_cigar.purchase_date, 
+        &[&id, &create_cigar.humidor_id, &create_cigar.brand_id, &create_cigar.name, &create_cigar.size_id, &create_cigar.strength_id, &create_cigar.origin_id,
+          &create_cigar.wrapper, &create_cigar.binder, &create_cigar.filler, &create_cigar.price, &create_cigar.purchase_date,
           &create_cigar.notes, &create_cigar.quantity, &create_cigar.ring_gauge_id, &create_cigar.length, &create_cigar.image_url, &now, &now]
     ).await {
         Ok(row) => {
@@ -176,7 +203,18 @@ pub async fn create_cigar(create_cigar: CreateCigar, _auth: AuthContext, db: DbP
     }
 }
 
-pub async fn get_cigar(id: Uuid, _auth: AuthContext, db: DbPool) -> Result<impl Reply, Rejection> {
+pub async fn get_cigar(
+    id: Uuid,
+    _auth: AuthContext,
+    pool: DbPool,
+) -> Result<impl Reply, Rejection> {
+    let db = pool.get().await.map_err(|e| {
+        eprintln!("Failed to get database connection: {}", e);
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
+    })?;
+
     match db.query_one(
         "SELECT id, humidor_id, brand_id, name, size_id, strength_id, origin_id, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge_id, length, image_url, is_active, created_at, updated_at FROM cigars WHERE id = $1",
         &[&id]
@@ -213,14 +251,26 @@ pub async fn get_cigar(id: Uuid, _auth: AuthContext, db: DbPool) -> Result<impl 
     }
 }
 
-pub async fn update_cigar(id: Uuid, update_cigar: UpdateCigar, _auth: AuthContext, db: DbPool) -> Result<impl Reply, Rejection> {
+pub async fn update_cigar(
+    id: Uuid,
+    update_cigar: UpdateCigar,
+    _auth: AuthContext,
+    pool: DbPool,
+) -> Result<impl Reply, Rejection> {
     // Validate input
     update_cigar.validate().map_err(warp::reject::custom)?;
-    
+
+    let db = pool.get().await.map_err(|e| {
+        eprintln!("Failed to get database connection: {}", e);
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
+    })?;
+
     let now = Utc::now();
-    
+
     match db.query_one(
-        "UPDATE cigars SET 
+        "UPDATE cigars SET
          humidor_id = COALESCE($2, humidor_id),
          brand_id = COALESCE($3, brand_id),
          name = COALESCE($4, name),
@@ -237,10 +287,10 @@ pub async fn update_cigar(id: Uuid, update_cigar: UpdateCigar, _auth: AuthContex
          ring_gauge_id = COALESCE($15, ring_gauge_id),
          length = COALESCE($16, length),
          image_url = COALESCE($17, image_url),
-         is_active = CASE 
+         is_active = CASE
              WHEN $14 IS NOT NULL AND $14 = 0 THEN false
-             WHEN $14 IS NOT NULL AND $14 > 0 THEN true 
-             ELSE is_active 
+             WHEN $14 IS NOT NULL AND $14 > 0 THEN true
+             ELSE is_active
          END,
          updated_at = $18
          WHERE id = $1
@@ -281,23 +331,35 @@ pub async fn update_cigar(id: Uuid, update_cigar: UpdateCigar, _auth: AuthContex
     }
 }
 
-pub async fn delete_cigar(id: Uuid, _auth: AuthContext, db: DbPool) -> Result<impl Reply, Rejection> {
+pub async fn delete_cigar(
+    id: Uuid,
+    _auth: AuthContext,
+    pool: DbPool,
+) -> Result<impl Reply, Rejection> {
+    let db = pool.get().await.map_err(|e| {
+        eprintln!("Failed to get database connection: {}", e);
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
+    })?;
+
     // Hard delete: actually remove the cigar from the database
     // Note: favorites will keep snapshot data due to ON DELETE SET NULL on cigar_id
-    match db.execute(
-        "DELETE FROM cigars WHERE id = $1",
-        &[&id]
-    ).await {
+    match db.execute("DELETE FROM cigars WHERE id = $1", &[&id]).await {
         Ok(rows_affected) => {
             if rows_affected > 0 {
-                Ok(warp::reply::json(&json!({"message": "Cigar deleted successfully"})))
+                Ok(warp::reply::json(
+                    &json!({"message": "Cigar deleted successfully"}),
+                ))
             } else {
                 Ok(warp::reply::json(&json!({"error": "Cigar not found"})))
             }
         }
         Err(e) => {
             eprintln!("Database error: {}", e);
-            Ok(warp::reply::json(&json!({"error": "Failed to delete cigar"})))
+            Ok(warp::reply::json(
+                &json!({"error": "Failed to delete cigar"}),
+            ))
         }
     }
 }
@@ -307,14 +369,19 @@ pub struct ScrapeRequest {
     url: String,
 }
 
-pub async fn scrape_cigar_url(body: ScrapeRequest, _auth: AuthContext) -> Result<impl Reply, Rejection> {
+pub async fn scrape_cigar_url(
+    body: ScrapeRequest,
+    _auth: AuthContext,
+) -> Result<impl Reply, Rejection> {
     use crate::services::scrape_cigar_url;
-    
+
     match scrape_cigar_url(&body.url).await {
         Ok(data) => Ok(warp::reply::json(&data)),
         Err(e) => {
             eprintln!("Scraping error: {}", e);
-            Ok(warp::reply::json(&json!({"error": "Failed to scrape cigar information"})))
+            Ok(warp::reply::json(
+                &json!({"error": "Failed to scrape cigar information"}),
+            ))
         }
     }
 }

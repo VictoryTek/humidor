@@ -1,11 +1,18 @@
 use chrono::Utc;
 use serde_json::json;
 use uuid::Uuid;
-use warp::{Reply, Rejection};
+use warp::{Rejection, Reply};
 
-use crate::{DbPool, models::*, validation::Validate};
+use crate::{errors::AppError, models::*, validation::Validate, DbPool};
 
-pub async fn get_sizes(db: DbPool) -> Result<impl Reply, Rejection> {
+pub async fn get_sizes(pool: DbPool) -> Result<impl Reply, Rejection> {
+    let db = pool.get().await.map_err(|e| {
+        eprintln!("Failed to get database connection: {}", e);
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
+    })?;
+
     match db.query(
         "SELECT id, name, length_inches, ring_gauge, description, created_at, updated_at FROM sizes ORDER BY name ASC",
         &[]
@@ -33,13 +40,20 @@ pub async fn get_sizes(db: DbPool) -> Result<impl Reply, Rejection> {
     }
 }
 
-pub async fn create_size(create_size: CreateSize, db: DbPool) -> Result<impl Reply, Rejection> {
+pub async fn create_size(create_size: CreateSize, pool: DbPool) -> Result<impl Reply, Rejection> {
     // Validate input
     create_size.validate().map_err(warp::reject::custom)?;
-    
+
     let id = Uuid::new_v4();
     let now = Utc::now();
-    
+
+    let db = pool.get().await.map_err(|e| {
+        eprintln!("Failed to get database connection: {}", e);
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
+    })?;
+
     match db.query_one(
         "INSERT INTO sizes (id, name, length_inches, ring_gauge, description, created_at, updated_at) 
          VALUES ($1, $2, $3, $4, $5, $6, $7) 
@@ -65,14 +79,26 @@ pub async fn create_size(create_size: CreateSize, db: DbPool) -> Result<impl Rep
     }
 }
 
-pub async fn update_size(id: Uuid, update_size: UpdateSize, db: DbPool) -> Result<impl Reply, Rejection> {
+pub async fn update_size(
+    id: Uuid,
+    update_size: UpdateSize,
+    pool: DbPool,
+) -> Result<impl Reply, Rejection> {
     // Validate input
     update_size.validate().map_err(warp::reject::custom)?;
-    
+
     let now = Utc::now();
-    
-    match db.query_one(
-        "UPDATE sizes SET 
+
+    let db = pool.get().await.map_err(|e| {
+        eprintln!("Failed to get database connection: {}", e);
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
+    })?;
+
+    match db
+        .query_one(
+            "UPDATE sizes SET 
          name = COALESCE($2, name),
          length_inches = COALESCE($3, length_inches),
          ring_gauge = COALESCE($4, ring_gauge),
@@ -80,8 +106,17 @@ pub async fn update_size(id: Uuid, update_size: UpdateSize, db: DbPool) -> Resul
          updated_at = $6
          WHERE id = $1
          RETURNING id, name, length_inches, ring_gauge, description, created_at, updated_at",
-        &[&id, &update_size.name, &update_size.length_inches, &update_size.ring_gauge, &update_size.description, &now]
-    ).await {
+            &[
+                &id,
+                &update_size.name,
+                &update_size.length_inches,
+                &update_size.ring_gauge,
+                &update_size.description,
+                &now,
+            ],
+        )
+        .await
+    {
         Ok(row) => {
             let size = Size {
                 id: row.get(0),
@@ -96,23 +131,36 @@ pub async fn update_size(id: Uuid, update_size: UpdateSize, db: DbPool) -> Resul
         }
         Err(e) => {
             eprintln!("Database error: {}", e);
-            Ok(warp::reply::json(&json!({"error": "Failed to update size"})))
+            Ok(warp::reply::json(
+                &json!({"error": "Failed to update size"}),
+            ))
         }
     }
 }
 
-pub async fn delete_size(id: Uuid, db: DbPool) -> Result<impl Reply, Rejection> {
+pub async fn delete_size(id: Uuid, pool: DbPool) -> Result<impl Reply, Rejection> {
+    let db = pool.get().await.map_err(|e| {
+        eprintln!("Failed to get database connection: {}", e);
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
+    })?;
+
     match db.execute("DELETE FROM sizes WHERE id = $1", &[&id]).await {
         Ok(rows_affected) => {
             if rows_affected > 0 {
-                Ok(warp::reply::json(&json!({"message": "Size deleted successfully"})))
+                Ok(warp::reply::json(
+                    &json!({"message": "Size deleted successfully"}),
+                ))
             } else {
                 Ok(warp::reply::json(&json!({"error": "Size not found"})))
             }
         }
         Err(e) => {
             eprintln!("Database error: {}", e);
-            Ok(warp::reply::json(&json!({"error": "Failed to delete size"})))
+            Ok(warp::reply::json(
+                &json!({"error": "Failed to delete size"}),
+            ))
         }
     }
 }

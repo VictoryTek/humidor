@@ -1,11 +1,18 @@
 use chrono::Utc;
 use serde_json::json;
 use uuid::Uuid;
-use warp::{Reply, Rejection};
+use warp::{Rejection, Reply};
 
-use crate::{DbPool, models::*, validation::Validate};
+use crate::{errors::AppError, models::*, validation::Validate, DbPool};
 
-pub async fn get_ring_gauges(db: DbPool) -> Result<impl Reply, Rejection> {
+pub async fn get_ring_gauges(pool: DbPool) -> Result<impl Reply, Rejection> {
+    let db = pool.get().await.map_err(|e| {
+        eprintln!("Failed to get database connection: {}", e);
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
+    })?;
+
     match db.query(
         "SELECT id, gauge, description, common_names, created_at, updated_at FROM ring_gauges ORDER BY gauge ASC",
         &[]
@@ -32,13 +39,23 @@ pub async fn get_ring_gauges(db: DbPool) -> Result<impl Reply, Rejection> {
     }
 }
 
-pub async fn create_ring_gauge(create_ring_gauge: CreateRingGauge, db: DbPool) -> Result<impl Reply, Rejection> {
+pub async fn create_ring_gauge(
+    create_ring_gauge: CreateRingGauge,
+    pool: DbPool,
+) -> Result<impl Reply, Rejection> {
     // Validate input
     create_ring_gauge.validate().map_err(warp::reject::custom)?;
-    
+
     let id = Uuid::new_v4();
     let now = Utc::now();
-    
+
+    let db = pool.get().await.map_err(|e| {
+        eprintln!("Failed to get database connection: {}", e);
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
+    })?;
+
     match db.query_one(
         "INSERT INTO ring_gauges (id, gauge, description, common_names, created_at, updated_at) 
          VALUES ($1, $2, $3, $4, $5, $6) 
@@ -63,22 +80,42 @@ pub async fn create_ring_gauge(create_ring_gauge: CreateRingGauge, db: DbPool) -
     }
 }
 
-pub async fn update_ring_gauge(id: Uuid, update_ring_gauge: UpdateRingGauge, db: DbPool) -> Result<impl Reply, Rejection> {
+pub async fn update_ring_gauge(
+    id: Uuid,
+    update_ring_gauge: UpdateRingGauge,
+    pool: DbPool,
+) -> Result<impl Reply, Rejection> {
     // Validate input
     update_ring_gauge.validate().map_err(warp::reject::custom)?;
-    
+
     let now = Utc::now();
-    
-    match db.query_one(
-        "UPDATE ring_gauges SET 
+
+    let db = pool.get().await.map_err(|e| {
+        eprintln!("Failed to get database connection: {}", e);
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
+    })?;
+
+    match db
+        .query_one(
+            "UPDATE ring_gauges SET 
          gauge = COALESCE($2, gauge),
          description = COALESCE($3, description),
          common_names = COALESCE($4, common_names),
          updated_at = $5
          WHERE id = $1
          RETURNING id, gauge, description, common_names, created_at, updated_at",
-        &[&id, &update_ring_gauge.gauge, &update_ring_gauge.description, &update_ring_gauge.common_names, &now]
-    ).await {
+            &[
+                &id,
+                &update_ring_gauge.gauge,
+                &update_ring_gauge.description,
+                &update_ring_gauge.common_names,
+                &now,
+            ],
+        )
+        .await
+    {
         Ok(row) => {
             let ring_gauge = RingGauge {
                 id: row.get(0),
@@ -92,23 +129,39 @@ pub async fn update_ring_gauge(id: Uuid, update_ring_gauge: UpdateRingGauge, db:
         }
         Err(e) => {
             eprintln!("Database error: {}", e);
-            Ok(warp::reply::json(&json!({"error": "Failed to update ring gauge"})))
+            Ok(warp::reply::json(
+                &json!({"error": "Failed to update ring gauge"}),
+            ))
         }
     }
 }
 
-pub async fn delete_ring_gauge(id: Uuid, db: DbPool) -> Result<impl Reply, Rejection> {
-    match db.execute("DELETE FROM ring_gauges WHERE id = $1", &[&id]).await {
+pub async fn delete_ring_gauge(id: Uuid, pool: DbPool) -> Result<impl Reply, Rejection> {
+    let db = pool.get().await.map_err(|e| {
+        eprintln!("Failed to get database connection: {}", e);
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
+    })?;
+
+    match db
+        .execute("DELETE FROM ring_gauges WHERE id = $1", &[&id])
+        .await
+    {
         Ok(rows_affected) => {
             if rows_affected > 0 {
-                Ok(warp::reply::json(&json!({"message": "Ring gauge deleted successfully"})))
+                Ok(warp::reply::json(
+                    &json!({"message": "Ring gauge deleted successfully"}),
+                ))
             } else {
                 Ok(warp::reply::json(&json!({"error": "Ring gauge not found"})))
             }
         }
         Err(e) => {
             eprintln!("Database error: {}", e);
-            Ok(warp::reply::json(&json!({"error": "Failed to delete ring gauge"})))
+            Ok(warp::reply::json(
+                &json!({"error": "Failed to delete ring gauge"}),
+            ))
         }
     }
 }

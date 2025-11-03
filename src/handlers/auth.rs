@@ -1,15 +1,19 @@
-use crate::models::{LoginRequest, LoginResponse, UserResponse, SetupStatusResponse, CreateHumidorRequest, Humidor, SetupRequest};
+use crate::errors::AppError;
+use crate::models::{
+    CreateHumidorRequest, Humidor, LoginRequest, LoginResponse, SetupRequest, SetupStatusResponse,
+    UserResponse,
+};
 use crate::DbPool;
-use warp::Reply;
-use serde_json::json;
-use uuid::Uuid;
 use chrono::Utc;
+use serde_json::json;
 use std::env;
+use uuid::Uuid;
+use warp::Reply;
 
 // Authentication and JWT utilities
-use jsonwebtoken::{encode, decode, Header, Algorithm, Validation, EncodingKey, DecodingKey};
-use serde::{Deserialize, Serialize};
 use bcrypt::{hash, verify, DEFAULT_COST};
+use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
@@ -22,24 +26,30 @@ pub struct Claims {
 /// This function will panic at startup if JWT_SECRET is not set, which is intentional
 /// to prevent running with an insecure default
 fn jwt_secret() -> String {
-    env::var("JWT_SECRET")
-        .expect("JWT_SECRET environment variable must be set. Generate one with: openssl rand -base64 32")
+    env::var("JWT_SECRET").expect(
+        "JWT_SECRET environment variable must be set. Generate one with: openssl rand -base64 32",
+    )
 }
 
 // Setup endpoints
-pub async fn get_setup_status(db: DbPool) -> Result<impl Reply, warp::Rejection> {
+pub async fn get_setup_status(pool: DbPool) -> Result<impl Reply, warp::Rejection> {
+    let db = pool.get().await.map_err(|e| {
+        eprintln!("Failed to get database connection: {}", e);
+        warp::reject::custom(AppError::DatabaseError("Database connection failed".to_string()))
+    })?;
+
     let query = "SELECT COUNT(*) FROM users WHERE is_admin = true";
-    
+
     match db.query_one(query, &[]).await {
         Ok(row) => {
             let admin_count: i64 = row.get(0);
             let needs_setup = admin_count == 0;
-            
+
             let response = SetupStatusResponse {
                 needs_setup,
                 has_admin: !needs_setup,
             };
-            
+
             Ok(warp::reply::json(&response))
         }
         Err(e) => {
@@ -53,8 +63,13 @@ pub async fn get_setup_status(db: DbPool) -> Result<impl Reply, warp::Rejection>
 
 pub async fn create_setup_user(
     setup_req: SetupRequest,
-    db: DbPool,
+    pool: DbPool,
 ) -> Result<impl Reply, warp::Rejection> {
+    let db = pool.get().await.map_err(|e| {
+        eprintln!("Failed to get database connection: {}", e);
+        warp::reject::custom(AppError::DatabaseError("Database connection failed".to_string()))
+    })?;
+
     // Check if setup is still needed
     let check_query = "SELECT COUNT(*) FROM users WHERE is_admin = true";
     if let Ok(row) = db.query_one(check_query, &[]).await {
@@ -65,10 +80,11 @@ pub async fn create_setup_user(
                     "error": "Setup has already been completed"
                 })),
                 warp::http::StatusCode::BAD_REQUEST,
-            ).into_response());
+            )
+            .into_response());
         }
     }
-    
+
     // Hash password
     let password_hash = match hash(&setup_req.user.password, DEFAULT_COST) {
         Ok(hash) => hash,
@@ -79,33 +95,37 @@ pub async fn create_setup_user(
                     "error": "Failed to process password"
                 })),
                 warp::http::StatusCode::INTERNAL_SERVER_ERROR,
-            ).into_response());
+            )
+            .into_response());
         }
     };
-    
+
     let user_id = Uuid::new_v4();
     let now = Utc::now();
-    
+
     let query = "
         INSERT INTO users (id, username, email, full_name, password_hash, is_admin, is_active, created_at, updated_at)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING id, username, email, full_name, is_admin, is_active, created_at, updated_at
     ";
-    
-    match db.query_one(
-        query,
-        &[
-            &user_id,
-            &setup_req.user.username,
-            &setup_req.user.email,
-            &setup_req.user.full_name,
-            &password_hash,
-            &true, // First user is admin
-            &true, // Active by default
-            &now,
-            &now,
-        ],
-    ).await {
+
+    match db
+        .query_one(
+            query,
+            &[
+                &user_id,
+                &setup_req.user.username,
+                &setup_req.user.email,
+                &setup_req.user.full_name,
+                &password_hash,
+                &true, // First user is admin
+                &true, // Active by default
+                &now,
+                &now,
+            ],
+        )
+        .await
+    {
         Ok(row) => {
             // Generate JWT token
             let token = match generate_token(&user_id.to_string(), &setup_req.user.username) {
@@ -117,10 +137,11 @@ pub async fn create_setup_user(
                             "error": "Failed to generate authentication token"
                         })),
                         warp::http::StatusCode::INTERNAL_SERVER_ERROR,
-                    ).into_response());
+                    )
+                    .into_response());
                 }
             };
-            
+
             let user_response = UserResponse {
                 id: row.get("id"),
                 username: row.get("username"),
@@ -131,44 +152,48 @@ pub async fn create_setup_user(
                 created_at: row.get("created_at"),
                 updated_at: row.get("updated_at"),
             };
-            
+
             // Create the first humidor
             let humidor_id = Uuid::new_v4();
             let humidor_query = "
                 INSERT INTO humidors (id, user_id, name, description, capacity, target_humidity, location, is_wishlist, created_at, updated_at)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             ";
-            
-            if let Err(e) = db.execute(
-                humidor_query,
-                &[
-                    &humidor_id,
-                    &user_id,
-                    &setup_req.humidor.name,
-                    &setup_req.humidor.description,
-                    &setup_req.humidor.capacity,
-                    &setup_req.humidor.target_humidity,
-                    &setup_req.humidor.location,
-                    &false, // is_wishlist
-                    &now,
-                    &now,
-                ],
-            ).await {
+
+            if let Err(e) = db
+                .execute(
+                    humidor_query,
+                    &[
+                        &humidor_id,
+                        &user_id,
+                        &setup_req.humidor.name,
+                        &setup_req.humidor.description,
+                        &setup_req.humidor.capacity,
+                        &setup_req.humidor.target_humidity,
+                        &setup_req.humidor.location,
+                        &false, // is_wishlist
+                        &now,
+                        &now,
+                    ],
+                )
+                .await
+            {
                 eprintln!("Failed to create humidor: {}", e);
                 return Ok(warp::reply::with_status(
                     warp::reply::json(&json!({
                         "error": "Failed to create humidor"
                     })),
                     warp::http::StatusCode::INTERNAL_SERVER_ERROR,
-                ).into_response());
+                )
+                .into_response());
             }
-            
+
             let response = json!({
                 "user": user_response,
                 "token": token,
                 "humidor_id": humidor_id.to_string()
             });
-            
+
             Ok(warp::reply::json(&response).into_response())
         }
         Err(e) => {
@@ -179,14 +204,16 @@ pub async fn create_setup_user(
                         "error": "Username or email already exists"
                     })),
                     warp::http::StatusCode::CONFLICT,
-                ).into_response())
+                )
+                .into_response())
             } else {
                 Ok(warp::reply::with_status(
                     warp::reply::json(&json!({
                         "error": "Failed to create user"
                     })),
                     warp::http::StatusCode::INTERNAL_SERVER_ERROR,
-                ).into_response())
+                )
+                .into_response())
             }
         }
     }
@@ -195,33 +222,39 @@ pub async fn create_setup_user(
 // Regular authentication endpoints
 pub async fn login_user(
     login_req: LoginRequest,
-    db: DbPool,
+    pool: DbPool,
 ) -> Result<impl Reply, warp::Rejection> {
+    let db = pool.get().await.map_err(|e| {
+        eprintln!("Failed to get database connection: {}", e);
+        warp::reject::custom(AppError::DatabaseError("Database connection failed".to_string()))
+    })?;
+
     let query = "
         SELECT id, username, email, full_name, password_hash, is_admin, is_active, created_at, updated_at
         FROM users 
         WHERE username = $1 OR email = $1
     ";
-    
+
     match db.query_opt(query, &[&login_req.username]).await {
         Ok(Some(row)) => {
             let password_hash: String = row.get("password_hash");
             let is_active: bool = row.get("is_active");
-            
+
             if !is_active {
                 return Ok(warp::reply::with_status(
                     warp::reply::json(&json!({
                         "error": "Account is disabled"
                     })),
                     warp::http::StatusCode::UNAUTHORIZED,
-                ).into_response());
+                )
+                .into_response());
             }
-            
+
             match verify(&login_req.password, &password_hash) {
                 Ok(true) => {
                     let user_id: Uuid = row.get("id");
                     let username: String = row.get("username");
-                    
+
                     let token = match generate_token(&user_id.to_string(), &username) {
                         Ok(token) => token,
                         Err(e) => {
@@ -231,10 +264,11 @@ pub async fn login_user(
                                     "error": "Authentication failed"
                                 })),
                                 warp::http::StatusCode::INTERNAL_SERVER_ERROR,
-                            ).into_response());
+                            )
+                            .into_response());
                         }
                     };
-                    
+
                     let user_response = UserResponse {
                         id: row.get("id"),
                         username: row.get("username"),
@@ -245,22 +279,21 @@ pub async fn login_user(
                         created_at: row.get("created_at"),
                         updated_at: row.get("updated_at"),
                     };
-                    
+
                     let response = LoginResponse {
                         user: user_response,
                         token,
                     };
-                    
+
                     Ok(warp::reply::json(&response).into_response())
                 }
-                Ok(false) => {
-                    Ok(warp::reply::with_status(
-                        warp::reply::json(&json!({
-                            "error": "Invalid username or password"
-                        })),
-                        warp::http::StatusCode::UNAUTHORIZED,
-                    ).into_response())
-                }
+                Ok(false) => Ok(warp::reply::with_status(
+                    warp::reply::json(&json!({
+                        "error": "Invalid username or password"
+                    })),
+                    warp::http::StatusCode::UNAUTHORIZED,
+                )
+                .into_response()),
                 Err(e) => {
                     eprintln!("Password verification error: {}", e);
                     Ok(warp::reply::with_status(
@@ -268,18 +301,18 @@ pub async fn login_user(
                             "error": "Authentication failed"
                         })),
                         warp::http::StatusCode::INTERNAL_SERVER_ERROR,
-                    ).into_response())
+                    )
+                    .into_response())
                 }
             }
         }
-        Ok(None) => {
-            Ok(warp::reply::with_status(
-                warp::reply::json(&json!({
-                    "error": "Invalid username or password"
-                })),
-                warp::http::StatusCode::UNAUTHORIZED,
-            ).into_response())
-        }
+        Ok(None) => Ok(warp::reply::with_status(
+            warp::reply::json(&json!({
+                "error": "Invalid username or password"
+            })),
+            warp::http::StatusCode::UNAUTHORIZED,
+        )
+        .into_response()),
         Err(e) => {
             eprintln!("Database error: {}", e);
             Ok(warp::reply::with_status(
@@ -287,7 +320,8 @@ pub async fn login_user(
                     "error": "Authentication failed"
                 })),
                 warp::http::StatusCode::INTERNAL_SERVER_ERROR,
-            ).into_response())
+            )
+            .into_response())
         }
     }
 }
@@ -297,8 +331,13 @@ pub async fn login_user(
 pub async fn create_humidor_for_setup(
     humidor_req: CreateHumidorRequest,
     user_id: String, // This would come from JWT auth middleware
-    db: DbPool,
+    pool: DbPool,
 ) -> Result<impl Reply, warp::Rejection> {
+    let db = pool.get().await.map_err(|e| {
+        eprintln!("Failed to get database connection: {}", e);
+        warp::reject::custom(AppError::DatabaseError("Database connection failed".to_string()))
+    })?;
+
     let humidor_id = Uuid::new_v4();
     let user_uuid = match Uuid::parse_str(&user_id) {
         Ok(uuid) => uuid,
@@ -308,32 +347,36 @@ pub async fn create_humidor_for_setup(
                     "error": "Invalid user ID"
                 })),
                 warp::http::StatusCode::BAD_REQUEST,
-            ).into_response());
+            )
+            .into_response());
         }
     };
     let now = Utc::now();
-    
+
     let query = "
         INSERT INTO humidors (id, user_id, name, description, capacity, target_humidity, location, is_wishlist, created_at, updated_at)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING id, user_id, name, description, capacity, target_humidity, location, is_wishlist, created_at, updated_at
     ";
-    
-    match db.query_one(
-        query,
-        &[
-            &humidor_id,
-            &user_uuid,
-            &humidor_req.name,
-            &humidor_req.description,
-            &humidor_req.capacity,
-            &humidor_req.target_humidity,
-            &humidor_req.location,
-            &false, // is_wishlist
-            &now,
-            &now,
-        ],
-    ).await {
+
+    match db
+        .query_one(
+            query,
+            &[
+                &humidor_id,
+                &user_uuid,
+                &humidor_req.name,
+                &humidor_req.description,
+                &humidor_req.capacity,
+                &humidor_req.target_humidity,
+                &humidor_req.location,
+                &false, // is_wishlist
+                &now,
+                &now,
+            ],
+        )
+        .await
+    {
         Ok(row) => {
             let humidor = Humidor {
                 id: row.get("id"),
@@ -347,7 +390,7 @@ pub async fn create_humidor_for_setup(
                 created_at: row.get("created_at"),
                 updated_at: row.get("updated_at"),
             };
-            
+
             Ok(warp::reply::json(&humidor).into_response())
         }
         Err(e) => {
@@ -357,7 +400,8 @@ pub async fn create_humidor_for_setup(
                     "error": "Failed to create humidor"
                 })),
                 warp::http::StatusCode::INTERNAL_SERVER_ERROR,
-            ).into_response())
+            )
+            .into_response())
         }
     }
 }
@@ -368,17 +412,17 @@ fn generate_token(user_id: &str, username: &str) -> Result<String, jsonwebtoken:
         .checked_add_signed(chrono::Duration::hours(24))
         .expect("valid timestamp")
         .timestamp() as usize;
-    
+
     let claims = Claims {
         sub: user_id.to_owned(),
         username: username.to_owned(),
         exp: expiration,
     };
-    
+
     let header = Header::new(Algorithm::HS256);
     let secret = jwt_secret();
     let key = EncodingKey::from_secret(secret.as_bytes());
-    
+
     encode(&header, &claims, &key)
 }
 
@@ -386,15 +430,20 @@ pub fn verify_token(token: &str) -> Result<Claims, jsonwebtoken::errors::Error> 
     let secret = jwt_secret();
     let key = DecodingKey::from_secret(secret.as_bytes());
     let validation = Validation::new(Algorithm::HS256);
-    
+
     decode::<Claims>(token, &key, &validation).map(|data| data.claims)
 }
 
 // User profile management
 pub async fn get_current_user(
     auth: crate::middleware::AuthContext,
-    db: DbPool,
+    pool: DbPool,
 ) -> Result<impl Reply, warp::Rejection> {
+    let db = pool.get().await.map_err(|e| {
+        eprintln!("Failed to get database connection: {}", e);
+        warp::reject::custom(AppError::DatabaseError("Database connection failed".to_string()))
+    })?;
+
     match db.query_one(
         "SELECT id, username, email, full_name, is_admin, is_active, created_at, updated_at FROM users WHERE id = $1",
         &[&auth.user_id]
@@ -422,8 +471,13 @@ pub async fn get_current_user(
 pub async fn update_current_user(
     update_req: crate::models::UpdateUserRequest,
     auth: crate::middleware::AuthContext,
-    db: DbPool,
+    pool: DbPool,
 ) -> Result<impl Reply, warp::Rejection> {
+    let db = pool.get().await.map_err(|e| {
+        eprintln!("Failed to get database connection: {}", e);
+        warp::reject::custom(AppError::DatabaseError("Database connection failed".to_string()))
+    })?;
+
     let mut updates = Vec::new();
     let mut values: Vec<String> = Vec::new();
     let mut param_index = 1;
@@ -447,7 +501,9 @@ pub async fn update_current_user(
     }
 
     if updates.is_empty() {
-        return Ok(warp::reply::json(&json!({"message": "No updates provided"})));
+        return Ok(warp::reply::json(
+            &json!({"message": "No updates provided"}),
+        ));
     }
 
     updates.push(format!("updated_at = ${}", param_index));
@@ -483,7 +539,9 @@ pub async fn update_current_user(
         }
         Err(e) => {
             eprintln!("Database error: {}", e);
-            Ok(warp::reply::json(&json!({"error": "Failed to update user"})))
+            Ok(warp::reply::json(
+                &json!({"error": "Failed to update user"}),
+            ))
         }
     }
 }
@@ -491,26 +549,38 @@ pub async fn update_current_user(
 pub async fn change_password(
     password_req: crate::models::ChangePasswordRequest,
     auth: crate::middleware::AuthContext,
-    db: DbPool,
+    pool: DbPool,
 ) -> Result<impl Reply, warp::Rejection> {
+    let db = pool.get().await.map_err(|e| {
+        eprintln!("Failed to get database connection: {}", e);
+        warp::reject::custom(AppError::DatabaseError("Database connection failed".to_string()))
+    })?;
+
     // Get current password hash
-    match db.query_one(
-        "SELECT password_hash FROM users WHERE id = $1",
-        &[&auth.user_id]
-    ).await {
+    match db
+        .query_one(
+            "SELECT password_hash FROM users WHERE id = $1",
+            &[&auth.user_id],
+        )
+        .await
+    {
         Ok(row) => {
             let current_hash: String = row.get(0);
-            
+
             // Verify current password
             match verify(&password_req.current_password, &current_hash) {
                 Ok(valid) => {
                     if !valid {
-                        return Ok(warp::reply::json(&json!({"error": "Current password is incorrect"})));
+                        return Ok(warp::reply::json(
+                            &json!({"error": "Current password is incorrect"}),
+                        ));
                     }
                 }
                 Err(e) => {
                     eprintln!("Password verification error: {}", e);
-                    return Ok(warp::reply::json(&json!({"error": "Password verification failed"})));
+                    return Ok(warp::reply::json(
+                        &json!({"error": "Password verification failed"}),
+                    ));
                 }
             }
 
@@ -519,22 +589,29 @@ pub async fn change_password(
                 Ok(h) => h,
                 Err(e) => {
                     eprintln!("Password hashing error: {}", e);
-                    return Ok(warp::reply::json(&json!({"error": "Failed to hash new password"})));
+                    return Ok(warp::reply::json(
+                        &json!({"error": "Failed to hash new password"}),
+                    ));
                 }
             };
 
             // Update password
             let now = Utc::now();
-            match db.execute(
-                "UPDATE users SET password_hash = $1, updated_at = $2 WHERE id = $3",
-                &[&new_hash, &now, &auth.user_id]
-            ).await {
-                Ok(_) => {
-                    Ok(warp::reply::json(&json!({"message": "Password updated successfully"})))
-                }
+            match db
+                .execute(
+                    "UPDATE users SET password_hash = $1, updated_at = $2 WHERE id = $3",
+                    &[&new_hash, &now, &auth.user_id],
+                )
+                .await
+            {
+                Ok(_) => Ok(warp::reply::json(
+                    &json!({"message": "Password updated successfully"}),
+                )),
                 Err(e) => {
                     eprintln!("Database error: {}", e);
-                    Ok(warp::reply::json(&json!({"error": "Failed to update password"})))
+                    Ok(warp::reply::json(
+                        &json!({"error": "Failed to update password"}),
+                    ))
                 }
             }
         }

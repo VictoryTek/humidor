@@ -63,7 +63,9 @@ impl ErrorResponse {
 }
 
 /// Convert AppError to HTTP response
-pub async fn handle_rejection(err: warp::Rejection) -> Result<impl Reply, std::convert::Infallible> {
+pub async fn handle_rejection(
+    err: warp::Rejection,
+) -> Result<impl Reply, std::convert::Infallible> {
     let (code, error_type, message) = if err.is_not_found() {
         (
             StatusCode::NOT_FOUND,
@@ -77,11 +79,9 @@ pub async fn handle_rejection(err: warp::Rejection) -> Result<impl Reply, std::c
                 "DATABASE_ERROR",
                 msg.clone(),
             ),
-            AppError::ValidationError(msg) => (
-                StatusCode::BAD_REQUEST,
-                "VALIDATION_ERROR",
-                msg.clone(),
-            ),
+            AppError::ValidationError(msg) => {
+                (StatusCode::BAD_REQUEST, "VALIDATION_ERROR", msg.clone())
+            }
             AppError::Unauthorized => (
                 StatusCode::UNAUTHORIZED,
                 "UNAUTHORIZED",
@@ -92,21 +92,9 @@ pub async fn handle_rejection(err: warp::Rejection) -> Result<impl Reply, std::c
                 "FORBIDDEN",
                 "Access denied".to_string(),
             ),
-            AppError::NotFound(msg) => (
-                StatusCode::NOT_FOUND,
-                "NOT_FOUND",
-                msg.clone(),
-            ),
-            AppError::Conflict(msg) => (
-                StatusCode::CONFLICT,
-                "CONFLICT",
-                msg.clone(),
-            ),
-            AppError::BadRequest(msg) => (
-                StatusCode::BAD_REQUEST,
-                "BAD_REQUEST",
-                msg.clone(),
-            ),
+            AppError::NotFound(msg) => (StatusCode::NOT_FOUND, "NOT_FOUND", msg.clone()),
+            AppError::Conflict(msg) => (StatusCode::CONFLICT, "CONFLICT", msg.clone()),
+            AppError::BadRequest(msg) => (StatusCode::BAD_REQUEST, "BAD_REQUEST", msg.clone()),
             AppError::InternalServerError(msg) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "INTERNAL_SERVER_ERROR",

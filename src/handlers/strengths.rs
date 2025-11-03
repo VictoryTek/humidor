@@ -1,11 +1,18 @@
 use chrono::Utc;
 use serde_json::json;
 use uuid::Uuid;
-use warp::{Reply, Rejection};
+use warp::{Rejection, Reply};
 
-use crate::{DbPool, models::*, validation::Validate};
+use crate::{errors::AppError, models::*, validation::Validate, DbPool};
 
-pub async fn get_strengths(db: DbPool) -> Result<impl Reply, Rejection> {
+pub async fn get_strengths(pool: DbPool) -> Result<impl Reply, Rejection> {
+    let db = pool.get().await.map_err(|e| {
+        eprintln!("Failed to get database connection: {}", e);
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
+    })?;
+
     match db.query(
         "SELECT id, name, description, level, created_at, updated_at FROM strengths ORDER BY level ASC",
         &[]
@@ -32,19 +39,39 @@ pub async fn get_strengths(db: DbPool) -> Result<impl Reply, Rejection> {
     }
 }
 
-pub async fn create_strength(create_strength: CreateStrength, db: DbPool) -> Result<impl Reply, Rejection> {
+pub async fn create_strength(
+    create_strength: CreateStrength,
+    pool: DbPool,
+) -> Result<impl Reply, Rejection> {
     // Validate input
     create_strength.validate().map_err(warp::reject::custom)?;
-    
+
     let id = Uuid::new_v4();
     let now = Utc::now();
-    
-    match db.query_one(
-        "INSERT INTO strengths (id, name, description, level, created_at, updated_at) 
+
+    let db = pool.get().await.map_err(|e| {
+        eprintln!("Failed to get database connection: {}", e);
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
+    })?;
+
+    match db
+        .query_one(
+            "INSERT INTO strengths (id, name, description, level, created_at, updated_at) 
          VALUES ($1, $2, $3, $4, $5, $6) 
          RETURNING id, name, description, level, created_at, updated_at",
-        &[&id, &create_strength.name, &create_strength.description, &create_strength.level, &now, &now]
-    ).await {
+            &[
+                &id,
+                &create_strength.name,
+                &create_strength.description,
+                &create_strength.level,
+                &now,
+                &now,
+            ],
+        )
+        .await
+    {
         Ok(row) => {
             let strength = Strength {
                 id: row.get(0),
@@ -58,27 +85,49 @@ pub async fn create_strength(create_strength: CreateStrength, db: DbPool) -> Res
         }
         Err(e) => {
             eprintln!("Database error: {}", e);
-            Ok(warp::reply::json(&json!({"error": "Failed to create strength"})))
+            Ok(warp::reply::json(
+                &json!({"error": "Failed to create strength"}),
+            ))
         }
     }
 }
 
-pub async fn update_strength(id: Uuid, update_strength: UpdateStrength, db: DbPool) -> Result<impl Reply, Rejection> {
+pub async fn update_strength(
+    id: Uuid,
+    update_strength: UpdateStrength,
+    pool: DbPool,
+) -> Result<impl Reply, Rejection> {
     // Validate input
     update_strength.validate().map_err(warp::reject::custom)?;
-    
+
     let now = Utc::now();
-    
-    match db.query_one(
-        "UPDATE strengths SET 
+
+    let db = pool.get().await.map_err(|e| {
+        eprintln!("Failed to get database connection: {}", e);
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
+    })?;
+
+    match db
+        .query_one(
+            "UPDATE strengths SET 
          name = COALESCE($2, name),
          description = COALESCE($3, description),
          level = COALESCE($4, level),
          updated_at = $5
          WHERE id = $1
          RETURNING id, name, description, level, created_at, updated_at",
-        &[&id, &update_strength.name, &update_strength.description, &update_strength.level, &now]
-    ).await {
+            &[
+                &id,
+                &update_strength.name,
+                &update_strength.description,
+                &update_strength.level,
+                &now,
+            ],
+        )
+        .await
+    {
         Ok(row) => {
             let strength = Strength {
                 id: row.get(0),
@@ -92,23 +141,39 @@ pub async fn update_strength(id: Uuid, update_strength: UpdateStrength, db: DbPo
         }
         Err(e) => {
             eprintln!("Database error: {}", e);
-            Ok(warp::reply::json(&json!({"error": "Failed to update strength"})))
+            Ok(warp::reply::json(
+                &json!({"error": "Failed to update strength"}),
+            ))
         }
     }
 }
 
-pub async fn delete_strength(id: Uuid, db: DbPool) -> Result<impl Reply, Rejection> {
-    match db.execute("DELETE FROM strengths WHERE id = $1", &[&id]).await {
+pub async fn delete_strength(id: Uuid, pool: DbPool) -> Result<impl Reply, Rejection> {
+    let db = pool.get().await.map_err(|e| {
+        eprintln!("Failed to get database connection: {}", e);
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
+    })?;
+
+    match db
+        .execute("DELETE FROM strengths WHERE id = $1", &[&id])
+        .await
+    {
         Ok(rows_affected) => {
             if rows_affected > 0 {
-                Ok(warp::reply::json(&json!({"message": "Strength deleted successfully"})))
+                Ok(warp::reply::json(
+                    &json!({"message": "Strength deleted successfully"}),
+                ))
             } else {
                 Ok(warp::reply::json(&json!({"error": "Strength not found"})))
             }
         }
         Err(e) => {
             eprintln!("Database error: {}", e);
-            Ok(warp::reply::json(&json!({"error": "Failed to delete strength"})))
+            Ok(warp::reply::json(
+                &json!({"error": "Failed to delete strength"}),
+            ))
         }
     }
 }

@@ -1,7 +1,7 @@
+use crate::validation::{validate_length, validate_url, Validate, ValidationResult};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use crate::validation::{Validate, ValidationResult, validate_length, validate_url};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Brand {
@@ -33,7 +33,7 @@ pub struct UpdateBrand {
 impl Validate for CreateBrand {
     fn validate(&self) -> ValidationResult<()> {
         validate_length(&self.name, "Name", 1, 100)?;
-        
+
         if let Some(desc) = &self.description {
             validate_length(desc, "Description", 0, 500)?;
         }
@@ -43,7 +43,7 @@ impl Validate for CreateBrand {
         if let Some(website) = &self.website {
             validate_url(website)?;
         }
-        
+
         Ok(())
     }
 }
@@ -62,7 +62,7 @@ impl Validate for UpdateBrand {
         if let Some(website) = &self.website {
             validate_url(website)?;
         }
-        
+
         Ok(())
     }
 }

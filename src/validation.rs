@@ -4,17 +4,24 @@ use crate::errors::AppError;
 pub type ValidationResult<T> = Result<T, AppError>;
 
 /// Validate string length
-pub fn validate_length(value: &str, field_name: &str, min: usize, max: usize) -> ValidationResult<()> {
+pub fn validate_length(
+    value: &str,
+    field_name: &str,
+    min: usize,
+    max: usize,
+) -> ValidationResult<()> {
     let len = value.len();
     if len < min {
-        return Err(AppError::ValidationError(
-            format!("{} must be at least {} characters", field_name, min)
-        ));
+        return Err(AppError::ValidationError(format!(
+            "{} must be at least {} characters",
+            field_name, min
+        )));
     }
     if len > max {
-        return Err(AppError::ValidationError(
-            format!("{} must be at most {} characters", field_name, max)
-        ));
+        return Err(AppError::ValidationError(format!(
+            "{} must be at most {} characters",
+            field_name, max
+        )));
     }
     Ok(())
 }
@@ -22,22 +29,29 @@ pub fn validate_length(value: &str, field_name: &str, min: usize, max: usize) ->
 /// Validate required string field
 pub fn validate_required(value: &str, field_name: &str) -> ValidationResult<()> {
     if value.trim().is_empty() {
-        Err(AppError::ValidationError(
-            format!("{} is required", field_name)
-        ))
+        Err(AppError::ValidationError(format!(
+            "{} is required",
+            field_name
+        )))
     } else {
         Ok(())
     }
 }
 
 /// Validate range for f64
-pub fn validate_range_f64(value: f64, min: f64, max: f64, field_name: &str) -> ValidationResult<()> {
+pub fn validate_range_f64(
+    value: f64,
+    min: f64,
+    max: f64,
+    field_name: &str,
+) -> ValidationResult<()> {
     if value >= min && value <= max {
         Ok(())
     } else {
-        Err(AppError::ValidationError(
-            format!("{} must be between {} and {}", field_name, min, max)
-        ))
+        Err(AppError::ValidationError(format!(
+            "{} must be between {} and {}",
+            field_name, min, max
+        )))
     }
 }
 
@@ -47,11 +61,13 @@ pub fn validate_email(email: &str) -> ValidationResult<()> {
     let email_regex = regex::Regex::new(
         r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$"
     ).unwrap();
-    
+
     if email_regex.is_match(email) {
         Ok(())
     } else {
-        Err(AppError::ValidationError("Invalid email format".to_string()))
+        Err(AppError::ValidationError(
+            "Invalid email format".to_string(),
+        ))
     }
 }
 
@@ -60,9 +76,10 @@ pub fn validate_positive(value: i32, field_name: &str) -> ValidationResult<()> {
     if value > 0 {
         Ok(())
     } else {
-        Err(AppError::ValidationError(
-            format!("{} must be greater than 0", field_name)
-        ))
+        Err(AppError::ValidationError(format!(
+            "{} must be greater than 0",
+            field_name
+        )))
     }
 }
 
@@ -71,9 +88,10 @@ pub fn validate_non_negative(value: i32, field_name: &str) -> ValidationResult<(
     if value >= 0 {
         Ok(())
     } else {
-        Err(AppError::ValidationError(
-            format!("{} must be 0 or greater", field_name)
-        ))
+        Err(AppError::ValidationError(format!(
+            "{} must be 0 or greater",
+            field_name
+        )))
     }
 }
 
@@ -82,9 +100,10 @@ pub fn validate_range(value: i32, field_name: &str, min: i32, max: i32) -> Valid
     if value >= min && value <= max {
         Ok(())
     } else {
-        Err(AppError::ValidationError(
-            format!("{} must be between {} and {}", field_name, min, max)
-        ))
+        Err(AppError::ValidationError(format!(
+            "{} must be between {} and {}",
+            field_name, min, max
+        )))
     }
 }
 
@@ -93,11 +112,13 @@ pub fn validate_url(url: &str) -> ValidationResult<()> {
     if url.is_empty() {
         return Ok(());
     }
-    
+
     if url.starts_with("http://") || url.starts_with("https://") {
         Ok(())
     } else {
-        Err(AppError::ValidationError("URL must start with http:// or https://".to_string()))
+        Err(AppError::ValidationError(
+            "URL must start with http:// or https://".to_string(),
+        ))
     }
 }
 

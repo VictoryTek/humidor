@@ -1,5 +1,5 @@
 use crate::middleware::AuthContext;
-use crate::models::{Humidor, CreateHumidorRequest, UpdateHumidorRequest};
+use crate::models::{CreateHumidorRequest, Humidor, UpdateHumidorRequest};
 use crate::validation::Validate;
 use crate::DbPool;
 use serde_json::json;
@@ -7,10 +7,18 @@ use std::convert::Infallible;
 use uuid::Uuid;
 use warp::{http::StatusCode, reply, Reply};
 
-pub async fn get_humidors(
-    auth: AuthContext,
-    db: DbPool,
-) -> Result<impl Reply, Infallible> {
+pub async fn get_humidors(auth: AuthContext, pool: DbPool) -> Result<impl Reply, Infallible> {
+    let db = match pool.get().await {
+        Ok(conn) => conn,
+        Err(e) => {
+            eprintln!("Failed to get database connection: {}", e);
+            return Ok(reply::with_status(
+                reply::json(&json!({"error": "Database connection failed"})),
+                StatusCode::INTERNAL_SERVER_ERROR
+            ));
+        }
+    };
+
     let user_id = auth.user_id;
     let query = "
         SELECT id, user_id, name, description, capacity, target_humidity, location, is_wishlist, created_at, updated_at
@@ -56,8 +64,19 @@ pub async fn get_humidors(
 pub async fn get_humidor(
     id: Uuid,
     auth: AuthContext,
-    db: DbPool,
+    pool: DbPool,
 ) -> Result<impl Reply, Infallible> {
+    let db = match pool.get().await {
+        Ok(conn) => conn,
+        Err(e) => {
+            eprintln!("Failed to get database connection: {}", e);
+            return Ok(reply::with_status(
+                reply::json(&json!({"error": "Database connection failed"})),
+                StatusCode::INTERNAL_SERVER_ERROR
+            ));
+        }
+    };
+
     let user_id = auth.user_id;
     let query = "
         SELECT id, user_id, name, description, capacity, target_humidity, location, is_wishlist, created_at, updated_at
@@ -108,8 +127,19 @@ pub async fn get_humidor(
 pub async fn create_humidor(
     request: CreateHumidorRequest,
     auth: AuthContext,
-    db: DbPool,
+    pool: DbPool,
 ) -> Result<impl Reply, Infallible> {
+    let db = match pool.get().await {
+        Ok(conn) => conn,
+        Err(e) => {
+            eprintln!("Failed to get database connection: {}", e);
+            return Ok(reply::with_status(
+                reply::json(&json!({"error": "Database connection failed"})),
+                StatusCode::INTERNAL_SERVER_ERROR
+            ));
+        }
+    };
+
     // Validate input
     if let Err(e) = request.validate() {
         return Ok(reply::with_status(
@@ -117,7 +147,7 @@ pub async fn create_humidor(
             StatusCode::BAD_REQUEST,
         ));
     }
-    
+
     let user_id = auth.user_id;
     let humidor_id = Uuid::new_v4();
     let now = chrono::Utc::now();
@@ -160,7 +190,10 @@ pub async fn create_humidor(
                 updated_at: row.get(9),
             };
 
-            Ok(reply::with_status(reply::json(&humidor), StatusCode::CREATED))
+            Ok(reply::with_status(
+                reply::json(&humidor),
+                StatusCode::CREATED,
+            ))
         }
         Err(e) => {
             eprintln!("Database error: {}", e);
@@ -180,8 +213,19 @@ pub async fn update_humidor(
     id: Uuid,
     request: UpdateHumidorRequest,
     auth: AuthContext,
-    db: DbPool,
+    pool: DbPool,
 ) -> Result<impl Reply, Infallible> {
+    let db = match pool.get().await {
+        Ok(conn) => conn,
+        Err(e) => {
+            eprintln!("Failed to get database connection: {}", e);
+            return Ok(reply::with_status(
+                reply::json(&json!({"error": "Database connection failed"})),
+                StatusCode::INTERNAL_SERVER_ERROR
+            ));
+        }
+    };
+
     // Validate input
     if let Err(e) = request.validate() {
         return Ok(reply::with_status(
@@ -189,7 +233,7 @@ pub async fn update_humidor(
             StatusCode::BAD_REQUEST,
         ));
     }
-    
+
     let user_id = auth.user_id;
     let now = chrono::Utc::now();
 
@@ -258,8 +302,19 @@ pub async fn update_humidor(
 pub async fn delete_humidor(
     id: Uuid,
     auth: AuthContext,
-    db: DbPool,
+    pool: DbPool,
 ) -> Result<impl Reply, Infallible> {
+    let db = match pool.get().await {
+        Ok(conn) => conn,
+        Err(e) => {
+            eprintln!("Failed to get database connection: {}", e);
+            return Ok(reply::with_status(
+                reply::json(&json!({"error": "Database connection failed"})),
+                StatusCode::INTERNAL_SERVER_ERROR
+            ));
+        }
+    };
+
     let user_id = auth.user_id;
     let query = "DELETE FROM humidors WHERE id = $1 AND user_id = $2";
 
@@ -300,8 +355,19 @@ pub async fn delete_humidor(
 pub async fn get_humidor_cigars(
     humidor_id: Uuid,
     auth: AuthContext,
-    db: DbPool,
+    pool: DbPool,
 ) -> Result<impl Reply, Infallible> {
+    let db = match pool.get().await {
+        Ok(conn) => conn,
+        Err(e) => {
+            eprintln!("Failed to get database connection: {}", e);
+            return Ok(reply::with_status(
+                reply::json(&json!({"error": "Database connection failed"})),
+                StatusCode::INTERNAL_SERVER_ERROR
+            ));
+        }
+    };
+
     let user_id = auth.user_id;
     // First verify the humidor belongs to the user
     let humidor_check = "SELECT id FROM humidors WHERE id = $1 AND user_id = $2";
