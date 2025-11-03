@@ -958,10 +958,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and(warp::get())
         .and_then(serve_login);
 
+    // Configure CORS - restrictive by default for security
+    // Use ALLOWED_ORIGINS env var for production (comma-separated list)
+    let allowed_origins: Vec<String> = env::var("ALLOWED_ORIGINS")
+        .unwrap_or_else(|_| "http://localhost:9898,http://127.0.0.1:9898".to_string())
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    println!("CORS: Allowing origins: {:?}", allowed_origins);
+
     let cors = warp::cors()
-        .allow_any_origin()
+        .allow_origins(allowed_origins.iter().map(|s| s.as_str()))
         .allow_headers(vec!["content-type", "authorization"])
-        .allow_methods(vec!["GET", "POST", "PUT", "DELETE"]);
+        .allow_methods(vec!["GET", "POST", "PUT", "DELETE"])
+        .allow_credentials(true); // Required for cookie-based auth
 
     let routes = root
         .or(setup)

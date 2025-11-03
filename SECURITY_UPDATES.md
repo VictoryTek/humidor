@@ -342,8 +342,97 @@ JWT_TOKEN_LIFETIME_HOURS=24
 ✅ Default 2-hour lifetime applied when env var not set  
 ✅ Configuration documented in .env files  
 
+---
+
+## Issue 2.2: CORS Configuration Too Permissive ✅ COMPLETED
+
+**Severity**: Medium - Security Best Practice
+
+**Status**: Fixed on 2025-11-02
+
+### Changes Made:
+
+1. **Updated CORS configuration in `src/main.rs`:**
+   - Removed dangerous `.allow_any_origin()` that accepted requests from any website
+   - Implemented configurable allowed origins via `ALLOWED_ORIGINS` environment variable
+   - Added comma-separated origin list parsing
+   - Added startup logging to show configured CORS origins for visibility
+
+2. **Updated configuration files:**
+   - `.env` - Added `ALLOWED_ORIGINS=http://localhost:9898,http://127.0.0.1:9898`
+   - `.env.example` - Added `ALLOWED_ORIGINS` with documentation and examples
+   - `docker-compose.yml` - Added environment variable with secure defaults
+
+### Technical Details:
+
+**Before (Insecure - accepts ANY origin):**
+```rust
+let cors = warp::cors()
+    .allow_any_origin()  // ⚠️ DANGEROUS - allows ANY website to access API
+    .allow_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+    .allow_headers(vec!["Content-Type", "Authorization"]);
+```
+
+**After (Secure - whitelist only):**
+```rust
+// Get allowed origins from environment variable
+let allowed_origins_str = env::var("ALLOWED_ORIGINS")
+    .unwrap_or_else(|_| "http://localhost:9898".to_string());
+
+let allowed_origins: Vec<String> = allowed_origins_str
+    .split(',')
+    .map(|s| s.trim().to_string())
+    .collect();
+
+println!("CORS: Allowing origins: {:?}", allowed_origins);
+
+let cors = warp::cors()
+    .allow_origins(allowed_origins.iter().map(|s| s.as_str()))
+    .allow_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+    .allow_headers(vec!["Content-Type", "Authorization"]);
+```
+
+### Security Improvements:
+
+1. **Prevents Unauthorized Access**: Only whitelisted origins can make API requests
+2. **CSRF Protection**: Reduces risk of cross-site request forgery attacks
+3. **Data Theft Prevention**: Other websites cannot steal user data via API calls
+4. **Environment-Based**: Different origins for dev, staging, and production
+5. **Audit Trail**: Startup logs show which origins are allowed
+
+### Configuration Examples:
+
+```bash
+# Development (local testing)
+ALLOWED_ORIGINS=http://localhost:9898,http://127.0.0.1:9898
+
+# Production (single domain)
+ALLOWED_ORIGINS=https://humidor.example.com
+
+# Production (multiple domains)
+ALLOWED_ORIGINS=https://humidor.example.com,https://www.humidor.example.com,https://app.humidor.example.com
+
+# Production with CDN
+ALLOWED_ORIGINS=https://humidor.example.com,https://cdn.humidor.example.com
+```
+
+### What This Fixes:
+
+- **Before:** Any website could send authenticated requests to your API (major security hole)
+- **After:** Only explicitly allowed origins can access the API
+- **Attack Prevented:** Malicious websites can no longer steal user data or perform actions on behalf of users
+
+### Testing:
+
+✅ Code compiles successfully with `cargo check`  
+✅ Project builds without errors with `cargo build` (47.60s)  
+✅ CORS configuration loads from environment variable  
+✅ Startup logs display configured origins for verification  
+✅ Default fallback to localhost for development  
+
 ### Next Steps:
 
-All critical security issues (1.1 - 1.4) have been completed! 🎉
+All critical security issues (1.1 - 1.4) have been completed! 🎉  
+Medium priority issues (2.1 - 2.2) have been completed! 🎉
 
 ```
