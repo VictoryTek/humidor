@@ -7,6 +7,7 @@ use crate::DbPool;
 use chrono::Utc;
 use serde_json::json;
 use std::env;
+use std::fs;
 use uuid::Uuid;
 use warp::Reply;
 
@@ -42,12 +43,19 @@ pub struct Claims {
     pub iat: usize,       // issued at time (for tracking)
 }
 
-/// Get JWT secret from environment variable
-/// This function will panic at startup if JWT_SECRET is not set, which is intentional
-/// to prevent running with an insecure default
+/// Get JWT secret from Docker secrets or environment variable
+/// Docker secrets take precedence over environment variables
+/// This function will panic at startup if JWT_SECRET is not available
 fn jwt_secret() -> String {
+    // Try Docker secret file first
+    if let Ok(content) = fs::read_to_string("/run/secrets/jwt_secret") {
+        return content.trim().to_string();
+    }
+    
+    // Fall back to environment variable
     env::var("JWT_SECRET").expect(
-        "JWT_SECRET environment variable must be set. Generate one with: openssl rand -base64 32",
+        "JWT_SECRET must be set either as a Docker secret or environment variable. \
+         Generate one with: openssl rand -base64 32",
     )
 }
 

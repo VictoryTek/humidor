@@ -3,3 +3,8 @@ analysis/
 screenshots/
 backups/
 .history/
+
+# Environment and secrets
+.env
+secrets/*.txt
+!secrets/*.txt.example

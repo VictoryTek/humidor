@@ -83,3 +83,13 @@ volumes:
 - **Database**: PostgreSQL with tokio-postgres
 - **Frontend**: HTML, CSS, JavaScript
 - **Deployment**: Docker & Docker Compose
+
+## Security
+
+This application uses **Docker Compose secrets** for sensitive data like database credentials and JWT signing keys. See [DOCKER_SECRETS.md](DOCKER_SECRETS.md) for detailed setup instructions.
+
+For production deployments, consider using:
+- Docker Swarm secrets
+- Kubernetes secrets
+- Cloud provider secret managers (AWS Secrets Manager, Azure Key Vault, etc.)
+- HashiCorp Vault

@@ -11,6 +11,7 @@ use deadpool_postgres::{Config, ManagerConfig, Pool, RecyclingMethod, Runtime};
 use middleware::{handle_rejection, with_current_user};
 use refinery::embed_migrations;
 use std::env;
+use std::fs;
 use tokio_postgres::NoTls;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 use warp::{Filter, Reply};
@@ -24,6 +25,40 @@ type DbPool = Pool;
 #[derive(Debug)]
 struct InvalidUuid;
 impl warp::reject::Reject for InvalidUuid {}
+
+/// Read a secret from Docker secrets or fall back to environment variable
+/// Docker secrets are mounted at /run/secrets/<secret_name>
+fn read_secret(secret_name: &str, env_var: &str) -> Option<String> {
+    let secret_path = format!("/run/secrets/{}", secret_name);
+    
+    // Try Docker secret file first
+    if let Ok(content) = fs::read_to_string(&secret_path) {
+        tracing::debug!(
+            secret_name = secret_name,
+            source = "docker_secret",
+            "Successfully read secret from file"
+        );
+        return Some(content.trim().to_string());
+    }
+    
+    // Fall back to environment variable
+    if let Ok(value) = env::var(env_var) {
+        tracing::debug!(
+            secret_name = secret_name,
+            env_var = env_var,
+            source = "environment",
+            "Successfully read secret from environment"
+        );
+        return Some(value);
+    }
+    
+    tracing::warn!(
+        secret_name = secret_name,
+        env_var = env_var,
+        "Failed to read secret from both Docker secrets and environment"
+    );
+    None
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -50,9 +85,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Starting Humidor application"
     );
 
-    let database_url = env::var("DATABASE_URL").unwrap_or_else(|_| {
-        "postgresql://humidor_user:humidor_pass@localhost:5432/humidor_db".to_string()
-    });
+    // Build DATABASE_URL from secrets or environment
+    let database_url = if let Some(template) = env::var("DATABASE_URL_TEMPLATE").ok() {
+        // Using Docker secrets - read username and password from secret files
+        let db_user = read_secret("db_user", "DB_USER")
+            .unwrap_or_else(|| "humidor_user".to_string());
+        let db_password = read_secret("db_password", "DB_PASSWORD")
+            .unwrap_or_else(|| "humidor_pass".to_string());
+        
+        template
+            .replace("{{DB_USER}}", &db_user)
+            .replace("{{DB_PASSWORD}}", &db_password)
+    } else {
+        // Fall back to DATABASE_URL environment variable or default
+        env::var("DATABASE_URL").unwrap_or_else(|_| {
+            "postgresql://humidor_user:humidor_pass@localhost:5432/humidor_db".to_string()
+        })
+    };
 
     // Create connection pool configuration
     tracing::info!(
