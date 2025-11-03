@@ -15,6 +15,25 @@ use bcrypt::{hash, verify, DEFAULT_COST};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 
+// Async-safe bcrypt operations using tokio::task::spawn_blocking
+async fn hash_password(password: String) -> Result<String, bcrypt::BcryptError> {
+    tokio::task::spawn_blocking(move || hash(&password, DEFAULT_COST))
+        .await
+        .map_err(|e| {
+            eprintln!("Task join error during password hashing: {}", e);
+            bcrypt::BcryptError::InvalidCost(DEFAULT_COST.to_string())
+        })?
+}
+
+async fn verify_password(password: String, hash_str: String) -> Result<bool, bcrypt::BcryptError> {
+    tokio::task::spawn_blocking(move || verify(&password, &hash_str))
+        .await
+        .map_err(|e| {
+            eprintln!("Task join error during password verification: {}", e);
+            bcrypt::BcryptError::InvalidHash("".to_string())
+        })?
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
     pub sub: String, // user id
@@ -85,8 +104,8 @@ pub async fn create_setup_user(
         }
     }
 
-    // Hash password
-    let password_hash = match hash(&setup_req.user.password, DEFAULT_COST) {
+    // Hash password (using spawn_blocking to avoid blocking async runtime)
+    let password_hash = match hash_password(setup_req.user.password.clone()).await {
         Ok(hash) => hash,
         Err(e) => {
             eprintln!("Password hashing error: {}", e);
@@ -250,7 +269,8 @@ pub async fn login_user(
                 .into_response());
             }
 
-            match verify(&login_req.password, &password_hash) {
+            // Verify password (using spawn_blocking to avoid blocking async runtime)
+            match verify_password(login_req.password.clone(), password_hash).await {
                 Ok(true) => {
                     let user_id: Uuid = row.get("id");
                     let username: String = row.get("username");
@@ -567,8 +587,8 @@ pub async fn change_password(
         Ok(row) => {
             let current_hash: String = row.get(0);
 
-            // Verify current password
-            match verify(&password_req.current_password, &current_hash) {
+            // Verify current password (using spawn_blocking to avoid blocking async runtime)
+            match verify_password(password_req.current_password.clone(), current_hash).await {
                 Ok(valid) => {
                     if !valid {
                         return Ok(warp::reply::json(
@@ -584,8 +604,8 @@ pub async fn change_password(
                 }
             }
 
-            // Hash new password
-            let new_hash = match hash(&password_req.new_password, DEFAULT_COST) {
+            // Hash new password (using spawn_blocking to avoid blocking async runtime)
+            let new_hash = match hash_password(password_req.new_password.clone()).await {
                 Ok(h) => h,
                 Err(e) => {
                     eprintln!("Password hashing error: {}", e);

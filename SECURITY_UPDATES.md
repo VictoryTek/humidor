@@ -174,8 +174,80 @@ pub async fn handler_name(params: Type, pool: DbPool) -> Result<impl Reply, Reje
 ✅ All 42 handler functions updated consistently  
 ✅ Middleware updated for connection pooling  
 
+---
+
+## Issue 1.4: Blocking bcrypt Operations ✅ COMPLETED
+
+### Changes Made:
+
+1. **Created async-safe bcrypt wrapper functions in `src/handlers/auth.rs`:**
+   - Added `hash_password()` - async wrapper for bcrypt hash operation
+   - Added `verify_password()` - async wrapper for bcrypt verify operation
+   - Both use `tokio::task::spawn_blocking` to run CPU-intensive operations off the async runtime
+
+2. **Updated all bcrypt usage in `src/handlers/auth.rs`:**
+   - `create_setup_user()` - Changed from `hash()` to `hash_password().await`
+   - `login_user()` - Changed from `verify()` to `verify_password().await`
+   - `change_password()` - Changed both `verify()` and `hash()` to async versions
+
+### Technical Details:
+
+**Problem:** bcrypt operations are intentionally CPU-intensive (by design for security), but calling them directly in async functions blocks the tokio runtime thread, preventing other async tasks from executing.
+
+**Before (Blocking):**
+```rust
+let password_hash = match hash(&setup_req.user.password, DEFAULT_COST) {
+    Ok(hash) => hash,
+    Err(e) => { /* error handling */ }
+};
+```
+
+**After (Non-blocking):**
+```rust
+let password_hash = match hash_password(setup_req.user.password.clone()).await {
+    Ok(hash) => hash,
+    Err(e) => { /* error handling */ }
+};
+```
+
+**Helper Functions:**
+```rust
+async fn hash_password(password: String) -> Result<String, bcrypt::BcryptError> {
+    tokio::task::spawn_blocking(move || hash(&password, DEFAULT_COST))
+        .await
+        .map_err(|e| {
+            eprintln!("Task join error during password hashing: {}", e);
+            bcrypt::BcryptError::InvalidCost(DEFAULT_COST.to_string())
+        })?
+}
+
+async fn verify_password(password: String, hash_str: String) -> Result<bool, bcrypt::BcryptError> {
+    tokio::task::spawn_blocking(move || verify(&password, &hash_str))
+        .await
+        .map_err(|e| {
+            eprintln!("Task join error during password verification: {}", e);
+            bcrypt::BcryptError::InvalidHash("".to_string())
+        })?
+}
+```
+
+### Benefits:
+
+1. **Non-blocking Async Runtime**: bcrypt operations no longer block tokio threads
+2. **Better Concurrency**: Other requests can be processed while password operations run
+3. **Improved Performance**: Prevents thread pool exhaustion under load
+4. **Deadlock Prevention**: Reduces risk of runtime deadlocks
+5. **Scalability**: Server can handle more concurrent authentication requests
+
+### Testing:
+
+✅ Code compiles successfully with `cargo check`  
+✅ Project builds without errors with `cargo build` (58.86s)  
+✅ All 3 bcrypt usage points updated (setup, login, password change)  
+✅ Async wrapper functions properly handle tokio task spawning  
+
 ### Next Steps:
 
-Ready to proceed with **Issue 1.4: Blocking bcrypt Operations** when you're ready.
+All critical security issues (1.1 - 1.4) have been completed! 🎉
 
 ```
