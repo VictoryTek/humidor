@@ -3,6 +3,9 @@ FROM rust:1.82-slim AS builder
 
 WORKDIR /app
 
+# Cache busting argument
+ARG CACHEBUST=1
+
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
     pkg-config \
@@ -15,6 +18,8 @@ COPY Cargo.toml Cargo.lock ./
 RUN cargo build --release
 
 # Build actual application
+# Force cache bust when source changes
+RUN echo "Cache bust: $CACHEBUST"
 COPY src ./src
 COPY static ./static
 COPY migrations ./migrations

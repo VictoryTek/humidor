@@ -1,6 +1,7 @@
 // Application State
 let humidors = [];
 let cigars = [];
+let wishListCigars = [];
 let currentHumidor = null;
 let currentCigar = null;
 let isEditingHumidor = false;
@@ -1702,11 +1703,6 @@ async function loadHumidors() {
             humidors = await response.json();
             console.log('✓ Humidors loaded:', humidors.length, humidors);
             
-            // Find wish list humidor
-            wishListHumidor = humidors.find(h => h.is_wishlist === true);
-            if (wishListHumidor) {
-                console.log('✓ Wish list humidor found:', wishListHumidor.name);
-            }
             // Load cigars for each humidor
             cigars = [];
             for (const humidor of humidors) {
@@ -1988,15 +1984,6 @@ function renderHumidorSections() {
         return;
     }
     
-    // Filter out wish list humidor from display - it has its own page
-    const regularHumidors = humidors.filter(h => !h.is_wishlist);
-    
-    if (regularHumidors.length === 0) {
-        console.log('✗ No regular humidors to render (only wish list exists)');
-        container.innerHTML = '';
-        return;
-    }
-    
     // Use filtered cigars if any filters are active, otherwise use all cigars
     const cigarsToDisplay = (searchQuery || selectedBrands.length > 0 || selectedSizes.length > 0 || 
                             selectedOrigins.length > 0 || selectedStrengths.length > 0 || 
@@ -2005,7 +1992,7 @@ function renderHumidorSections() {
     console.log(`→ Total cigars available: ${cigars.length}`);
     console.log(`→ Cigars to display (after filters): ${cigarsToDisplay.length}`);
     
-    container.innerHTML = regularHumidors.map(humidor => {
+    container.innerHTML = humidors.map(humidor => {
         const humidorCigars = cigarsToDisplay.filter(cigar => {
             const matches = cigar.humidor_id === humidor.id;
             console.log(`  Comparing cigar.humidor_id="${cigar.humidor_id}" (${typeof cigar.humidor_id}) with humidor.id="${humidor.id}" (${typeof humidor.id}) = ${matches}`);
@@ -2161,7 +2148,11 @@ function closeHumidorModal() {
 
 // Report Card Modal Functions
 function openReportCard(cigarId) {
-    const cigar = cigars.find(c => c.id === cigarId);
+    // Check both regular cigars and wish list cigars
+    let cigar = cigars.find(c => c.id === cigarId);
+    if (!cigar) {
+        cigar = wishListCigars.find(c => c.id === cigarId);
+    }
     if (!cigar) {
         console.error('Cigar not found:', cigarId);
         return;
@@ -2197,8 +2188,8 @@ function openReportCard(cigarId) {
     
     document.getElementById('reportCardNotes').textContent = cigar.notes || 'No notes available';
     
-    // Check if this cigar is in the wish list
-    const isInWishList = humidor && humidor.is_wishlist;
+    // Check if this cigar is in the wish list (cigars in wish list don't have humidor_id)
+    const isInWishList = !cigar.humidor_id || cigar.humidor_id === null;
     
     // Set up action buttons
     const actionsContainer = document.querySelector('.report-card-actions');
@@ -2264,11 +2255,11 @@ function openCigarModal(humidorId = null, cigar = null) {
     
     title.textContent = isEditingCigar ? 'Edit Cigar' : 'Add New Cigar';
     
-    // Populate humidor dropdown (wish list appears last)
+    // Populate humidor dropdown
     humidorSelect.innerHTML = '<option value="">Select Humidor</option>';
     
-    // Add regular humidors first
-    humidors.filter(h => !h.is_wishlist).forEach(humidor => {
+    // Add all humidors
+    humidors.forEach(humidor => {
         const option = document.createElement('option');
         option.value = humidor.id;
         option.textContent = humidor.name;
@@ -2278,17 +2269,14 @@ function openCigarModal(humidorId = null, cigar = null) {
         humidorSelect.appendChild(option);
     });
     
-    // Add wish list option last if it exists (check both global variable and humidors array)
-    const wishListOption = wishListHumidor || humidors.find(h => h.is_wishlist === true);
-    if (wishListOption) {
-        const option = document.createElement('option');
-        option.value = wishListOption.id;
-        option.textContent = '📝 ' + wishListOption.name;
-        if (humidorId && wishListOption.id === humidorId) {
-            option.selected = true;
-        }
-        humidorSelect.appendChild(option);
+    // Always add Wish List option last (special identifier)
+    const wishListOpt = document.createElement('option');
+    wishListOpt.value = 'WISH_LIST';
+    wishListOpt.textContent = '📝 Wish List';
+    if (humidorId === 'WISH_LIST') {
+        wishListOpt.selected = true;
     }
+    humidorSelect.appendChild(wishListOpt);
     
     console.log(`✓ Humidor dropdown populated with ${humidors.length} options`);
     
@@ -2545,8 +2533,11 @@ async function saveCigar() {
         }
     }
     
+    const selectedHumidorId = formData.get('humidor_id') || null;
+    const isWishList = selectedHumidorId === 'WISH_LIST';
+    
     const cigarData = {
-        humidor_id: formData.get('humidor_id') || null,
+        humidor_id: isWishList ? null : selectedHumidorId,
         brand_id: document.getElementById('cigarBrand').value || null,
         name: formData.get('name'),
         size_id: document.getElementById('cigarSize').value || null,
@@ -2563,15 +2554,16 @@ async function saveCigar() {
 
     console.log('=== saveCigar() called ===');
     console.log('→ Form data extracted:', cigarData);
+    console.log('→ Is Wish List:', isWishList);
     
-    // Validate that a humidor is selected
-    if (!cigarData.humidor_id || cigarData.humidor_id.trim() === '') {
+    // Validate that a humidor/location is selected
+    if (!isWishList && (!cigarData.humidor_id || cigarData.humidor_id.trim() === '')) {
         console.error('✗ No humidor selected!');
-        showToast('Please select a humidor for this cigar', 'error');
+        showToast('Please select a humidor or wish list for this cigar', 'error');
         return;
     }
     
-    console.log(`✓ Humidor selected: ${cigarData.humidor_id}`);
+    console.log(`✓ Location selected: ${isWishList ? 'Wish List' : cigarData.humidor_id}`);
 
     try {
         let response;
@@ -2602,28 +2594,58 @@ async function saveCigar() {
         if (response.ok) {
             const savedCigar = await response.json();
             console.log('✓ Cigar saved successfully:', savedCigar);
-            console.log('→ Reloading humidors and cigars...');
+            
+            // If this was meant for wish list, add it there
+            if (isWishList) {
+                console.log('→ Adding cigar to wish list...');
+                console.log('  Cigar ID:', savedCigar.id);
+                const wishListResponse = await makeAuthenticatedRequest('/api/v1/wish_list', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        cigar_id: savedCigar.id,
+                        notes: null
+                    })
+                });
+                
+                console.log('  Wish list API response status:', wishListResponse.status);
+                
+                if (!wishListResponse.ok) {
+                    const errorText = await wishListResponse.text();
+                    console.error('✗ Failed to add to wish list:', errorText);
+                    let errorData;
+                    try {
+                        errorData = JSON.parse(errorText);
+                    } catch (e) {
+                        errorData = { error: errorText };
+                    }
+                    console.error('  Error details:', errorData);
+                    showToast(errorData.error || 'Failed to add to wish list', 'error');
+                    return;
+                }
+                
+                const wishListData = await wishListResponse.json();
+                console.log('✓ Cigar added to wish list successfully:', wishListData);
+            }
+            
+            console.log('→ Reloading data...');
             
             // Clear the file input
             document.getElementById('cigarImageUpload').value = '';
             
-            await loadHumidors();
-            
-            // Check if the cigar was added to the wish list
-            const wishList = humidors.find(h => h.is_wishlist === true);
-            const addedToWishList = wishList && savedCigar.humidor_id === wishList.id;
-            
-            console.log('→ Checking if cigar was added to wish list...');
-            console.log('  - Current page:', currentPage);
-            console.log('  - Wish list exists:', !!wishList);
-            console.log('  - Saved cigar humidor_id:', savedCigar.humidor_id);
-            console.log('  - Wish list humidor_id:', wishList ? wishList.id : 'N/A');
-            console.log('  - Added to wish list:', addedToWishList);
-            
-            // If we're on the wish list page and the cigar was added to the wish list, reload it
-            if (currentPage === 'wishlist' && addedToWishList) {
-                console.log('→ Cigar was added to wish list, reloading wish list page...');
-                await loadWishList();
+            // Reload data based on what's currently visible
+            if (isWishList) {
+                // Refresh wish list page if it's currently visible (same as favorites behavior)
+                const wishlistSection = document.getElementById('wishlistSection');
+                if (wishlistSection && wishlistSection.style.display !== 'none') {
+                    console.log('→ Wish list page is visible, reloading...');
+                    await loadWishList();
+                }
+            } else {
+                // Reload humidors for regular cigars
+                await loadHumidors();
             }
             
             showToast(isEditingCigar ? 'Cigar updated successfully!' : 'Cigar added successfully!', 'success');
@@ -3010,8 +3032,7 @@ function createFavoriteCard(cigar) {
            <img src="/static/cigar-placeholder.png" alt="Cigar placeholder" style="display: none; width: 100%; height: 100%; object-fit: contain; padding: 2rem;">`
         : `<img src="/static/cigar-placeholder.png" alt="Cigar placeholder" style="width: 100%; height: 100%; object-fit: contain; padding: 2rem;">`;
     
-    // For out of stock cigars, disable click to open report card and show different actions
-    const cardOnClick = cigar.out_of_stock ? '' : `onclick="openReportCard('${cigar.id}')"`;
+    // Out of stock cigars should still be clickable to view report card
     const cardStyle = cigar.out_of_stock ? 'style="opacity: 0.7;"' : '';
     
     // OUT OF STOCK badge centered on card (same style as humidor cards)
@@ -3030,7 +3051,7 @@ function createFavoriteCard(cigar) {
         : `onclick="removeFavorite('${cigar.id}')"`; // Use cigar_id for active cigars
     
     return `
-        <div class="cigar-card" data-cigar-id="${cigar.id}" ${cardOnClick} ${cardStyle}>
+        <div class="cigar-card" data-cigar-id="${cigar.id}" onclick="openReportCard('${cigar.id}')" ${cardStyle}>
             <div class="cigar-card-image" style="position: relative;">
                 ${outOfStockBadge}
                 ${imageHtml}
@@ -3068,61 +3089,29 @@ async function removeFavorite(cigarId) {
 // Wish List Functions
 let wishListHumidor = null;
 
-async function getOrCreateWishListHumidor() {
-    try {
-        // Check if wish list humidor already exists
-        const response = await makeAuthenticatedRequest('/api/v1/humidors');
-        const allHumidors = await response.json();
-        
-        wishListHumidor = allHumidors.find(h => h.is_wishlist === true);
-        
-        // If not, create it
-        if (!wishListHumidor) {
-            const createResponse = await makeAuthenticatedRequest('/api/v1/humidors', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: 'Wish List',
-                    description: 'Cigars you want to add to your collection',
-                    capacity: null,
-                    target_humidity: null,
-                    location: null,
-                    is_wishlist: true
-                })
-            });
-            
-            wishListHumidor = await createResponse.json();
-            console.log('✓ Wish list humidor created:', wishListHumidor);
-        }
-        
-        return wishListHumidor;
-    } catch (error) {
-        console.error('Error creating wish list humidor:', error);
-        throw error;
-    }
-}
-
 async function loadWishList() {
     try {
-        await getOrCreateWishListHumidor();
-        
-        if (!wishListHumidor) {
-            showToast('Failed to load wish list', 'error');
-            return;
-        }
-        
-        // Load cigars from wish list humidor
-        const response = await makeAuthenticatedRequest(`/api/v1/cigars?humidor_id=${wishListHumidor.id}`, {
+        // Load wish list items using the new API
+        const response = await makeAuthenticatedRequest('/api/v1/wish_list', {
             method: 'GET'
         });
         
         if (!response.ok) {
-            throw new Error('Failed to fetch wish list cigars');
+            throw new Error('Failed to fetch wish list');
         }
         
-        const data = await response.json();
-        const wishListCigars = data.cigars || [];
-        console.log(`✓ Loaded ${wishListCigars.length} cigars for wish list:`, wishListCigars);
+        const wishListItems = await response.json();
+        console.log(`✓ Loaded ${wishListItems.length} items in wish list:`, wishListItems);
+        
+        // Extract cigars from wish list items and store globally
+        wishListCigars = wishListItems
+            .filter(item => item.cigar !== null)
+            .map(item => ({
+                ...item.cigar,
+                wish_list_notes: item.notes,
+                wish_list_id: item.id
+            }));
+        console.log(`✓ ${wishListCigars.length} cigars with details:`, wishListCigars);
         
         const emptyState = document.getElementById('wishlistEmptyState');
         const wishlistGrid = document.getElementById('wishlistGrid');
@@ -3170,7 +3159,7 @@ async function moveCigarToHumidor(cigarId, event) {
     event?.stopPropagation();
     
     try {
-        // Get list of regular humidors (not wish list)
+        // Get list of humidors
         const response = await makeAuthenticatedRequest('/api/v1/humidors', {
             method: 'GET'
         });
@@ -3180,19 +3169,27 @@ async function moveCigarToHumidor(cigarId, event) {
         }
         
         const allHumidors = await response.json();
-        const regularHumidors = allHumidors.filter(h => !h.is_wishlist);
         
-        if (regularHumidors.length === 0) {
+        if (allHumidors.length === 0) {
             showToast('Please create a humidor first', 'error');
             return;
         }
         
         // Show selection modal
-        const humidorId = await showHumidorSelectionModal(regularHumidors);
+        const humidorId = await showHumidorSelectionModal(allHumidors);
         
         if (!humidorId) return; // User cancelled
         
-        // Update the cigar's humidor_id
+        // First, remove from wish list
+        const removeResponse = await makeAuthenticatedRequest(`/api/v1/wish_list/${cigarId}`, {
+            method: 'DELETE'
+        });
+        
+        if (!removeResponse.ok) {
+            console.warn('Failed to remove from wish list, continuing anyway');
+        }
+        
+        // Then update the cigar's humidor_id
         const updateResponse = await makeAuthenticatedRequest(`/api/v1/cigars/${cigarId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -3269,15 +3266,16 @@ async function deleteWishListCigar(cigarId, event) {
     }
     
     try {
-        await makeAuthenticatedRequest(`/api/v1/cigars/${cigarId}`, {
+        // Remove from wish list (not deleting the cigar itself)
+        await makeAuthenticatedRequest(`/api/v1/wish_list/${cigarId}`, {
             method: 'DELETE'
         });
         
         showToast('Cigar removed from wish list');
         await loadWishList();
     } catch (error) {
-        console.error('Error deleting cigar:', error);
-        showToast('Failed to delete cigar', 'error');
+        console.error('Error removing cigar from wish list:', error);
+        showToast('Failed to remove cigar from wish list', 'error');
     }
 }
 

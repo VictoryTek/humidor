@@ -61,7 +61,7 @@ pub async fn get_wish_list(auth: AuthContext, pool: DbPool) -> Result<impl Reply
             "notes": row.get::<_, Option<String>>(3),
             "created_at": row.get::<_, chrono::DateTime<Utc>>(4),
             "cigar": if cigar_exists.is_some() {
-                let is_active: bool = row.get(23);
+                let is_active: bool = row.get(24);
                 serde_json::json!({
                     "id": row.get::<_, Uuid>(5),
                     "humidor_id": row.get::<_, Option<Uuid>>(6),
@@ -99,6 +99,10 @@ pub async fn add_to_wish_list(
     auth: AuthContext,
     pool: DbPool,
 ) -> Result<impl Reply, Rejection> {
+    eprintln!("=== ADD_TO_WISH_LIST HANDLER CALLED ===");
+    eprintln!("User ID: {}", auth.user_id);
+    eprintln!("Cigar ID: {}", request.cigar_id);
+    
     let db = pool.get().await.map_err(|e| {
         eprintln!("Failed to get database connection: {}", e);
         warp::reject::custom(AppError::DatabaseError("Database connection failed".to_string()))
@@ -106,10 +110,17 @@ pub async fn add_to_wish_list(
     
     let id = Uuid::new_v4();
     let now = Utc::now();
+    
+    // Parse cigar_id from string to ensure it's a proper Uuid type
+    let cigar_id = Uuid::parse_str(&request.cigar_id.to_string())
+        .map_err(|e| {
+            eprintln!("Invalid cigar_id format: {}", e);
+            warp::reject::custom(AppError::ValidationError("Invalid cigar ID format".to_string()))
+        })?;
 
     // Check if cigar exists
     let cigar_exists = db
-        .query_opt("SELECT id FROM cigars WHERE id = $1", &[&request.cigar_id])
+        .query_opt("SELECT id FROM cigars WHERE id = $1", &[&cigar_id])
         .await
         .map_err(|e| {
             eprintln!("Database error checking cigar: {}", e);
@@ -117,36 +128,66 @@ pub async fn add_to_wish_list(
         })?;
 
     if cigar_exists.is_none() {
-        eprintln!("Cigar not found: {}", request.cigar_id);
+        eprintln!("Cigar not found: {}", cigar_id);
         return Err(warp::reject::custom(AppError::NotFound("Cigar not found".to_string())));
     }
 
-    match db
-        .query_one(
+    // Insert the wish list item with notes
+    let result = db
+        .query_opt(
             "INSERT INTO wish_list (id, user_id, cigar_id, notes, created_at)
          VALUES ($1, $2, $3, $4, $5)
          ON CONFLICT (user_id, cigar_id) DO NOTHING
          RETURNING id, user_id, cigar_id, notes, created_at",
-            &[&id, &auth.user_id, &request.cigar_id, &request.notes, &now],
+            &[&id, &auth.user_id, &cigar_id, &request.notes.as_deref(), &now],
         )
         .await
-    {
-        Ok(row) => {
-            let wish_list_item = WishListResponse {
-                id: row.get(0),
-                user_id: row.get(1),
-                cigar_id: row.get(2),
-                notes: row.get(3),
-                created_at: row.get(4),
-            };
-            Ok(warp::reply::with_status(
-                json(&wish_list_item),
-                warp::http::StatusCode::CREATED,
-            ))
-        }
-        Err(e) => {
+        .map_err(|e| {
             eprintln!("Database error adding to wish list: {}", e);
-            Err(warp::reject::reject())
+            warp::reject::reject()
+        })?;
+
+    // If insert succeeded, return the new item
+    if let Some(row) = result {
+        let wish_list_item = WishListResponse {
+            id: row.get(0),
+            user_id: row.get(1),
+            cigar_id: row.get(2),
+            notes: row.get(3),
+            created_at: row.get(4),
+        };
+        Ok(warp::reply::with_status(
+            json(&wish_list_item),
+            warp::http::StatusCode::CREATED,
+        ))
+    } else {
+        // Item already exists (conflict), fetch and return it
+        match db
+            .query_one(
+                "SELECT id, user_id, cigar_id, notes, created_at
+             FROM wish_list
+             WHERE user_id = $1 AND cigar_id = $2",
+                &[&auth.user_id, &request.cigar_id],
+            )
+            .await
+        {
+            Ok(row) => {
+                let wish_list_item = WishListResponse {
+                    id: row.get(0),
+                    user_id: row.get(1),
+                    cigar_id: row.get(2),
+                    notes: row.get(3),
+                    created_at: row.get(4),
+                };
+                Ok(warp::reply::with_status(
+                    json(&wish_list_item),
+                    warp::http::StatusCode::OK,
+                ))
+            }
+            Err(e) => {
+                eprintln!("Database error fetching existing wish list item: {}", e);
+                Err(warp::reject::reject())
+            }
         }
     }
 }

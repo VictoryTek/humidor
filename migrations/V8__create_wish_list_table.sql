@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS wish_list (
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     cigar_id UUID NOT NULL REFERENCES cigars(id) ON DELETE CASCADE,
     notes TEXT,
-    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     UNIQUE(user_id, cigar_id)
 );
 
