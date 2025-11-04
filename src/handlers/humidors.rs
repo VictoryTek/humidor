@@ -21,10 +21,10 @@ pub async fn get_humidors(auth: AuthContext, pool: DbPool) -> Result<impl Reply,
 
     let user_id = auth.user_id;
     let query = "
-        SELECT id, user_id, name, description, capacity, target_humidity, location, is_wishlist, created_at, updated_at
+        SELECT id, user_id, name, description, capacity, target_humidity, location, created_at, updated_at
         FROM humidors 
         WHERE user_id = $1
-        ORDER BY is_wishlist DESC, created_at ASC
+        ORDER BY created_at ASC
     ";
 
     match db.query(query, &[&user_id]).await {
@@ -39,9 +39,8 @@ pub async fn get_humidors(auth: AuthContext, pool: DbPool) -> Result<impl Reply,
                     capacity: row.get(4),
                     target_humidity: row.get(5),
                     location: row.get(6),
-                    is_wishlist: row.get(7),
-                    created_at: row.get(8),
-                    updated_at: row.get(9),
+                    created_at: row.get(7),
+                    updated_at: row.get(8),
                 })
                 .collect();
 
@@ -79,7 +78,7 @@ pub async fn get_humidor(
 
     let user_id = auth.user_id;
     let query = "
-        SELECT id, user_id, name, description, capacity, target_humidity, location, is_wishlist, created_at, updated_at
+        SELECT id, user_id, name, description, capacity, target_humidity, location, created_at, updated_at
         FROM humidors 
         WHERE id = $1 AND user_id = $2
     ";
@@ -94,9 +93,8 @@ pub async fn get_humidor(
                 capacity: row.get(4),
                 target_humidity: row.get(5),
                 location: row.get(6),
-                is_wishlist: row.get(7),
-                created_at: row.get(8),
-                updated_at: row.get(9),
+                created_at: row.get(7),
+                updated_at: row.get(8),
             };
 
             Ok(reply::with_status(reply::json(&humidor), StatusCode::OK))
@@ -153,9 +151,9 @@ pub async fn create_humidor(
     let now = chrono::Utc::now();
 
     let query = "
-        INSERT INTO humidors (id, user_id, name, description, capacity, target_humidity, location, is_wishlist, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-        RETURNING id, user_id, name, description, capacity, target_humidity, location, is_wishlist, created_at, updated_at
+        INSERT INTO humidors (id, user_id, name, description, capacity, target_humidity, location, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        RETURNING id, user_id, name, description, capacity, target_humidity, location, created_at, updated_at
     ";
 
     match db
@@ -169,7 +167,6 @@ pub async fn create_humidor(
                 &request.capacity,
                 &request.target_humidity,
                 &request.location,
-                &request.is_wishlist, // Use the is_wishlist from request
                 &now,
                 &now,
             ],
@@ -185,9 +182,8 @@ pub async fn create_humidor(
                 capacity: row.get(4),
                 target_humidity: row.get(5),
                 location: row.get(6),
-                is_wishlist: row.get(7),
-                created_at: row.get(8),
-                updated_at: row.get(9),
+                created_at: row.get(7),
+                updated_at: row.get(8),
             };
 
             Ok(reply::with_status(
@@ -241,7 +237,7 @@ pub async fn update_humidor(
         UPDATE humidors 
         SET name = $3, description = $4, capacity = $5, target_humidity = $6, location = $7, updated_at = $8
         WHERE id = $1 AND user_id = $2
-        RETURNING id, user_id, name, description, capacity, target_humidity, location, is_wishlist, created_at, updated_at
+        RETURNING id, user_id, name, description, capacity, target_humidity, location, created_at, updated_at
     ";
 
     match db
@@ -269,9 +265,8 @@ pub async fn update_humidor(
                 capacity: row.get(4),
                 target_humidity: row.get(5),
                 location: row.get(6),
-                is_wishlist: row.get(7),
-                created_at: row.get(8),
-                updated_at: row.get(9),
+                created_at: row.get(7),
+                updated_at: row.get(8),
             };
 
             Ok(reply::with_status(reply::json(&humidor), StatusCode::OK))

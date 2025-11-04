@@ -14,7 +14,6 @@ pub struct Humidor {
     pub capacity: Option<i32>,
     pub target_humidity: Option<i32>,
     pub location: Option<String>,
-    pub is_wishlist: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -26,8 +25,6 @@ pub struct CreateHumidorRequest {
     pub capacity: Option<i32>,
     pub target_humidity: Option<i32>,
     pub location: Option<String>,
-    #[serde(default)]
-    pub is_wishlist: bool,
 }
 
 #[derive(Debug, Deserialize)]

@@ -184,8 +184,8 @@ pub async fn create_setup_user(
             // Create the first humidor
             let humidor_id = Uuid::new_v4();
             let humidor_query = "
-                INSERT INTO humidors (id, user_id, name, description, capacity, target_humidity, location, is_wishlist, created_at, updated_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                INSERT INTO humidors (id, user_id, name, description, capacity, target_humidity, location, created_at, updated_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             ";
 
             if let Err(e) = db
@@ -199,7 +199,6 @@ pub async fn create_setup_user(
                         &setup_req.humidor.capacity,
                         &setup_req.humidor.target_humidity,
                         &setup_req.humidor.location,
-                        &false, // is_wishlist
                         &now,
                         &now,
                     ],
@@ -383,9 +382,9 @@ pub async fn create_humidor_for_setup(
     let now = Utc::now();
 
     let query = "
-        INSERT INTO humidors (id, user_id, name, description, capacity, target_humidity, location, is_wishlist, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-        RETURNING id, user_id, name, description, capacity, target_humidity, location, is_wishlist, created_at, updated_at
+        INSERT INTO humidors (id, user_id, name, description, capacity, target_humidity, location, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        RETURNING id, user_id, name, description, capacity, target_humidity, location, created_at, updated_at
     ";
 
     match db
@@ -399,7 +398,6 @@ pub async fn create_humidor_for_setup(
                 &humidor_req.capacity,
                 &humidor_req.target_humidity,
                 &humidor_req.location,
-                &false, // is_wishlist
                 &now,
                 &now,
             ],
@@ -415,7 +413,6 @@ pub async fn create_humidor_for_setup(
                 capacity: row.get("capacity"),
                 target_humidity: row.get("target_humidity"),
                 location: row.get("location"),
-                is_wishlist: row.get("is_wishlist"),
                 created_at: row.get("created_at"),
                 updated_at: row.get("updated_at"),
             };

@@ -1,0 +1,7 @@
+# Use LLD linker to avoid Windows MSVC PDB limit issues
+# Disable debug info completely to avoid PDB corruption
+[build]
+rustflags = ["-C", "debuginfo=0"]
+
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "debuginfo=0"]
