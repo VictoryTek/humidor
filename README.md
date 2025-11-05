@@ -77,6 +77,35 @@ volumes:
   postgres_data:
 ```
 
+## Environment Variables
+
+The following environment variables can be configured:
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `DATABASE_URL` | Yes | - | PostgreSQL connection string (e.g., `postgresql://user:pass@host:5432/dbname`) |
+| `PORT` | No | `9898` | Port for the web server to listen on |
+| `RUST_LOG` | No | `info` | Logging level (`trace`, `debug`, `info`, `warn`, `error`) |
+| `JWT_SECRET` | Yes* | - | Secret key for JWT token signing (auto-generated if not provided) |
+| `BASE_URL` | No | `http://localhost:9898` | Base URL for the application (used in password reset emails) |
+| `ALLOWED_ORIGINS` | No | `http://localhost:9898,http://127.0.0.1:9898` | Comma-separated list of allowed CORS origins |
+| `SMTP_HOST` | No | - | SMTP server hostname for sending emails (optional) |
+| `SMTP_PORT` | No | `587` | SMTP server port |
+| `SMTP_USER` | No | - | SMTP authentication username |
+| `SMTP_PASSWORD` | No | - | SMTP authentication password |
+| `SMTP_FROM_EMAIL` | No | - | Email address to send from |
+
+**Note**: Variables marked with * are required for production but can be auto-generated in development.
+
+### Password Reset Email Configuration
+
+Password reset functionality works without SMTP configured - reset URLs will be logged to the console instead. To enable email delivery:
+
+1. Configure the SMTP environment variables above
+2. Restart the web service: `docker-compose restart web`
+
+See [docs/PASSWORD_RESET_README.md](docs/PASSWORD_RESET_README.md) for detailed email provider setup instructions.
+
 ## Tech Stack
 
 - **Backend**: Rust with Warp web framework
