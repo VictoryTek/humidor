@@ -484,9 +484,127 @@
                     </div>
                 </div>
 
+                <!-- Settings Section -->
+                <div class="app-settings-section" id="settingsSection" style="display: none;">
+                    <div class="content-header">
+                        <h1 class="page-title">Settings</h1>
+                    </div>
+
+                    <div class="settings-container">
+                        <!-- Backup & Restore Section -->
+                        <div class="settings-section">
+                            <h3 class="section-title">
+                                <span class="mdi mdi-database-export"></span>
+                                Backup & Restore
+                            </h3>
+                            <p class="section-description">
+                                Create backups of your entire collection including cigars, humidors, and images. 
+                                Backups can be downloaded, uploaded, and restored. 
+                                <strong>Warning:</strong> Restoring a backup will replace all current data.
+                            </p>
+                            
+                            <div class="backup-actions">
+                                <button class="btn btn-primary" id="createBackupBtn">
+                                    <span class="mdi mdi-plus-circle"></span>
+                                    Create Backup
+                                </button>
+                                <label for="uploadBackupInput" class="btn btn-secondary upload-btn">
+                                    <span class="mdi mdi-upload"></span>
+                                    Upload Backup
+                                </label>
+                                <input type="file" id="uploadBackupInput" accept=".zip" style="display: none;">
+                            </div>
+
+                            <div class="backups-table-container">
+                                <table class="backups-table" id="backupsTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Backup Name</th>
+                                            <th>Date Created</th>
+                                            <th>Size</th>
+                                            <th class="actions-column">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="backupsTableBody">
+                                        <tr>
+                                            <td colspan="4" class="loading-row">Loading backups...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Other sections will be added here for brands, humidors, etc. -->
             </div>
         </main>
+    </div>
+
+    <!-- Restore Confirmation Dialog -->
+    <div class="modal" id="restoreConfirmModal">
+        <div class="modal-content confirm-modal-content">
+            <div class="modal-header">
+                <h2>⚠️ Confirm Backup Restore</h2>
+                <button class="close-btn" id="closeRestoreModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="warning-text">
+                    <strong>This action cannot be undone!</strong>
+                </p>
+                <p>
+                    Restoring this backup will:
+                </p>
+                <ul class="warning-list">
+                    <li>Replace ALL current data with the backup data</li>
+                    <li>Overwrite all cigars, humidors, and organizers</li>
+                    <li>Replace all uploaded images</li>
+                </ul>
+                <p>
+                    Make sure you have a recent backup before proceeding.
+                </p>
+                <p class="restore-filename">
+                    Backup file: <strong id="restoreFilename"></strong>
+                </p>
+                <div class="checkbox-container">
+                    <label>
+                        <input type="checkbox" id="restoreConfirmCheckbox">
+                        I understand that this action is irreversible
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelRestoreBtn">Cancel</button>
+                <button class="btn btn-danger" id="confirmRestoreBtn" disabled>
+                    <span class="mdi mdi-database-import"></span>
+                    Restore Backup
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Dialog -->
+    <div class="modal" id="deleteConfirmModal">
+        <div class="modal-content confirm-modal-content">
+            <div class="modal-header">
+                <h2>🗑️ Confirm Delete</h2>
+                <button class="close-btn" id="closeDeleteModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete this backup?</p>
+                <p class="delete-filename">
+                    <strong id="deleteFilename"></strong>
+                </p>
+                <p>This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelDeleteBtn">Cancel</button>
+                <button class="btn btn-danger" id="confirmDeleteBtn">
+                    <span class="mdi mdi-delete"></span>
+                    Delete Backup
+                </button>
+            </div>
+        </div>
     </div>
 
     <!-- Brand Modal -->

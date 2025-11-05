@@ -1616,6 +1616,12 @@ function initializeNavigation() {
     // Add event listeners to navigation items
     document.querySelectorAll('.nav-item').forEach(item => {
         item.addEventListener('click', (e) => {
+            // Allow external links (like settings.html) to work normally
+            const href = item.getAttribute('href');
+            if (href && (href.startsWith('/static/') || href.startsWith('http'))) {
+                return; // Let the browser handle it
+            }
+            
             e.preventDefault();
             const page = item.getAttribute('data-page');
             navigateToPage(page);
@@ -1656,7 +1662,7 @@ function navigateToPage(page) {
     });
 
     // Hide all sections
-    document.querySelectorAll('.humidors-section, .organizer-section, .profile-section, .favorites-section, .wishlist-section').forEach(section => {
+    document.querySelectorAll('.humidors-section, .organizer-section, .profile-section, .app-settings-section, .favorites-section, .wishlist-section').forEach(section => {
         section.style.display = 'none';
     });
 
@@ -1697,6 +1703,11 @@ function navigateToPage(page) {
         case 'profile':
             document.getElementById('profileSection').style.display = 'block';
             loadUserProfile();
+            break;
+        case 'settings':
+            document.getElementById('settingsSection').style.display = 'block';
+            initializeBackupHandlers();
+            loadBackups();
             break;
     }
 
@@ -3348,6 +3359,301 @@ async function deleteWishListCigar(cigarId, event) {
         console.error('Error removing cigar from wish list:', error);
         showToast('Failed to remove cigar from wish list', 'error');
     }
+}
+
+// ============================================
+// BACKUP & RESTORE FUNCTIONS
+// ============================================
+
+let backups = [];
+let restoreTarget = null;
+let deleteTarget = null;
+
+async function loadBackups() {
+    try {
+        const response = await makeAuthenticatedRequest('/api/v1/backups');
+        
+        if (response && response.ok) {
+            const data = await response.json();
+            backups = data.backups || [];
+            renderBackupsTable();
+        } else {
+            console.error('Failed to load backups');
+            renderBackupsTable();
+        }
+    } catch (error) {
+        console.error('Error loading backups:', error);
+        renderBackupsTable();
+    }
+}
+
+function renderBackupsTable() {
+    const tbody = document.getElementById('backupsTableBody');
+    
+    if (!tbody) return; // Not on settings page
+    
+    if (backups.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="4" class="empty-row">No backups found. Create your first backup above.</td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = backups.map(backup => `
+        <tr>
+            <td><span class="backup-name">${backup.name}</span></td>
+            <td>${formatBackupDate(backup.date)}</td>
+            <td>${backup.size}</td>
+            <td class="actions-cell">
+                <button class="btn-icon" onclick="downloadBackup('${backup.name}')" title="Download">
+                    <span class="mdi mdi-download"></span>
+                </button>
+                <button class="btn-icon btn-restore" onclick="showRestoreDialog('${backup.name}')" title="Restore">
+                    <span class="mdi mdi-database-import"></span>
+                </button>
+                <button class="btn-icon btn-delete" onclick="showDeleteDialog('${backup.name}')" title="Delete">
+                    <span class="mdi mdi-delete"></span>
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function formatBackupDate(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+async function createBackup() {
+    const btn = document.getElementById('createBackupBtn');
+    if (!btn) return;
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i class="mdi mdi-loading mdi-spin"></i> Creating...';
+    
+    try {
+        const response = await makeAuthenticatedRequest('/api/v1/backups', {
+            method: 'POST'
+        });
+        
+        if (response && response.ok) {
+            showToast('Backup created successfully', 'success');
+            await loadBackups();
+        } else {
+            const error = await response.json();
+            showToast(error.message || 'Failed to create backup', 'error');
+        }
+    } catch (error) {
+        console.error('Error creating backup:', error);
+        showToast('Error creating backup', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span class="mdi mdi-plus-circle"></span> Create Backup';
+    }
+}
+
+async function uploadBackupFile(file) {
+    if (!file.name.endsWith('.zip')) {
+        showToast('Only .zip files are allowed', 'error');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+        const token = localStorage.getItem('humidor_token');
+        const response = await fetch('/api/v1/backups/upload', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            },
+            body: formData
+        });
+        
+        if (response.ok) {
+            showToast('Backup uploaded successfully', 'success');
+            await loadBackups();
+        } else {
+            const error = await response.json();
+            showToast(error.message || 'Failed to upload backup', 'error');
+        }
+    } catch (error) {
+        console.error('Error uploading backup:', error);
+        showToast('Error uploading backup', 'error');
+    }
+}
+
+function downloadBackup(filename) {
+    const token = localStorage.getItem('humidor_token');
+    const url = `/api/v1/backups/${filename}/download?token=${token}`;
+    
+    // Create a temporary link and click it
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    showToast('Downloading backup...', 'success');
+}
+
+function showRestoreDialog(filename) {
+    restoreTarget = filename;
+    const modal = document.getElementById('restoreConfirmModal');
+    if (!modal) return;
+    
+    document.getElementById('restoreFilename').textContent = filename;
+    document.getElementById('restoreConfirmCheckbox').checked = false;
+    document.getElementById('confirmRestoreBtn').disabled = true;
+    modal.classList.add('show');
+}
+
+function closeRestoreDialog() {
+    const modal = document.getElementById('restoreConfirmModal');
+    if (modal) {
+        modal.classList.remove('show');
+    }
+    restoreTarget = null;
+}
+
+async function confirmRestore() {
+    if (!restoreTarget) return;
+    
+    const btn = document.getElementById('confirmRestoreBtn');
+    if (!btn) return;
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i class="mdi mdi-loading mdi-spin"></i> Restoring...';
+    
+    try {
+        const response = await makeAuthenticatedRequest(`/api/v1/backups/${restoreTarget}/restore`, {
+            method: 'POST'
+        });
+        
+        if (response && response.ok) {
+            showToast('Backup restored successfully. Reloading...', 'success');
+            closeRestoreDialog();
+            
+            // Reload the page after a short delay
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            const error = await response.json();
+            showToast(error.message || 'Failed to restore backup', 'error');
+            btn.disabled = false;
+            btn.innerHTML = '<span class="mdi mdi-database-import"></span> Restore Backup';
+        }
+    } catch (error) {
+        console.error('Error restoring backup:', error);
+        showToast('Error restoring backup', 'error');
+        btn.disabled = false;
+        btn.innerHTML = '<span class="mdi mdi-database-import"></span> Restore Backup';
+    }
+}
+
+function showDeleteDialog(filename) {
+    deleteTarget = filename;
+    const modal = document.getElementById('deleteConfirmModal');
+    if (!modal) return;
+    
+    document.getElementById('deleteFilename').textContent = filename;
+    modal.classList.add('show');
+}
+
+function closeDeleteDialog() {
+    const modal = document.getElementById('deleteConfirmModal');
+    if (modal) {
+        modal.classList.remove('show');
+    }
+    deleteTarget = null;
+}
+
+async function confirmDelete() {
+    if (!deleteTarget) return;
+    
+    const btn = document.getElementById('confirmDeleteBtn');
+    if (!btn) return;
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i class="mdi mdi-loading mdi-spin"></i> Deleting...';
+    
+    try {
+        const response = await makeAuthenticatedRequest(`/api/v1/backups/${deleteTarget}`, {
+            method: 'DELETE'
+        });
+        
+        if (response && response.ok) {
+            showToast('Backup deleted successfully', 'success');
+            closeDeleteDialog();
+            await loadBackups();
+        } else {
+            const error = await response.json();
+            showToast(error.message || 'Failed to delete backup', 'error');
+        }
+    } catch (error) {
+        console.error('Error deleting backup:', error);
+        showToast('Error deleting backup', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span class="mdi mdi-delete"></span> Delete Backup';
+    }
+}
+
+// Initialize backup event listeners
+function initializeBackupHandlers() {
+    // Create backup button
+    const createBtn = document.getElementById('createBackupBtn');
+    if (createBtn) {
+        createBtn.addEventListener('click', createBackup);
+    }
+    
+    // Upload backup input
+    const uploadInput = document.getElementById('uploadBackupInput');
+    if (uploadInput) {
+        uploadInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                uploadBackupFile(e.target.files[0]);
+                e.target.value = ''; // Reset input
+            }
+        });
+    }
+    
+    // Restore dialog handlers
+    const closeRestoreBtn = document.getElementById('closeRestoreModal');
+    const cancelRestoreBtn = document.getElementById('cancelRestoreBtn');
+    const confirmRestoreBtn = document.getElementById('confirmRestoreBtn');
+    const restoreCheckbox = document.getElementById('restoreConfirmCheckbox');
+    
+    if (closeRestoreBtn) closeRestoreBtn.addEventListener('click', closeRestoreDialog);
+    if (cancelRestoreBtn) cancelRestoreBtn.addEventListener('click', closeRestoreDialog);
+    if (confirmRestoreBtn) confirmRestoreBtn.addEventListener('click', confirmRestore);
+    if (restoreCheckbox) {
+        restoreCheckbox.addEventListener('change', (e) => {
+            if (confirmRestoreBtn) {
+                confirmRestoreBtn.disabled = !e.target.checked;
+            }
+        });
+    }
+    
+    // Delete dialog handlers
+    const closeDeleteBtn = document.getElementById('closeDeleteModal');
+    const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
+    const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+    
+    if (closeDeleteBtn) closeDeleteBtn.addEventListener('click', closeDeleteDialog);
+    if (cancelDeleteBtn) cancelDeleteBtn.addEventListener('click', closeDeleteDialog);
+    if (confirmDeleteBtn) confirmDeleteBtn.addEventListener('click', confirmDelete);
 }
 
 // Global functions for modal opening (called from HTML)

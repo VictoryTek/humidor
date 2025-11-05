@@ -1,3 +1,4 @@
+pub mod backup;
 pub mod email;
 
 use regex::Regex;

@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[allow(dead_code)] // Used for database queries but not directly constructed
 pub struct PasswordResetToken {
     pub id: Uuid,
     pub user_id: Uuid,

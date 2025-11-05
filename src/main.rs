@@ -503,6 +503,68 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and(with_db(db_pool.clone()))
         .and_then(handlers::change_password);
 
+    // Backup/Restore API routes (authenticated)
+    let get_backups = warp::path("api")
+        .and(warp::path("v1"))
+        .and(warp::path("backups"))
+        .and(warp::path::end())
+        .and(warp::get())
+        .and(with_current_user(db_pool.clone()))
+        .and(with_db(db_pool.clone()))
+        .and_then(handlers::backups::get_backups);
+
+    let create_backup = warp::path("api")
+        .and(warp::path("v1"))
+        .and(warp::path("backups"))
+        .and(warp::path::end())
+        .and(warp::post())
+        .and(with_current_user(db_pool.clone()))
+        .and(with_db(db_pool.clone()))
+        .and_then(handlers::backups::create_backup_handler);
+
+    let download_backup = warp::path("api")
+        .and(warp::path("v1"))
+        .and(warp::path("backups"))
+        .and(warp::path::param())
+        .and(warp::path("download"))
+        .and(warp::path::end())
+        .and(warp::get())
+        .and(with_current_user(db_pool.clone()))
+        .and(with_db(db_pool.clone()))
+        .and_then(handlers::backups::download_backup);
+
+    let delete_backup = warp::path("api")
+        .and(warp::path("v1"))
+        .and(warp::path("backups"))
+        .and(warp::path::param())
+        .and(warp::path::end())
+        .and(warp::delete())
+        .and(with_current_user(db_pool.clone()))
+        .and(with_db(db_pool.clone()))
+        .and_then(handlers::backups::delete_backup_handler);
+
+    let restore_backup = warp::path("api")
+        .and(warp::path("v1"))
+        .and(warp::path("backups"))
+        .and(warp::path::param())
+        .and(warp::path("restore"))
+        .and(warp::path::end())
+        .and(warp::post())
+        .and(with_current_user(db_pool.clone()))
+        .and(with_db(db_pool.clone()))
+        .and_then(handlers::backups::restore_backup_handler);
+
+    let upload_backup = warp::path("api")
+        .and(warp::path("v1"))
+        .and(warp::path("backups"))
+        .and(warp::path("upload"))
+        .and(warp::path::end())
+        .and(warp::post())
+        .and(warp::multipart::form().max_length(100_000_000)) // 100MB max
+        .and(with_current_user(db_pool.clone()))
+        .and(with_db(db_pool.clone()))
+        .and_then(handlers::backups::upload_backup);
+
     // Humidor API routes (authenticated)
     let get_humidors = warp::path("api")
         .and(warp::path("v1"))
@@ -654,7 +716,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and_then(handlers::update_wish_list_notes);
 
     // Combine all API routes
-    let api = scrape_cigar
+    let api = get_backups
+        .or(create_backup)
+        .or(download_backup)
+        .or(delete_backup)
+        .or(restore_backup)
+        .or(upload_backup)
+        .or(scrape_cigar)
         .or(create_cigar)
         .or(update_cigar)
         .or(delete_cigar)

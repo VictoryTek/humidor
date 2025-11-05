@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod backups;
 pub mod brands;
 pub mod cigars;
 pub mod favorites;

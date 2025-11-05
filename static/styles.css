@@ -3639,6 +3639,218 @@ body {
     margin-top: 0.5rem;
 }
 
+/* ============================================
+   BACKUP & RESTORE STYLES
+   ============================================ */
+
+.section-description {
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: rgba(212, 175, 55, 0.1);
+    border-left: 3px solid var(--accent-gold);
+    border-radius: 4px;
+}
+
+.section-description strong {
+    color: var(--accent-gold);
+}
+
+.backup-actions {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.upload-btn {
+    cursor: pointer;
+    margin: 0;
+}
+
+.backups-table-container {
+    overflow-x: auto;
+    border-radius: 8px;
+    border: 1px solid rgba(212, 175, 55, 0.2);
+}
+
+.backups-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--surface-secondary);
+}
+
+.backups-table thead {
+    background: rgba(212, 175, 55, 0.15);
+}
+
+.backups-table th {
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-primary);
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid rgba(212, 175, 55, 0.3);
+}
+
+.backups-table th.actions-column {
+    text-align: right;
+    width: 150px;
+}
+
+.backups-table tbody tr {
+    border-bottom: 1px solid rgba(212, 175, 55, 0.1);
+    transition: background 0.2s ease;
+}
+
+.backups-table tbody tr:hover {
+    background: rgba(212, 175, 55, 0.05);
+}
+
+.backups-table td {
+    padding: 1rem;
+    color: var(--text-primary);
+}
+
+.backups-table td.loading-row,
+.backups-table td.empty-row {
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 2rem;
+    font-style: italic;
+}
+
+.backups-table .backup-name {
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+    color: var(--accent-gold);
+}
+
+.backups-table .actions-cell {
+    text-align: right;
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+}
+
+.btn-icon {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 4px;
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-icon:hover {
+    background: rgba(212, 175, 55, 0.1);
+    color: var(--accent-gold);
+}
+
+.btn-icon.btn-restore:hover {
+    background: rgba(76, 175, 80, 0.1);
+    color: #4caf50;
+}
+
+.btn-icon.btn-delete:hover {
+    background: rgba(244, 67, 54, 0.1);
+    color: #f44336;
+}
+
+.btn-icon .mdi {
+    font-size: 1.25rem;
+}
+
+/* Confirmation Modals */
+.confirm-modal-content {
+    max-width: 500px;
+}
+
+.warning-text {
+    color: #f44336;
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+
+.warning-list {
+    margin: 1rem 0;
+    padding-left: 1.5rem;
+    color: var(--text-secondary);
+    line-height: 1.8;
+}
+
+.warning-list li {
+    margin-bottom: 0.5rem;
+}
+
+.restore-filename,
+.delete-filename {
+    padding: 0.75rem;
+    background: rgba(212, 175, 55, 0.1);
+    border-left: 3px solid var(--accent-gold);
+    border-radius: 4px;
+    margin: 1rem 0;
+}
+
+.checkbox-container {
+    margin: 1.5rem 0;
+}
+
+.checkbox-container label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    user-select: none;
+}
+
+.checkbox-container input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    padding: 1.5rem;
+    border-top: 1px solid rgba(212, 175, 55, 0.2);
+}
+
+.btn-danger {
+    background: linear-gradient(135deg, #f44336, #d32f2f);
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-danger:hover:not(:disabled) {
+    background: linear-gradient(135deg, #d32f2f, #b71c1c);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
+}
+
+.btn-danger:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 .info-badge {
     display: inline-block;
     padding: 0.25rem 0.75rem;
