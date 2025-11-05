@@ -2173,6 +2173,42 @@ body {
     font-style: italic;
 }
 
+/* Image Upload Row */
+.image-upload-row {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.image-upload-row input[type="url"] {
+    flex: 1;
+}
+
+.btn-upload {
+    padding: 0.875rem 1.5rem;
+    background: linear-gradient(135deg, var(--accent-gold) 0%, var(--accent-copper) 100%);
+    color: var(--primary-dark);
+    border: none;
+    border-radius: 0.5rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3);
+    white-space: nowrap;
+    font-family: 'Inter', sans-serif;
+}
+
+.btn-upload:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(212, 175, 55, 0.4);
+}
+
+.btn-upload:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(212, 175, 55, 0.3);
+}
+
 .form-actions {
     display: flex;
     gap: 1rem;
@@ -2383,6 +2419,13 @@ body {
     color: var(--text-secondary);
     margin-bottom: 1rem;
     font-size: 0.95rem;
+}
+
+.import-url-content p.supported-sites {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin-top: -0.5rem;
+    font-style: italic;
 }
 
 .url-input {
@@ -3411,6 +3454,18 @@ body {
     word-wrap: break-word;
     overflow-wrap: break-word;
     padding-right: 0.5rem;
+}
+
+.report-card-field span a {
+    color: var(--accent-gold);
+    text-decoration: none;
+    word-break: break-all;
+    transition: color 0.2s ease;
+}
+
+.report-card-field span a:hover {
+    color: var(--accent-gold-light);
+    text-decoration: underline;
 }
 
 .report-card-notes-section {

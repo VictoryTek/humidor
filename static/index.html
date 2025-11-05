@@ -672,15 +672,15 @@
             <form id="cigarForm" class="cigar-form">
                 <div class="form-grid">
                     <div class="form-group full-width">
-                        <label for="cigarImageUrl">Image URL</label>
-                        <input type="url" id="cigarImageUrl" name="image_url" placeholder="https://example.com/cigar-image.jpg">
-                        <small class="form-hint">Or upload an image below</small>
-                    </div>
-                    
-                    <div class="form-group full-width">
-                        <label for="cigarImageUpload">Upload Image</label>
-                        <input type="file" id="cigarImageUpload" accept="image/*">
-                        <small class="form-hint">Recommended: JPG or PNG, max 5MB</small>
+                        <label for="cigarImageUrl">Cigar Image</label>
+                        <div class="image-upload-row">
+                            <input type="file" id="cigarImageUpload" accept="image/*" style="display: none;">
+                            <button type="button" class="btn-upload" id="uploadImageBtn">
+                                📁 Choose Image
+                            </button>
+                            <input type="url" id="cigarImageUrl" name="image_url" placeholder="Or enter image URL...">
+                        </div>
+                        <small class="form-hint" id="uploadFileName">JPG or PNG, max 5MB</small>
                     </div>
                     
                     <div class="form-group">
@@ -747,6 +747,12 @@
                 </div>
                 
                 <div class="form-group full-width">
+                    <label for="cigarRetailLink">Retail Link</label>
+                    <input type="url" id="cigarRetailLink" name="retail_link" placeholder="https://www.cigarsinternational.com/...">
+                    <small class="form-hint">Link to where you purchased or found this cigar</small>
+                </div>
+                
+                <div class="form-group full-width">
                     <label for="cigarNotes">Notes</label>
                     <textarea id="cigarNotes" name="notes" rows="3" placeholder="Tasting notes, pairing suggestions, etc."></textarea>
                 </div>
@@ -767,9 +773,10 @@
             </div>
             
             <div class="import-url-content">
-                <p>Enter a product URL from a cigar retailer or review site:</p>
+                <p>Enter a product URL from a cigar retailer:</p>
+                <p class="supported-sites"><strong>Supported:</strong> Cigars International, Famous Smoke, JR Cigars</p>
                 <div class="form-group">
-                    <input type="url" id="importUrl" placeholder="https://www.cigaraficionado.com/..." class="url-input">
+                    <input type="url" id="importUrl" placeholder="https://www.cigarsinternational.com/p/..." class="url-input">
                 </div>
                 <div id="importStatus" class="import-status"></div>
                 <div class="form-actions">
@@ -906,6 +913,10 @@
                             <div class="report-card-field">
                                 <label>HUMIDOR:</label>
                                 <span id="reportCardHumidor"></span>
+                            </div>
+                            <div class="report-card-field" id="reportCardRetailLinkField" style="grid-column: 1 / -1;">
+                                <label>RETAIL LINK:</label>
+                                <span id="reportCardRetailLink"></span>
                             </div>
                         </div>
                     </div>

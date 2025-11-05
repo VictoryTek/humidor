@@ -24,6 +24,7 @@ pub struct Cigar {
     pub ring_gauge_id: Option<Uuid>,
     pub length: Option<f64>,
     pub image_url: Option<String>,
+    pub retail_link: Option<String>,
     pub is_active: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -47,6 +48,7 @@ pub struct CreateCigar {
     pub length: Option<f64>,
     pub humidor_id: Option<Uuid>,
     pub image_url: Option<String>,
+    pub retail_link: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -67,6 +69,7 @@ pub struct UpdateCigar {
     pub length: Option<f64>,
     pub humidor_id: Option<Uuid>,
     pub image_url: Option<String>,
+    pub retail_link: Option<String>,
 }
 
 impl Validate for CreateCigar {

@@ -31,7 +31,7 @@ pub async fn get_cigars(
     })?;
 
     // Build query with parameterized conditions to prevent SQL injection
-    let base_query = "SELECT id, humidor_id, brand_id, name, size_id, strength_id, origin_id, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge_id, length, image_url, is_active, created_at, updated_at FROM cigars";
+    let base_query = "SELECT id, humidor_id, brand_id, name, size_id, strength_id, origin_id, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge_id, length, image_url, retail_link, is_active, created_at, updated_at FROM cigars";
     let mut conditions = Vec::new();
     let mut param_values: Vec<Box<dyn ToSql + Sync + Send>> = Vec::new();
     let mut param_counter = 1;
@@ -124,9 +124,10 @@ pub async fn get_cigars(
                     ring_gauge_id: row.get(14),
                     length: row.get(15),
                     image_url: row.get(16),
-                    is_active: row.get(17),
-                    created_at: row.get(18),
-                    updated_at: row.get(19),
+                    retail_link: row.get(17),
+                    is_active: row.get(18),
+                    created_at: row.get(19),
+                    updated_at: row.get(20),
                 };
                 cigars.push(cigar);
             }
@@ -164,12 +165,12 @@ pub async fn create_cigar(
     let now = Utc::now();
 
     match db.query_one(
-        "INSERT INTO cigars (id, humidor_id, brand_id, name, size_id, strength_id, origin_id, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge_id, length, image_url, is_active, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, true, $18, $19)
-         RETURNING id, humidor_id, brand_id, name, size_id, strength_id, origin_id, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge_id, length, image_url, is_active, created_at, updated_at",
+        "INSERT INTO cigars (id, humidor_id, brand_id, name, size_id, strength_id, origin_id, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge_id, length, image_url, retail_link, is_active, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, true, $19, $20)
+         RETURNING id, humidor_id, brand_id, name, size_id, strength_id, origin_id, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge_id, length, image_url, retail_link, is_active, created_at, updated_at",
         &[&id, &create_cigar.humidor_id, &create_cigar.brand_id, &create_cigar.name, &create_cigar.size_id, &create_cigar.strength_id, &create_cigar.origin_id,
           &create_cigar.wrapper, &create_cigar.binder, &create_cigar.filler, &create_cigar.price, &create_cigar.purchase_date,
-          &create_cigar.notes, &create_cigar.quantity, &create_cigar.ring_gauge_id, &create_cigar.length, &create_cigar.image_url, &now, &now]
+          &create_cigar.notes, &create_cigar.quantity, &create_cigar.ring_gauge_id, &create_cigar.length, &create_cigar.image_url, &create_cigar.retail_link, &now, &now]
     ).await {
         Ok(row) => {
             let cigar = Cigar {
@@ -190,9 +191,10 @@ pub async fn create_cigar(
                 ring_gauge_id: row.get(14),
                 length: row.get(15),
                 image_url: row.get(16),
-                is_active: row.get(17),
-                created_at: row.get(18),
-                updated_at: row.get(19),
+                retail_link: row.get(17),
+                is_active: row.get(18),
+                created_at: row.get(19),
+                updated_at: row.get(20),
             };
             Ok(warp::reply::json(&cigar))
         }
@@ -216,7 +218,7 @@ pub async fn get_cigar(
     })?;
 
     match db.query_one(
-        "SELECT id, humidor_id, brand_id, name, size_id, strength_id, origin_id, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge_id, length, image_url, is_active, created_at, updated_at FROM cigars WHERE id = $1",
+        "SELECT id, humidor_id, brand_id, name, size_id, strength_id, origin_id, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge_id, length, image_url, retail_link, is_active, created_at, updated_at FROM cigars WHERE id = $1",
         &[&id]
     ).await {
         Ok(row) => {
@@ -238,9 +240,10 @@ pub async fn get_cigar(
                 ring_gauge_id: row.get(14),
                 length: row.get(15),
                 image_url: row.get(16),
-                is_active: row.get(17),
-                created_at: row.get(18),
-                updated_at: row.get(19),
+                retail_link: row.get(17),
+                is_active: row.get(18),
+                created_at: row.get(19),
+                updated_at: row.get(20),
             };
             Ok(warp::reply::json(&cigar))
         }
@@ -287,17 +290,18 @@ pub async fn update_cigar(
          ring_gauge_id = COALESCE($15, ring_gauge_id),
          length = COALESCE($16, length),
          image_url = COALESCE($17, image_url),
+         retail_link = COALESCE($18, retail_link),
          is_active = CASE
              WHEN $14 IS NOT NULL AND $14 = 0 THEN false
              WHEN $14 IS NOT NULL AND $14 > 0 THEN true
              ELSE is_active
          END,
-         updated_at = $18
+         updated_at = $19
          WHERE id = $1
-         RETURNING id, humidor_id, brand_id, name, size_id, strength_id, origin_id, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge_id, length, image_url, is_active, created_at, updated_at",
+         RETURNING id, humidor_id, brand_id, name, size_id, strength_id, origin_id, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge_id, length, image_url, retail_link, is_active, created_at, updated_at",
         &[&id, &update_cigar.humidor_id, &update_cigar.brand_id, &update_cigar.name, &update_cigar.size_id, &update_cigar.strength_id, &update_cigar.origin_id,
           &update_cigar.wrapper, &update_cigar.binder, &update_cigar.filler, &update_cigar.price, &update_cigar.purchase_date,
-          &update_cigar.notes, &update_cigar.quantity, &update_cigar.ring_gauge_id, &update_cigar.length, &update_cigar.image_url, &now]
+          &update_cigar.notes, &update_cigar.quantity, &update_cigar.ring_gauge_id, &update_cigar.length, &update_cigar.image_url, &update_cigar.retail_link, &now]
     ).await {
         Ok(row) => {
             let cigar = Cigar {
@@ -318,9 +322,10 @@ pub async fn update_cigar(
                 ring_gauge_id: row.get(14),
                 length: row.get(15),
                 image_url: row.get(16),
-                is_active: row.get(17),
-                created_at: row.get(18),
-                updated_at: row.get(19),
+                retail_link: row.get(17),
+                is_active: row.get(18),
+                created_at: row.get(19),
+                updated_at: row.get(20),
             };
             Ok(warp::reply::json(&cigar))
         }

@@ -1356,6 +1356,61 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    // Image upload button handler
+    const uploadImageBtn = document.getElementById('uploadImageBtn');
+    const cigarImageUpload = document.getElementById('cigarImageUpload');
+    const uploadFileName = document.getElementById('uploadFileName');
+    
+    if (uploadImageBtn && cigarImageUpload) {
+        uploadImageBtn.addEventListener('click', () => {
+            cigarImageUpload.click();
+        });
+        
+        cigarImageUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                uploadFileName.textContent = `Selected: ${file.name}`;
+            } else {
+                uploadFileName.textContent = 'JPG or PNG, max 5MB';
+            }
+        });
+    }
+    
+    // Humidor dropdown change handler for wish list
+    const cigarHumidorSelect = document.getElementById('cigarHumidor');
+    const cigarQuantityInput = document.getElementById('cigarQuantity');
+    const cigarPurchaseDateInput = document.getElementById('cigarPurchaseDate');
+    
+    if (cigarHumidorSelect) {
+        cigarHumidorSelect.addEventListener('change', (e) => {
+            const selectedOption = e.target.options[e.target.selectedIndex];
+            const isWishList = selectedOption.text === 'Wish List';
+            
+            if (isWishList) {
+                // Disable and clear quantity and purchase date for wish list
+                cigarQuantityInput.disabled = true;
+                cigarQuantityInput.value = '';
+                cigarQuantityInput.removeAttribute('required');
+                cigarPurchaseDateInput.disabled = true;
+                cigarPurchaseDateInput.value = '';
+                
+                // Add visual indicator
+                cigarQuantityInput.parentElement.style.opacity = '0.5';
+                cigarPurchaseDateInput.parentElement.style.opacity = '0.5';
+            } else {
+                // Enable for regular humidors
+                cigarQuantityInput.disabled = false;
+                cigarQuantityInput.value = '1';
+                cigarQuantityInput.setAttribute('required', 'required');
+                cigarPurchaseDateInput.disabled = false;
+                
+                // Remove visual indicator
+                cigarQuantityInput.parentElement.style.opacity = '1';
+                cigarPurchaseDateInput.parentElement.style.opacity = '1';
+            }
+        });
+    }
+    
     // Cigar modal events
     if (elements.closeCigarModal) {
         elements.closeCigarModal.addEventListener('click', closeCigarModal);
@@ -2188,6 +2243,16 @@ function openReportCard(cigarId) {
     
     document.getElementById('reportCardNotes').textContent = cigar.notes || 'No notes available';
     
+    // Set retail link
+    const retailLinkField = document.getElementById('reportCardRetailLinkField');
+    const retailLinkSpan = document.getElementById('reportCardRetailLink');
+    if (cigar.retail_link) {
+        retailLinkField.style.display = '';
+        retailLinkSpan.innerHTML = `<a href="${cigar.retail_link}" target="_blank" rel="noopener noreferrer">${cigar.retail_link}</a>`;
+    } else {
+        retailLinkField.style.display = 'none';
+    }
+    
     // Check if this cigar is in the wish list (cigars in wish list don't have humidor_id)
     const isInWishList = !cigar.humidor_id || cigar.humidor_id === null;
     
@@ -2382,6 +2447,12 @@ function closeCigarModal() {
     modal.classList.remove('show');
     isEditingCigar = false;
     currentCigar = null;
+    
+    // Reset file upload display
+    const uploadFileName = document.getElementById('uploadFileName');
+    if (uploadFileName) {
+        uploadFileName.textContent = 'JPG or PNG, max 5MB';
+    }
 }
 
 async function saveHumidor() {
