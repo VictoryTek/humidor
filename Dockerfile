@@ -40,6 +40,9 @@ WORKDIR /app
 COPY --from=builder --chown=humidor:humidor /app/target/release/humidor ./
 COPY --from=builder --chown=humidor:humidor /app/static ./static
 
+# Create directories for runtime data with correct permissions
+RUN mkdir -p backups uploads && chown -R humidor:humidor backups uploads
+
 USER humidor
 
 EXPOSE 9898

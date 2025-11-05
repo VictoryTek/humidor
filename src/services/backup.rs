@@ -202,14 +202,14 @@ async fn export_database(
     ];
 
     for table in tables {
-        // Use jsonb_agg to aggregate rows as JSON
+        // Use json_agg to aggregate rows as JSON (returns text, not jsonb)
         let query = format!(
-            "SELECT COALESCE(jsonb_agg(row_to_json(t)), '[]'::jsonb) FROM {} t",
+            "SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json)::text FROM {} t",
             table
         );
         let row = db.query_one(&query, &[]).await?;
         
-        // Get the JSONB value as a string and parse it
+        // Get the JSON value as a string and parse it
         let json_str: String = row.get(0);
         let table_data: serde_json::Value = serde_json::from_str(&json_str)?;
 
