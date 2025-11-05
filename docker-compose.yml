@@ -28,6 +28,15 @@ services:
       PORT: 9898
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:9898,http://127.0.0.1:9898}
       JWT_TOKEN_LIFETIME_HOURS: ${JWT_TOKEN_LIFETIME_HOURS:-2}
+      # =====================================
+      # Email Configuration (Optional)
+      # Uncomment to enable password reset emails
+      # BASE_URL=http://localhost:9898
+      # SMTP_HOST=
+      # SMTP_PORT=587
+      # SMTP_USER=
+      # SMTP_PASSWORD=
+      # SMTP_FROM_EMAIL=
     secrets:
       - db_user
       - db_password

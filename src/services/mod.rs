@@ -1,7 +1,11 @@
+pub mod email;
+
 use regex::Regex;
 use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+
+pub use email::EmailService;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ScrapedCigarData {

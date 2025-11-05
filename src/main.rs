@@ -447,6 +447,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and(with_db(db_pool.clone()))
         .and_then(handlers::login_user);
 
+    // Password reset routes (public)
+    let forgot_password = warp::path("api")
+        .and(warp::path("v1"))
+        .and(warp::path("auth"))
+        .and(warp::path("forgot-password"))
+        .and(warp::post())
+        .and(warp::body::json())
+        .and(with_db(db_pool.clone()))
+        .and_then(handlers::forgot_password);
+
+    let reset_password = warp::path("api")
+        .and(warp::path("v1"))
+        .and(warp::path("auth"))
+        .and(warp::path("reset-password"))
+        .and(warp::post())
+        .and(warp::body::json())
+        .and(with_db(db_pool.clone()))
+        .and_then(handlers::reset_password);
+
+    let email_config_status = warp::path("api")
+        .and(warp::path("v1"))
+        .and(warp::path("auth"))
+        .and(warp::path("email-config"))
+        .and(warp::get())
+        .and_then(handlers::check_email_config);
+
     // User profile API routes (authenticated)
     let get_current_user = warp::path("api")
         .and(warp::path("v1"))
@@ -657,6 +683,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .or(get_setup_status)
         .or(create_setup_user)
         .or(login_user)
+        .or(forgot_password)
+        .or(reset_password)
+        .or(email_config_status)
         .or(get_current_user)
         .or(update_current_user)
         .or(change_password)
@@ -699,6 +728,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and(warp::get())
         .and_then(serve_login);
 
+    // Password reset page routes
+    let forgot_password_page = warp::path("forgot-password.html")
+        .and(warp::get())
+        .and_then(serve_forgot_password);
+
+    let reset_password_page = warp::path("reset-password.html")
+        .and(warp::get())
+        .and_then(serve_reset_password);
+
     // Configure CORS - restrictive by default for security
     // Use ALLOWED_ORIGINS env var for production (comma-separated list)
     let allowed_origins: Vec<String> = env::var("ALLOWED_ORIGINS")
@@ -720,6 +758,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .or(root)
         .or(setup)
         .or(login)
+        .or(forgot_password_page)
+        .or(reset_password_page)
         .or(static_files)
         .or(api)
         .with(log_requests())
@@ -818,6 +858,28 @@ async fn serve_login() -> Result<impl Reply, warp::Rejection> {
         Ok(content) => Ok(warp::reply::html(content).into_response()),
         Err(_) => Ok(warp::reply::with_status(
             warp::reply::html("<h1>Login Not Found</h1>".to_string()),
+            warp::http::StatusCode::NOT_FOUND,
+        )
+        .into_response()),
+    }
+}
+
+async fn serve_forgot_password() -> Result<impl Reply, warp::Rejection> {
+    match tokio::fs::read_to_string("static/forgot-password.html").await {
+        Ok(content) => Ok(warp::reply::html(content).into_response()),
+        Err(_) => Ok(warp::reply::with_status(
+            warp::reply::html("<h1>Forgot Password Not Found</h1>".to_string()),
+            warp::http::StatusCode::NOT_FOUND,
+        )
+        .into_response()),
+    }
+}
+
+async fn serve_reset_password() -> Result<impl Reply, warp::Rejection> {
+    match tokio::fs::read_to_string("static/reset-password.html").await {
+        Ok(content) => Ok(warp::reply::html(content).into_response()),
+        Err(_) => Ok(warp::reply::with_status(
+            warp::reply::html("<h1>Reset Password Not Found</h1>".to_string()),
             warp::http::StatusCode::NOT_FOUND,
         )
         .into_response()),

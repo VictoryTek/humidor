@@ -656,3 +656,198 @@ pub async fn change_password(
         }
     }
 }
+
+// Password Reset Handlers
+use crate::models::{ForgotPasswordRequest, ResetPasswordRequest};
+use crate::services::EmailService;
+use rand::Rng;
+
+/// Generate a secure random token for password reset
+fn generate_reset_token() -> String {
+    rand::thread_rng()
+        .sample_iter(&rand::distributions::Alphanumeric)
+        .take(64)
+        .map(char::from)
+        .collect()
+}
+
+/// Handle forgot password request - generates token and sends reset email
+pub async fn forgot_password(
+    request: ForgotPasswordRequest,
+    pool: DbPool,
+) -> Result<impl Reply, warp::Rejection> {
+    let db = pool.get().await.map_err(|e| {
+        eprintln!("Failed to get database connection: {}", e);
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
+    })?;
+
+    // Look up user by email (case-insensitive)
+    let user_result = db
+        .query_opt(
+            "SELECT id, username, email FROM users WHERE LOWER(email) = LOWER($1)",
+            &[&request.email],
+        )
+        .await
+        .map_err(|e| {
+            eprintln!("Database error checking user: {}", e);
+            warp::reject::reject()
+        })?;
+
+    // Don't reveal whether user exists (security best practice)
+    if user_result.is_none() {
+        eprintln!("Password reset requested for non-existent email: {}", request.email);
+        return Ok(warp::reply::json(&json!({
+            "message": "If that email exists, a password reset link has been sent"
+        })));
+    }
+
+    let user_row = user_result.unwrap();
+    let user_id: Uuid = user_row.get(0);
+    
+    // Generate secure token
+    let token = generate_reset_token();
+    let token_id = Uuid::new_v4();
+    let now = Utc::now();
+
+    // Store token in database
+    db.execute(
+        "INSERT INTO password_reset_tokens (id, user_id, token, created_at) VALUES ($1, $2, $3, $4)",
+        &[&token_id, &user_id, &token, &now],
+    )
+    .await
+    .map_err(|e| {
+        eprintln!("Failed to store password reset token: {}", e);
+        warp::reject::reject()
+    })?;
+
+    // Send email with reset link
+    let base_url = env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:9898".to_string());
+    let reset_url = format!("{}/reset-password.html?token={}", base_url, token);
+
+    // Try to send email, but don't fail if SMTP isn't configured
+    match EmailService::from_env() {
+        Ok(email_service) => {
+            if let Err(e) = email_service.send_password_reset_email(&request.email, &reset_url).await {
+                eprintln!("Failed to send password reset email: {}", e);
+                eprintln!("Reset URL (for testing): {}", reset_url);
+            }
+        }
+        Err(e) => {
+            eprintln!("Email service not configured: {}", e);
+            eprintln!("Reset URL (for testing): {}", reset_url);
+        }
+    }
+
+    Ok(warp::reply::json(&json!({
+        "message": "If that email exists, a password reset link has been sent"
+    })))
+}
+
+/// Handle reset password request - validates token and updates password
+pub async fn reset_password(
+    request: ResetPasswordRequest,
+    pool: DbPool,
+) -> Result<impl Reply, warp::Rejection> {
+    let db = pool.get().await.map_err(|e| {
+        eprintln!("Failed to get database connection: {}", e);
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
+    })?;
+
+    // Validate token and get user_id
+    let token_result = db
+        .query_opt(
+            "SELECT user_id, created_at FROM password_reset_tokens WHERE token = $1",
+            &[&request.token],
+        )
+        .await
+        .map_err(|e| {
+            eprintln!("Database error checking token: {}", e);
+            warp::reject::reject()
+        })?;
+
+    if token_result.is_none() {
+        eprintln!("Invalid or expired token used for password reset");
+        return Err(warp::reject::custom(AppError::BadRequest(
+            "Invalid or expired reset token".to_string(),
+        )));
+    }
+
+    let token_row = token_result.unwrap();
+    let user_id: Uuid = token_row.get(0);
+    let created_at: chrono::DateTime<Utc> = token_row.get(1);
+
+    // Check if token is expired (30 minutes)
+    let expiration_duration = chrono::Duration::minutes(30);
+    if Utc::now().signed_duration_since(created_at) > expiration_duration {
+        // Delete expired token
+        db.execute(
+            "DELETE FROM password_reset_tokens WHERE token = $1",
+            &[&request.token],
+        )
+        .await
+        .ok();
+
+        return Err(warp::reject::custom(AppError::BadRequest(
+            "Reset token has expired".to_string(),
+        )));
+    }
+
+    // Hash new password
+    let password_hash = match hash_password(request.password.clone()).await {
+        Ok(h) => h,
+        Err(e) => {
+            eprintln!("Password hashing error: {}", e);
+            return Err(warp::reject::custom(AppError::InternalServerError(
+                "Failed to hash password".to_string(),
+            )));
+        }
+    };
+
+    // Update user's password
+    let now = Utc::now();
+    db.execute(
+        "UPDATE users SET password_hash = $1, updated_at = $2 WHERE id = $3",
+        &[&password_hash, &now, &user_id],
+    )
+    .await
+    .map_err(|e| {
+        eprintln!("Failed to update password: {}", e);
+        warp::reject::reject()
+    })?;
+
+    // Delete the used token
+    db.execute(
+        "DELETE FROM password_reset_tokens WHERE token = $1",
+        &[&request.token],
+    )
+    .await
+    .ok();
+
+    eprintln!("✅ Password reset successful for user: {}", user_id);
+
+    Ok(warp::reply::json(&json!({
+        "message": "Password has been reset successfully"
+    })))
+}
+
+/// Check if email service is configured
+pub async fn check_email_config() -> Result<impl Reply, warp::Rejection> {
+    let smtp_host = env::var("SMTP_HOST").ok();
+    let smtp_user = env::var("SMTP_USER").ok();
+    let smtp_password = env::var("SMTP_PASSWORD").ok();
+    
+    let is_configured = smtp_host.is_some() 
+        && smtp_user.is_some() 
+        && smtp_password.is_some()
+        && !smtp_host.as_ref().unwrap().is_empty()
+        && !smtp_user.as_ref().unwrap().is_empty()
+        && !smtp_password.as_ref().unwrap().is_empty();
+    
+    Ok(warp::reply::json(&json!({
+        "email_configured": is_configured
+    })))
+}
