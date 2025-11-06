@@ -438,6 +438,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and(with_db(db_pool.clone()))
         .and_then(handlers::create_setup_user);
 
+    let setup_restore = warp::path("api")
+        .and(warp::path("v1"))
+        .and(warp::path("setup"))
+        .and(warp::path("restore"))
+        .and(warp::post())
+        .and(warp::multipart::form().max_length(100_000_000)) // 100MB max
+        .and(with_db(db_pool.clone()))
+        .and_then(handlers::backups::setup_restore_backup);
+
     let login_user = warp::path("api")
         .and(warp::path("v1"))
         .and(warp::path("auth"))
@@ -716,19 +725,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and_then(handlers::update_wish_list_notes);
 
     // Combine all API routes
-    let api = get_backups
+    // Group routes to reduce type complexity
+    let backup_routes = get_backups
         .or(create_backup)
         .or(download_backup)
         .or(delete_backup)
         .or(restore_backup)
         .or(upload_backup)
-        .or(scrape_cigar)
+        .boxed();
+    
+    let cigar_routes = scrape_cigar
         .or(create_cigar)
         .or(update_cigar)
         .or(delete_cigar)
         .or(get_cigar)
         .or(get_cigars)
-        .or(get_brands)
+        .boxed();
+    
+    let organizer_routes = get_brands
         .or(create_brand)
         .or(update_brand)
         .or(delete_brand)
@@ -748,7 +762,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .or(create_ring_gauge)
         .or(update_ring_gauge)
         .or(delete_ring_gauge)
-        .or(get_setup_status)
+        .boxed();
+    
+    let auth_routes = get_setup_status
         .or(create_setup_user)
         .or(login_user)
         .or(forgot_password)
@@ -757,13 +773,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .or(get_current_user)
         .or(update_current_user)
         .or(change_password)
-        .or(get_humidors)
+        .boxed();
+    
+    let humidor_routes = get_humidors
         .or(get_humidor_cigars) // Must come before get_humidor (more specific route)
         .or(create_humidor)
         .or(update_humidor)
         .or(delete_humidor)
         .or(get_humidor) // Less specific, should be last
-        .or(check_favorite) // Must come before remove_favorite (more specific route)
+        .boxed();
+    
+    let favorite_routes = check_favorite // Must come before remove_favorite (more specific route)
         .or(get_favorites)
         .or(add_favorite)
         .or(remove_favorite)
@@ -771,7 +791,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .or(update_wish_list_notes) // Must come before remove_from_wish_list (both have UUID path)
         .or(get_wish_list)
         .or(add_to_wish_list)
-        .or(remove_from_wish_list);
+        .or(remove_from_wish_list)
+        .boxed();
+    
+    // Combine all routes
+    let api = backup_routes
+        .or(cigar_routes)
+        .or(organizer_routes)
+        .or(auth_routes)
+        .or(setup_restore)
+        .or(humidor_routes)
+        .or(favorite_routes);
 
     // Health check endpoint (no auth required)
     let health = warp::path("health")

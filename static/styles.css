@@ -3863,3 +3863,38 @@ body {
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
+
+/* Setup Wizard - Restore from Backup */
+.divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    margin: 2rem 0;
+}
+
+.divider::before,
+.divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.divider span {
+    padding: 0 1rem;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+}
+
+.restore-section {
+    margin-top: 1.5rem;
+    padding: 1.5rem;
+    background: rgba(51, 31, 21, 0.3);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+}
+
+.backup-upload-section {
+    margin-top: 1rem;
+}

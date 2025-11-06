@@ -2,6 +2,7 @@ use crate::middleware::auth::AuthContext;
 use crate::services::backup::{create_backup, delete_backup, list_backups, restore_backup, BackupInfo};
 use bytes::Buf;
 use deadpool_postgres::Pool as DbPool;
+use futures::StreamExt;
 use serde::Serialize;
 use std::path::Path;
 use warp::{Rejection, Reply};
@@ -179,6 +180,93 @@ pub async fn upload_backup(
             return Ok(warp::reply::json(&MessageResponse {
                 message: format!("Backup {} uploaded successfully", filename),
             }));
+        }
+    }
+
+    Ok(warp::reply::json(&MessageResponse {
+        message: "No file provided".to_string(),
+    }))
+}
+
+// Setup restore - upload and restore backup during initial setup (no auth required)
+pub async fn setup_restore_backup(
+    mut form: warp::multipart::FormData,
+    pool: DbPool,
+) -> Result<impl Reply, Rejection> {
+    let uploads_dir = Path::new("uploads");
+    
+    // Process multipart form data
+    while let Some(Ok(mut part)) = form.next().await {
+        if part.name() == "file" {
+            let filename = part
+                .filename()
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| "backup.zip".to_string());
+
+            if !filename.ends_with(".zip") {
+                return Ok(warp::reply::json(&MessageResponse {
+                    message: "Invalid file type. Only .zip files are allowed".to_string(),
+                }));
+            }
+
+            let backup_path = uploads_dir.join(&filename);
+            
+            // Security check: ensure the path is within uploads directory
+            if !backup_path.starts_with(uploads_dir) {
+                return Ok(warp::reply::json(&MessageResponse {
+                    message: "Invalid filename".to_string(),
+                }));
+            }
+
+            // Collect all data into a buffer
+            let mut buffer = Vec::new();
+            while let Some(Ok(mut chunk)) = part.data().await {
+                while chunk.has_remaining() {
+                    let bytes = chunk.chunk();
+                    buffer.extend_from_slice(bytes);
+                    let len = bytes.len();
+                    chunk.advance(len);
+                }
+            }
+
+            // Write to file
+            tokio::fs::write(&backup_path, &buffer).await.map_err(|e| {
+                eprintln!("Error writing file: {}", e);
+                warp::reject::reject()
+            })?;
+
+            // Now restore the backup
+            let db = pool.get().await.map_err(|e| {
+                eprintln!("Failed to get database connection: {}", e);
+                warp::reject::reject()
+            })?;
+
+            let backup_path_str = backup_path.to_str().ok_or_else(|| {
+                eprintln!("Invalid path");
+                warp::reject::reject()
+            })?;
+
+            // Convert error to String immediately to avoid Send issues across await
+            let result = restore_backup(&db, backup_path_str)
+                .await
+                .map_err(|e| format!("Error restoring backup: {}", e));
+
+            // Clean up the uploaded file regardless of success/failure
+            let _ = tokio::fs::remove_file(&backup_path).await;
+            
+            match result {
+                Ok(_) => {
+                    return Ok(warp::reply::json(&MessageResponse {
+                        message: "Backup restored successfully".to_string(),
+                    }));
+                }
+                Err(error_msg) => {
+                    eprintln!("{}", error_msg);
+                    return Ok(warp::reply::json(&MessageResponse {
+                        message: error_msg,
+                    }));
+                }
+            }
         }
     }
 

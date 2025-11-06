@@ -66,6 +66,37 @@ document.addEventListener('DOMContentLoaded', function() {
     elements.password.addEventListener('input', validatePasswords);
     elements.confirmPassword.addEventListener('input', validatePasswords);
     
+    // Restore from backup listeners
+    const selectBackupBtn = document.getElementById('selectBackupBtn');
+    const restoreBackupFile = document.getElementById('restoreBackupFile');
+    const restoreBackupBtn = document.getElementById('restoreBackupBtn');
+    const backupFileName = document.getElementById('backupFileName');
+    const selectedFileName = document.getElementById('selectedFileName');
+    
+    if (selectBackupBtn) {
+        selectBackupBtn.addEventListener('click', () => {
+            restoreBackupFile.click();
+        });
+    }
+    
+    if (restoreBackupFile) {
+        restoreBackupFile.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                selectedFileName.textContent = file.name;
+                backupFileName.style.display = 'block';
+                restoreBackupBtn.style.display = 'block';
+            } else {
+                backupFileName.style.display = 'none';
+                restoreBackupBtn.style.display = 'none';
+            }
+        });
+    }
+    
+    if (restoreBackupBtn) {
+        restoreBackupBtn.addEventListener('click', handleRestoreBackup);
+    }
+    
     // Set default values
     elements.capacity.value = 50;
 });
@@ -640,4 +671,66 @@ if (document.readyState === 'loading') {
 } else {
     console.log('DOM already loaded, initializing wizard immediately...');
     updateWizard();
+}
+// Restore from Backup functionality
+async function handleRestoreBackup() {
+    const fileInput = document.getElementById('restoreBackupFile');
+    const restoreLoading = document.getElementById('restoreLoading');
+    const restoreBackupBtn = document.getElementById('restoreBackupBtn');
+    const selectBackupBtn = document.getElementById('selectBackupBtn');
+    
+    const file = fileInput.files[0];
+    if (!file) {
+        showToast('Please select a backup file', 'error');
+        return;
+    }
+    
+    // Validate file extension
+    if (!file.name.endsWith('.zip')) {
+        showToast('Please select a valid backup file (.zip)', 'error');
+        return;
+    }
+    
+    // Show loading state
+    restoreLoading.style.display = 'block';
+    restoreBackupBtn.style.display = 'none';
+    selectBackupBtn.disabled = true;
+    
+    try {
+        console.log('Uploading and restoring backup:', file.name);
+        
+        // Create FormData and append file
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        // Upload and restore the backup (no auth required during setup)
+        const response = await fetch('/api/v1/setup/restore', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to restore backup');
+        }
+        
+        const result = await response.json();
+        console.log('Backup restored successfully:', result);
+        
+        showToast('Backup restored successfully! Redirecting to login...', 'success');
+        
+        // Wait 2 seconds then redirect directly to login page
+        setTimeout(() => {
+            window.location.href = '/login.html';
+        }, 2000);
+        
+    } catch (error) {
+        console.error('Error restoring backup:', error);
+        showToast('Error restoring backup: ' + error.message, 'error');
+        
+        // Reset UI
+        restoreLoading.style.display = 'none';
+        restoreBackupBtn.style.display = 'block';
+        selectBackupBtn.disabled = false;
+    }
 }

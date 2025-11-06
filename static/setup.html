@@ -93,7 +93,35 @@
                             <span>Secure and private</span>
                         </div>
                     </div>
-                    <p class="already-setup">
+                    
+                    <!-- Restore from Backup Section -->
+                    <div class="restore-section">
+                        <div class="divider">
+                            <span>OR</span>
+                        </div>
+                        <h3 style="margin-top: 2rem; margin-bottom: 1rem; font-size: 1.1rem;">Restore from Backup</h3>
+                        <p style="margin-bottom: 1rem; color: var(--text-secondary);">
+                            Already have a backup? Upload it to restore your complete collection, including all users, humidors, and cigars.
+                        </p>
+                        <div class="backup-upload-section">
+                            <input type="file" id="restoreBackupFile" accept=".zip" style="display: none;">
+                            <button class="btn btn-secondary" id="selectBackupBtn" style="width: 100%; margin-bottom: 0.5rem;">
+                                📁 Select Backup File
+                            </button>
+                            <div id="backupFileName" style="display: none; padding: 0.75rem; background: var(--background-tertiary); border-radius: 8px; margin-bottom: 0.5rem; text-align: center; color: var(--text-secondary);">
+                                <span id="selectedFileName"></span>
+                            </div>
+                            <button class="btn btn-primary" id="restoreBackupBtn" style="width: 100%; display: none;">
+                                ⬆️ Restore from Backup
+                            </button>
+                            <div id="restoreLoading" style="display: none; text-align: center; padding: 1rem;">
+                                <div class="spinner" style="margin: 0 auto 1rem;"></div>
+                                <p style="color: var(--text-secondary);">Restoring backup...</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <p class="already-setup" style="margin-top: 2rem;">
                         Already have an account? 
                         <a href="/" class="setup-link">Go to login</a>
                     </p>

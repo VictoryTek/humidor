@@ -3492,19 +3492,41 @@ async function uploadBackupFile(file) {
     }
 }
 
-function downloadBackup(filename) {
+async function downloadBackup(filename) {
     const token = localStorage.getItem('humidor_token');
-    const url = `/api/v1/backups/${filename}/download?token=${token}`;
+    const url = `/api/v1/backups/${filename}/download`;
     
-    // Create a temporary link and click it
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    showToast('Downloading backup...', 'success');
+    try {
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Download failed');
+        }
+
+        // Get the blob from the response
+        const blob = await response.blob();
+        
+        // Create a temporary link and trigger download
+        const link = document.createElement('a');
+        link.href = window.URL.createObjectURL(blob);
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Clean up the blob URL
+        window.URL.revokeObjectURL(link.href);
+        
+        showToast('Backup downloaded successfully', 'success');
+    } catch (error) {
+        console.error('Error downloading backup:', error);
+        showToast('Failed to download backup', 'error');
+    }
 }
 
 function showRestoreDialog(filename) {

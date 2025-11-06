@@ -70,8 +70,15 @@ pub async fn restore_backup(
     db: &Client,
     backup_name: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let backups_dir = Path::new("backups");
-    let backup_path = backups_dir.join(backup_name);
+    // Check if backup_name is a full path or just a filename
+    let backup_path = if backup_name.contains("/") || backup_name.contains("\\") {
+        // It's a full path
+        Path::new(backup_name).to_path_buf()
+    } else {
+        // It's just a filename, look in backups directory
+        let backups_dir = Path::new("backups");
+        backups_dir.join(backup_name)
+    };
 
     if !backup_path.exists() {
         return Err("Backup file not found".into());
@@ -270,14 +277,34 @@ async fn import_database(
 }
 
 async fn import_row(
-    _db: &Client,
-    _table: &str,
-    _row: &serde_json::Value,
+    db: &Client,
+    table: &str,
+    row: &serde_json::Value,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // TODO: Implement row import with proper type handling
-    // For now, this is a placeholder
-    // In production, we'd need to handle each table's schema specifically
-    Ok(())
+    // Convert JSON value to string for PostgreSQL
+    let json_str = serde_json::to_string(row)?;
+    
+    eprintln!("DEBUG: Importing row into table '{}': {}", table, &json_str[..100.min(json_str.len())]);
+    
+    // Use a simpler approach: cast the JSON text to jsonb and use json_populate_record
+    // The key is to pass the JSON as TEXT, not try to bind it as a parameter
+    let query = format!(
+        "INSERT INTO {} SELECT * FROM json_populate_record(NULL::{}, '{}'::json)",
+        table, table, json_str.replace("'", "''")  // Escape single quotes
+    );
+    
+    match db.execute(&query, &[]).await {
+        Ok(count) => {
+            eprintln!("DEBUG: Successfully inserted {} row(s) into '{}'", count, table);
+            Ok(())
+        }
+        Err(e) => {
+            eprintln!("ERROR: Failed to insert into '{}': {}", table, e);
+            eprintln!("ERROR: Query was: {}", query);
+            eprintln!("ERROR: JSON was: {}", &json_str[..200.min(json_str.len())]);
+            Err(Box::new(e))
+        }
+    }
 }
 
 fn add_directory_to_zip(
