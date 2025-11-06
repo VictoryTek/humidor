@@ -88,6 +88,104 @@ fn validate_jwt_secret() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Validate database connection at startup - fail fast if database is unreachable
+async fn validate_database_connection(pool: &DbPool) -> anyhow::Result<()> {
+    match pool.get().await {
+        Ok(client) => {
+            // Test query to verify database is actually working
+            match client.query_one("SELECT 1 as test", &[]).await {
+                Ok(_) => {
+                    tracing::info!("Database connection validated successfully");
+                    Ok(())
+                }
+                Err(e) => {
+                    bail!(
+                        "Database connection test query failed: {}. \
+                         Verify database is running and schema is initialized.",
+                        e
+                    );
+                }
+            }
+        }
+        Err(e) => {
+            bail!(
+                "Failed to acquire database connection from pool: {}. \
+                 Check DATABASE_URL configuration and verify PostgreSQL is running.",
+                e
+            );
+        }
+    }
+}
+
+/// Validate SMTP configuration if email service is enabled
+fn validate_smtp_config() -> anyhow::Result<()> {
+    // Check if SMTP is intended to be used
+    let smtp_enabled = env::var("SMTP_ENABLED")
+        .unwrap_or_else(|_| "false".to_string())
+        .to_lowercase() == "true";
+    
+    if !smtp_enabled {
+        tracing::info!("SMTP email service disabled (SMTP_ENABLED=false or not set)");
+        return Ok(());
+    }
+    
+    // If SMTP is enabled, validate required configuration
+    let mut missing = Vec::new();
+    
+    if env::var("SMTP_HOST").is_err() {
+        missing.push("SMTP_HOST");
+    }
+    if env::var("SMTP_PORT").is_err() {
+        missing.push("SMTP_PORT");
+    }
+    if env::var("SMTP_USERNAME").is_err() {
+        missing.push("SMTP_USERNAME");
+    }
+    if env::var("SMTP_PASSWORD").is_err() {
+        missing.push("SMTP_PASSWORD");
+    }
+    if env::var("SMTP_FROM").is_err() {
+        missing.push("SMTP_FROM");
+    }
+    
+    if !missing.is_empty() {
+        bail!(
+            "SMTP is enabled but required configuration is missing: {}. \
+             Either set SMTP_ENABLED=false or provide all SMTP configuration variables.",
+            missing.join(", ")
+        );
+    }
+    
+    tracing::info!(
+        smtp_host = env::var("SMTP_HOST").unwrap(),
+        smtp_port = env::var("SMTP_PORT").unwrap(),
+        smtp_from = env::var("SMTP_FROM").unwrap(),
+        "SMTP configuration validated successfully"
+    );
+    
+    Ok(())
+}
+
+/// Comprehensive startup configuration validation - fail fast with clear errors
+async fn validate_environment(pool: &DbPool) -> anyhow::Result<()> {
+    tracing::info!("Starting environment validation...");
+    
+    // Validate JWT secret
+    tracing::debug!("Validating JWT secret configuration...");
+    validate_jwt_secret()?;
+    
+    // Validate database connectivity
+    tracing::debug!("Validating database connection...");
+    validate_database_connection(pool).await?;
+    
+    // Validate SMTP configuration if enabled
+    tracing::debug!("Validating SMTP configuration...");
+    validate_smtp_config()?;
+    
+    tracing::info!("✅ All environment validations passed successfully");
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenvy::dotenv().ok();
@@ -112,9 +210,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         version = env!("CARGO_PKG_VERSION"),
         "Starting Humidor application"
     );
-
-    // Validate required secrets before proceeding - fail fast at startup
-    validate_jwt_secret()?;
 
     // Build DATABASE_URL from secrets or environment
     let database_url = if let Some(template) = env::var("DATABASE_URL_TEMPLATE").ok() {
@@ -180,6 +275,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Use the pool for all handlers
     let db_pool = pool;
+
+    // Validate all environment configuration before accepting requests
+    // This ensures the application fails fast with clear error messages
+    // if any required configuration is missing or invalid
+    validate_environment(&db_pool).await?;
 
     // Get server port from environment
     let port: u16 = env::var("PORT")
