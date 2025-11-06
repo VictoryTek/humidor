@@ -45,7 +45,10 @@ impl CigarScraper {
             .timeout(Duration::from_secs(15))
             .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
             .build()
-            .unwrap();
+            .unwrap_or_else(|e| {
+                tracing::error!(error = %e, "Failed to build HTTP client, using default");
+                reqwest::Client::new()
+            });
 
         Self { client }
     }
@@ -108,7 +111,15 @@ impl CigarScraper {
 
     fn extract_size_info(&self, text: &str) -> (Option<String>, Option<String>) {
         // Look for size pattern like "6 x 52" or "6.5 x 52"
-        let size_re = Regex::new(r"(\d+\.?\d*)\s*x\s*(\d+)").unwrap();
+        // Regex pattern is known to be valid, so this should never fail
+        let size_re = match Regex::new(r"(\d+\.?\d*)\s*x\s*(\d+)") {
+            Ok(re) => re,
+            Err(e) => {
+                tracing::error!(error = %e, "Failed to compile size regex - this should never happen");
+                return (None, None);
+            }
+        };
+        
         if let Some(caps) = size_re.captures(text) {
             return (Some(caps[1].to_string()), Some(caps[2].to_string()));
         }

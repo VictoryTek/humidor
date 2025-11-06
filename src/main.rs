@@ -7,6 +7,7 @@ mod models;
 mod services;
 mod validation;
 
+use anyhow::{anyhow, bail};
 use deadpool_postgres::{Config, ManagerConfig, Pool, RecyclingMethod, Runtime};
 use middleware::{handle_rejection, with_current_user};
 use refinery::embed_migrations;
@@ -60,6 +61,33 @@ fn read_secret(secret_name: &str, env_var: &str) -> Option<String> {
     None
 }
 
+/// Validate JWT secret at startup - fail fast before accepting requests
+fn validate_jwt_secret() -> anyhow::Result<()> {
+    let secret = read_secret("jwt_secret", "JWT_SECRET")
+        .ok_or_else(|| {
+            anyhow!(
+                "JWT_SECRET not found in /run/secrets/jwt_secret or JWT_SECRET environment variable. \
+                 Generate a secure secret with: openssl rand -base64 32"
+            )
+        })?;
+    
+    // Validate minimum length for cryptographic security
+    if secret.len() < 32 {
+        bail!(
+            "JWT_SECRET must be at least 32 characters for cryptographic security. \
+             Current length: {}. Generate a secure secret with: openssl rand -base64 32",
+            secret.len()
+        );
+    }
+    
+    tracing::info!(
+        secret_length = secret.len(),
+        "JWT secret validated successfully"
+    );
+    
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenvy::dotenv().ok();
@@ -84,6 +112,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         version = env!("CARGO_PKG_VERSION"),
         "Starting Humidor application"
     );
+
+    // Validate required secrets before proceeding - fail fast at startup
+    validate_jwt_secret()?;
 
     // Build DATABASE_URL from secrets or environment
     let database_url = if let Some(template) = env::var("DATABASE_URL_TEMPLATE").ok() {

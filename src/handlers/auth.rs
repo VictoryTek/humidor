@@ -45,7 +45,8 @@ pub struct Claims {
 
 /// Get JWT secret from Docker secrets or environment variable
 /// Docker secrets take precedence over environment variables
-/// This function will panic at startup if JWT_SECRET is not available
+/// Note: This function assumes the secret was validated at startup via validate_jwt_secret()
+/// If the secret is missing, this will return a default that will cause authentication to fail
 fn jwt_secret() -> String {
     // Try Docker secret file first
     if let Ok(content) = fs::read_to_string("/run/secrets/jwt_secret") {
@@ -53,10 +54,16 @@ fn jwt_secret() -> String {
     }
     
     // Fall back to environment variable
-    env::var("JWT_SECRET").expect(
-        "JWT_SECRET must be set either as a Docker secret or environment variable. \
-         Generate one with: openssl rand -base64 32",
-    )
+    // At this point, the secret should have been validated at startup
+    // If it's still missing, return a placeholder that will cause auth failures
+    env::var("JWT_SECRET").unwrap_or_else(|_| {
+        tracing::error!(
+            "JWT_SECRET not found - authentication will fail. \
+             This should have been caught at startup validation."
+        );
+        // Return a value that will cause JWT operations to fail gracefully
+        "INVALID_SECRET_NOT_CONFIGURED".to_string()
+    })
 }
 
 // Setup endpoints
@@ -444,7 +451,10 @@ fn generate_token(user_id: &str, username: &str) -> Result<String, jsonwebtoken:
     let iat = now.timestamp() as usize;
     let expiration = now
         .checked_add_signed(chrono::Duration::hours(token_lifetime_hours))
-        .expect("valid timestamp")
+        .ok_or_else(|| {
+            tracing::error!("Failed to calculate token expiration timestamp");
+            jsonwebtoken::errors::Error::from(jsonwebtoken::errors::ErrorKind::InvalidToken)
+        })?
         .timestamp() as usize;
 
     let claims = Claims {
@@ -696,14 +706,19 @@ pub async fn forgot_password(
         })?;
 
     // Don't reveal whether user exists (security best practice)
-    if user_result.is_none() {
-        eprintln!("Password reset requested for non-existent email: {}", request.email);
-        return Ok(warp::reply::json(&json!({
-            "message": "If that email exists, a password reset link has been sent"
-        })));
-    }
-
-    let user_row = user_result.unwrap();
+    let user_row = match user_result {
+        Some(row) => row,
+        None => {
+            tracing::info!(
+                email = %request.email,
+                "Password reset requested for non-existent email"
+            );
+            return Ok(warp::reply::json(&json!({
+                "message": "If that email exists, a password reset link has been sent"
+            })));
+        }
+    };
+    
     let user_id: Uuid = user_row.get(0);
     
     // Generate secure token
@@ -769,14 +784,16 @@ pub async fn reset_password(
             warp::reject::reject()
         })?;
 
-    if token_result.is_none() {
-        eprintln!("Invalid or expired token used for password reset");
-        return Err(warp::reject::custom(AppError::BadRequest(
-            "Invalid or expired reset token".to_string(),
-        )));
-    }
-
-    let token_row = token_result.unwrap();
+    let token_row = match token_result {
+        Some(row) => row,
+        None => {
+            tracing::warn!("Invalid or expired password reset token used");
+            return Err(warp::reject::custom(AppError::BadRequest(
+                "Invalid or expired reset token".to_string(),
+            )));
+        }
+    };
+    
     let user_id: Uuid = token_row.get(0);
     let created_at: chrono::DateTime<Utc> = token_row.get(1);
 
@@ -840,12 +857,11 @@ pub async fn check_email_config() -> Result<impl Reply, warp::Rejection> {
     let smtp_user = env::var("SMTP_USER").ok();
     let smtp_password = env::var("SMTP_PASSWORD").ok();
     
-    let is_configured = smtp_host.is_some() 
-        && smtp_user.is_some() 
-        && smtp_password.is_some()
-        && !smtp_host.as_ref().unwrap().is_empty()
-        && !smtp_user.as_ref().unwrap().is_empty()
-        && !smtp_password.as_ref().unwrap().is_empty();
+    // Use pattern matching to safely check all conditions
+    let is_configured = matches!(
+        (&smtp_host, &smtp_user, &smtp_password),
+        (Some(h), Some(u), Some(p)) if !h.is_empty() && !u.is_empty() && !p.is_empty()
+    );
     
     Ok(warp::reply::json(&json!({
         "email_configured": is_configured

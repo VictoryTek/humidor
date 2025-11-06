@@ -76,11 +76,18 @@ pub async fn download_backup(
                     format!("attachment; filename=\"{}\"", filename),
                 )
                 .body(contents)
-                .unwrap();
+                .map_err(|e| {
+                    tracing::error!(error = %e, "Failed to build HTTP response for backup download");
+                    warp::reject::reject()
+                })?;
             Ok(response)
         }
         Err(e) => {
-            eprintln!("Error reading backup file: {}", e);
+            tracing::error!(
+                filename = %filename,
+                error = %e,
+                "Error reading backup file"
+            );
             Err(warp::reject::not_found())
         }
     }
@@ -135,7 +142,10 @@ pub async fn upload_backup(
     use futures::StreamExt;
 
     let backups_dir = Path::new("backups");
-    std::fs::create_dir_all(backups_dir).unwrap();
+    std::fs::create_dir_all(backups_dir).map_err(|e| {
+        tracing::error!(error = %e, "Failed to create backups directory");
+        warp::reject::reject()
+    })?;
 
     let mut parts = form;
     

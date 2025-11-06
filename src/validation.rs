@@ -58,9 +58,14 @@ pub fn validate_range_f64(
 /// Validate email format
 #[allow(dead_code)]
 pub fn validate_email(email: &str) -> ValidationResult<()> {
+    // This regex pattern is well-tested and should never fail to compile
     let email_regex = regex::Regex::new(
         r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$"
-    ).unwrap();
+    ).map_err(|e| {
+        // This should never happen with a valid regex pattern
+        tracing::error!(error = %e, "Failed to compile email regex - this indicates a code error");
+        AppError::InternalServerError("Email validation regex compilation failed".to_string())
+    })?;
 
     if email_regex.is_match(email) {
         Ok(())

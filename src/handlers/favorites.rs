@@ -135,16 +135,25 @@ pub async fn add_favorite(
         )
         .await
         .map_err(|e| {
-            eprintln!("Database error fetching cigar for snapshot: {}", e);
+            tracing::error!(
+                cigar_id = %request.cigar_id,
+                error = %e,
+                "Database error fetching cigar for snapshot"
+            );
             warp::reject::reject()
         })?;
 
-    if cigar.is_none() {
-        eprintln!("Cigar not found: {}", request.cigar_id);
-        return Err(warp::reject::reject());
-    }
-
-    let cigar = cigar.unwrap();
+    let cigar = match cigar {
+        Some(row) => row,
+        None => {
+            tracing::warn!(
+                cigar_id = %request.cigar_id,
+                "Attempted to favorite non-existent cigar"
+            );
+            return Err(warp::reject::reject());
+        }
+    };
+    
     let snapshot_name: String = cigar.get(0);
     let snapshot_brand_id: Option<Uuid> = cigar.get(1);
     let snapshot_size_id: Option<Uuid> = cigar.get(2);
