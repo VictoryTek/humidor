@@ -287,27 +287,41 @@ async fn import_row(
     table: &str,
     row: &serde_json::Value,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Convert JSON value to string for PostgreSQL
-    let json_str = serde_json::to_string(row)?;
-    
-    eprintln!("DEBUG: Importing row into table '{}': {}", table, &json_str[..100.min(json_str.len())]);
-    
-    // Use a simpler approach: cast the JSON text to jsonb and use json_populate_record
-    // The key is to pass the JSON as TEXT, not try to bind it as a parameter
+    // Use parameterized query to prevent SQL injection
+    // PostgreSQL's tokio-postgres driver handles proper escaping
     let query = format!(
-        "INSERT INTO {} SELECT * FROM json_populate_record(NULL::{}, '{}'::json)",
-        table, table, json_str.replace("'", "''")  // Escape single quotes
+        "INSERT INTO {} SELECT * FROM json_populate_record(NULL::{}, $1::json)",
+        table, table
     );
     
-    match db.execute(&query, &[]).await {
+    // Convert to JSON value - the driver will serialize it safely
+    let json_value = row.clone();
+    
+    tracing::debug!(
+        table = %table,
+        row_preview = %serde_json::to_string(&json_value)
+            .unwrap_or_default()
+            .chars()
+            .take(100)
+            .collect::<String>(),
+        "Importing row into table"
+    );
+    
+    match db.execute(&query, &[&json_value]).await {
         Ok(count) => {
-            eprintln!("DEBUG: Successfully inserted {} row(s) into '{}'", count, table);
+            tracing::debug!(
+                table = %table,
+                rows_inserted = count,
+                "Successfully inserted row"
+            );
             Ok(())
         }
         Err(e) => {
-            eprintln!("ERROR: Failed to insert into '{}': {}", table, e);
-            eprintln!("ERROR: Query was: {}", query);
-            eprintln!("ERROR: JSON was: {}", &json_str[..200.min(json_str.len())]);
+            tracing::error!(
+                table = %table,
+                error = %e,
+                "Failed to insert row during backup restore"
+            );
             Err(Box::new(e))
         }
     }
