@@ -21,7 +21,7 @@ async fn hash_password(password: String) -> Result<String, bcrypt::BcryptError> 
     tokio::task::spawn_blocking(move || hash(&password, DEFAULT_COST))
         .await
         .map_err(|e| {
-            eprintln!("Task join error during password hashing: {}", e);
+            tracing::error!(error = %e, "Task join error during password hashing");
             bcrypt::BcryptError::InvalidCost(DEFAULT_COST.to_string())
         })?
 }
@@ -30,7 +30,7 @@ async fn verify_password(password: String, hash_str: String) -> Result<bool, bcr
     tokio::task::spawn_blocking(move || verify(&password, &hash_str))
         .await
         .map_err(|e| {
-            eprintln!("Task join error during password verification: {}", e);
+            tracing::error!(error = %e, "Task join error during password verification");
             bcrypt::BcryptError::InvalidHash("".to_string())
         })?
 }
@@ -69,7 +69,7 @@ fn jwt_secret() -> String {
 // Setup endpoints
 pub async fn get_setup_status(pool: DbPool) -> Result<impl Reply, warp::Rejection> {
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError("Database connection failed".to_string()))
     })?;
 
@@ -88,7 +88,7 @@ pub async fn get_setup_status(pool: DbPool) -> Result<impl Reply, warp::Rejectio
             Ok(warp::reply::json(&response))
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             Ok(warp::reply::json(&json!({
                 "error": "Failed to check setup status"
             })))
@@ -101,7 +101,7 @@ pub async fn create_setup_user(
     pool: DbPool,
 ) -> Result<impl Reply, warp::Rejection> {
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError("Database connection failed".to_string()))
     })?;
 
@@ -124,7 +124,7 @@ pub async fn create_setup_user(
     let password_hash = match hash_password(setup_req.user.password.clone()).await {
         Ok(hash) => hash,
         Err(e) => {
-            eprintln!("Password hashing error: {}", e);
+            tracing::error!(error = %e, "Password hashing error");
             return Ok(warp::reply::with_status(
                 warp::reply::json(&json!({
                     "error": "Failed to process password"
@@ -166,7 +166,7 @@ pub async fn create_setup_user(
             let token = match generate_token(&user_id.to_string(), &setup_req.user.username) {
                 Ok(token) => token,
                 Err(e) => {
-                    eprintln!("Token generation error: {}", e);
+                    tracing::error!(error = %e, "Token generation error");
                     return Ok(warp::reply::with_status(
                         warp::reply::json(&json!({
                             "error": "Failed to generate authentication token"
@@ -212,7 +212,7 @@ pub async fn create_setup_user(
                 )
                 .await
             {
-                eprintln!("Failed to create humidor: {}", e);
+                tracing::error!(error = %e, "Failed to create humidor");
                 return Ok(warp::reply::with_status(
                     warp::reply::json(&json!({
                         "error": "Failed to create humidor"
@@ -231,7 +231,7 @@ pub async fn create_setup_user(
             Ok(warp::reply::json(&response).into_response())
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             if e.to_string().contains("duplicate key") {
                 Ok(warp::reply::with_status(
                     warp::reply::json(&json!({
@@ -259,7 +259,7 @@ pub async fn login_user(
     pool: DbPool,
 ) -> Result<impl Reply, warp::Rejection> {
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError("Database connection failed".to_string()))
     })?;
 
@@ -293,7 +293,7 @@ pub async fn login_user(
                     let token = match generate_token(&user_id.to_string(), &username) {
                         Ok(token) => token,
                         Err(e) => {
-                            eprintln!("Token generation error: {}", e);
+                            tracing::error!(error = %e, "Token generation error");
                             return Ok(warp::reply::with_status(
                                 warp::reply::json(&json!({
                                     "error": "Authentication failed"
@@ -330,7 +330,7 @@ pub async fn login_user(
                 )
                 .into_response()),
                 Err(e) => {
-                    eprintln!("Password verification error: {}", e);
+                    tracing::error!(error = %e, "Password verification error");
                     Ok(warp::reply::with_status(
                         warp::reply::json(&json!({
                             "error": "Authentication failed"
@@ -349,7 +349,7 @@ pub async fn login_user(
         )
         .into_response()),
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             Ok(warp::reply::with_status(
                 warp::reply::json(&json!({
                     "error": "Authentication failed"
@@ -369,7 +369,7 @@ pub async fn create_humidor_for_setup(
     pool: DbPool,
 ) -> Result<impl Reply, warp::Rejection> {
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError("Database connection failed".to_string()))
     })?;
 
@@ -427,7 +427,7 @@ pub async fn create_humidor_for_setup(
             Ok(warp::reply::json(&humidor).into_response())
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             Ok(warp::reply::with_status(
                 warp::reply::json(&json!({
                     "error": "Failed to create humidor"
@@ -485,7 +485,7 @@ pub async fn get_current_user(
     pool: DbPool,
 ) -> Result<impl Reply, warp::Rejection> {
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError("Database connection failed".to_string()))
     })?;
 
@@ -507,7 +507,7 @@ pub async fn get_current_user(
             Ok(warp::reply::json(&user))
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             Ok(warp::reply::json(&json!({"error": "Failed to fetch user"})))
         }
     }
@@ -519,7 +519,7 @@ pub async fn update_current_user(
     pool: DbPool,
 ) -> Result<impl Reply, warp::Rejection> {
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError("Database connection failed".to_string()))
     })?;
 
@@ -583,7 +583,7 @@ pub async fn update_current_user(
             Ok(warp::reply::json(&user))
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             Ok(warp::reply::json(
                 &json!({"error": "Failed to update user"}),
             ))
@@ -597,7 +597,7 @@ pub async fn change_password(
     pool: DbPool,
 ) -> Result<impl Reply, warp::Rejection> {
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError("Database connection failed".to_string()))
     })?;
 
@@ -622,7 +622,7 @@ pub async fn change_password(
                     }
                 }
                 Err(e) => {
-                    eprintln!("Password verification error: {}", e);
+                    tracing::error!(error = %e, "Password verification error");
                     return Ok(warp::reply::json(
                         &json!({"error": "Password verification failed"}),
                     ));
@@ -633,7 +633,7 @@ pub async fn change_password(
             let new_hash = match hash_password(password_req.new_password.clone()).await {
                 Ok(h) => h,
                 Err(e) => {
-                    eprintln!("Password hashing error: {}", e);
+                    tracing::error!(error = %e, "Password hashing error");
                     return Ok(warp::reply::json(
                         &json!({"error": "Failed to hash new password"}),
                     ));
@@ -653,7 +653,7 @@ pub async fn change_password(
                     &json!({"message": "Password updated successfully"}),
                 )),
                 Err(e) => {
-                    eprintln!("Database error: {}", e);
+                    tracing::error!(error = %e, "Database error");
                     Ok(warp::reply::json(
                         &json!({"error": "Failed to update password"}),
                     ))
@@ -661,7 +661,7 @@ pub async fn change_password(
             }
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             Ok(warp::reply::json(&json!({"error": "Failed to fetch user"})))
         }
     }
@@ -687,7 +687,7 @@ pub async fn forgot_password(
     pool: DbPool,
 ) -> Result<impl Reply, warp::Rejection> {
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError(
             "Database connection failed".to_string(),
         ))
@@ -701,7 +701,7 @@ pub async fn forgot_password(
         )
         .await
         .map_err(|e| {
-            eprintln!("Database error checking user: {}", e);
+            tracing::error!(error = %e, "Database error checking user");
             warp::reject::reject()
         })?;
 
@@ -733,7 +733,7 @@ pub async fn forgot_password(
     )
     .await
     .map_err(|e| {
-        eprintln!("Failed to store password reset token: {}", e);
+        tracing::error!(error = %e, "Failed to store password reset token");
         warp::reject::reject()
     })?;
 
@@ -745,13 +745,13 @@ pub async fn forgot_password(
     match EmailService::from_env() {
         Ok(email_service) => {
             if let Err(e) = email_service.send_password_reset_email(&request.email, &reset_url).await {
-                eprintln!("Failed to send password reset email: {}", e);
-                eprintln!("Reset URL (for testing): {}", reset_url);
+                tracing::error!(error = %e, "Failed to send password reset email");
+                tracing::info!(reset_url = %reset_url, "Password reset URL (for testing)");
             }
         }
         Err(e) => {
-            eprintln!("Email service not configured: {}", e);
-            eprintln!("Reset URL (for testing): {}", reset_url);
+            tracing::warn!(error = %e, "Email service not configured");
+            tracing::info!(reset_url = %reset_url, "Password reset URL (for testing)");
         }
     }
 
@@ -766,7 +766,7 @@ pub async fn reset_password(
     pool: DbPool,
 ) -> Result<impl Reply, warp::Rejection> {
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError(
             "Database connection failed".to_string(),
         ))
@@ -780,7 +780,7 @@ pub async fn reset_password(
         )
         .await
         .map_err(|e| {
-            eprintln!("Database error checking token: {}", e);
+            tracing::error!(error = %e, "Database error checking token");
             warp::reject::reject()
         })?;
 
@@ -817,7 +817,7 @@ pub async fn reset_password(
     let password_hash = match hash_password(request.password.clone()).await {
         Ok(h) => h,
         Err(e) => {
-            eprintln!("Password hashing error: {}", e);
+            tracing::error!(error = %e, "Password hashing error");
             return Err(warp::reject::custom(AppError::InternalServerError(
                 "Failed to hash password".to_string(),
             )));
@@ -832,7 +832,7 @@ pub async fn reset_password(
     )
     .await
     .map_err(|e| {
-        eprintln!("Failed to update password: {}", e);
+        tracing::error!(error = %e, "Failed to update password");
         warp::reject::reject()
     })?;
 
@@ -844,7 +844,7 @@ pub async fn reset_password(
     .await
     .ok();
 
-    eprintln!("✅ Password reset successful for user: {}", user_id);
+    tracing::info!(user_id = %user_id, "Password reset successful");
 
     Ok(warp::reply::json(&json!({
         "message": "Password has been reset successfully"

@@ -82,7 +82,11 @@ pub fn with_current_user(
             let db = match pool.get().await {
                 Ok(conn) => conn,
                 Err(e) => {
-                    eprintln!("Failed to get database connection in auth middleware: {}", e);
+                    tracing::error!(
+                        error = %e,
+                        user_id = %auth_ctx.user_id,
+                        "Failed to get database connection in auth middleware"
+                    );
                     return Err(reject::custom(AppError::Unauthorized));
                 }
             };
@@ -111,7 +115,11 @@ pub fn with_current_user(
                 }
                 Ok(None) => Err(reject::custom(AppError::Unauthorized)),
                 Err(e) => {
-                    eprintln!("Database error in auth middleware: {}", e);
+                    tracing::error!(
+                        error = %e,
+                        user_id = %auth_ctx.user_id,
+                        "Database error in auth middleware"
+                    );
                     Err(reject::custom(AppError::Unauthorized))
                 }
             }

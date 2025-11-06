@@ -11,7 +11,7 @@ pub async fn get_humidors(auth: AuthContext, pool: DbPool) -> Result<impl Reply,
     let db = match pool.get().await {
         Ok(conn) => conn,
         Err(e) => {
-            eprintln!("Failed to get database connection: {}", e);
+            tracing::error!(error = %e, "Failed to get database connection");
             return Ok(reply::with_status(
                 reply::json(&json!({"error": "Database connection failed"})),
                 StatusCode::INTERNAL_SERVER_ERROR
@@ -47,7 +47,7 @@ pub async fn get_humidors(auth: AuthContext, pool: DbPool) -> Result<impl Reply,
             Ok(reply::with_status(reply::json(&humidors), StatusCode::OK))
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             let error_response = json!({
                 "error": "Failed to fetch humidors",
                 "details": e.to_string()
@@ -68,7 +68,7 @@ pub async fn get_humidor(
     let db = match pool.get().await {
         Ok(conn) => conn,
         Err(e) => {
-            eprintln!("Failed to get database connection: {}", e);
+            tracing::error!(error = %e, "Failed to get database connection");
             return Ok(reply::with_status(
                 reply::json(&json!({"error": "Database connection failed"})),
                 StatusCode::INTERNAL_SERVER_ERROR
@@ -109,7 +109,7 @@ pub async fn get_humidor(
             ))
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             let error_response = json!({
                 "error": "Failed to fetch humidor",
                 "details": e.to_string()
@@ -130,7 +130,7 @@ pub async fn create_humidor(
     let db = match pool.get().await {
         Ok(conn) => conn,
         Err(e) => {
-            eprintln!("Failed to get database connection: {}", e);
+            tracing::error!(error = %e, "Failed to get database connection");
             return Ok(reply::with_status(
                 reply::json(&json!({"error": "Database connection failed"})),
                 StatusCode::INTERNAL_SERVER_ERROR
@@ -192,7 +192,7 @@ pub async fn create_humidor(
             ))
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             let error_response = json!({
                 "error": "Failed to create humidor",
                 "details": e.to_string()
@@ -214,7 +214,7 @@ pub async fn update_humidor(
     let db = match pool.get().await {
         Ok(conn) => conn,
         Err(e) => {
-            eprintln!("Failed to get database connection: {}", e);
+            tracing::error!(error = %e, "Failed to get database connection");
             return Ok(reply::with_status(
                 reply::json(&json!({"error": "Database connection failed"})),
                 StatusCode::INTERNAL_SERVER_ERROR
@@ -281,7 +281,7 @@ pub async fn update_humidor(
             ))
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             let error_response = json!({
                 "error": "Failed to update humidor",
                 "details": e.to_string()
@@ -302,7 +302,7 @@ pub async fn delete_humidor(
     let db = match pool.get().await {
         Ok(conn) => conn,
         Err(e) => {
-            eprintln!("Failed to get database connection: {}", e);
+            tracing::error!(error = %e, "Failed to get database connection");
             return Ok(reply::with_status(
                 reply::json(&json!({"error": "Database connection failed"})),
                 StatusCode::INTERNAL_SERVER_ERROR
@@ -334,7 +334,7 @@ pub async fn delete_humidor(
             }
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             let error_response = json!({
                 "error": "Failed to delete humidor",
                 "details": e.to_string()
@@ -355,7 +355,7 @@ pub async fn get_humidor_cigars(
     let db = match pool.get().await {
         Ok(conn) => conn,
         Err(e) => {
-            eprintln!("Failed to get database connection: {}", e);
+            tracing::error!(error = %e, "Failed to get database connection");
             return Ok(reply::with_status(
                 reply::json(&json!({"error": "Database connection failed"})),
                 StatusCode::INTERNAL_SERVER_ERROR
@@ -405,7 +405,7 @@ pub async fn get_humidor_cigars(
                     Ok(reply::with_status(reply::json(&cigars), StatusCode::OK))
                 }
                 Err(e) => {
-                    eprintln!("Database error: {}", e);
+                    tracing::error!(error = %e, "Database error");
                     let error_response = json!({
                         "error": "Failed to fetch cigars",
                         "details": e.to_string()
@@ -427,7 +427,7 @@ pub async fn get_humidor_cigars(
             ))
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             let error_response = json!({
                 "error": "Failed to verify humidor access",
                 "details": e.to_string()

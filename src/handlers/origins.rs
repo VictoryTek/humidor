@@ -7,7 +7,7 @@ use crate::{errors::AppError, models::*, validation::Validate, DbPool};
 
 pub async fn get_origins(pool: DbPool) -> Result<impl Reply, Rejection> {
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError(
             "Database connection failed".to_string(),
         ))
@@ -34,7 +34,7 @@ pub async fn get_origins(pool: DbPool) -> Result<impl Reply, Rejection> {
             Ok(warp::reply::json(&origins))
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             Ok(warp::reply::json(&json!({"error": "Failed to fetch origins"})))
         }
     }
@@ -51,7 +51,7 @@ pub async fn create_origin(
     let now = Utc::now();
 
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError(
             "Database connection failed".to_string(),
         ))
@@ -87,7 +87,7 @@ pub async fn create_origin(
             Ok(warp::reply::json(&origin))
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             Ok(warp::reply::json(
                 &json!({"error": "Failed to create origin"}),
             ))
@@ -106,7 +106,7 @@ pub async fn update_origin(
     let now = Utc::now();
 
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError(
             "Database connection failed".to_string(),
         ))
@@ -146,7 +146,7 @@ pub async fn update_origin(
             Ok(warp::reply::json(&origin))
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             Ok(warp::reply::json(
                 &json!({"error": "Failed to update origin"}),
             ))
@@ -156,7 +156,7 @@ pub async fn update_origin(
 
 pub async fn delete_origin(id: Uuid, pool: DbPool) -> Result<impl Reply, Rejection> {
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError(
             "Database connection failed".to_string(),
         ))
@@ -176,7 +176,7 @@ pub async fn delete_origin(id: Uuid, pool: DbPool) -> Result<impl Reply, Rejecti
             }
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             Ok(warp::reply::json(
                 &json!({"error": "Failed to delete origin"}),
             ))

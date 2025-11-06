@@ -975,7 +975,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .filter(|s| !s.is_empty())
         .collect();
 
-    println!("CORS: Allowing origins: {:?}", allowed_origins);
+    tracing::info!(
+        allowed_origins = ?allowed_origins,
+        "CORS configuration loaded"
+    );
 
     let cors = warp::cors()
         .allow_origins(allowed_origins.iter().map(|s| s.as_str()))
@@ -1003,10 +1006,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!(
         addr = %format!("0.0.0.0:{}", port),
         port = port,
+        url = %format!("http://0.0.0.0:{}", port),
         "Server started successfully, listening for connections"
     );
-    
-    println!("Server running on http://0.0.0.0:{}", port);
 
     warp::serve(routes).run(([0, 0, 0, 0], port)).await;
 

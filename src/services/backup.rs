@@ -96,7 +96,11 @@ pub async fn restore_backup(
         serde_json::from_str(&contents)?
     };
 
-    eprintln!("Restoring backup created at: {}", metadata.created_at);
+    tracing::info!(
+        backup_created_at = %metadata.created_at,
+        backup_version = %metadata.version,
+        "Restoring backup"
+    );
 
     // Read database JSON
     let database_json: serde_json::Value = {

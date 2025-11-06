@@ -21,7 +21,7 @@ pub async fn get_backups(_auth: AuthContext, _pool: DbPool) -> Result<impl Reply
     match list_backups() {
         Ok(backups) => Ok(warp::reply::json(&BackupsResponse { backups })),
         Err(e) => {
-            eprintln!("Error listing backups: {}", e);
+            tracing::error!(error = %e, "Error listing backups");
             Ok(warp::reply::json(&BackupsResponse {
                 backups: Vec::new(),
             }))
@@ -34,7 +34,7 @@ pub async fn create_backup_handler(
     pool: DbPool,
 ) -> Result<impl Reply, Rejection> {
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::reject()
     })?;
 
@@ -45,7 +45,7 @@ pub async fn create_backup_handler(
             }))
         }
         Err(e) => {
-            eprintln!("Error creating backup: {}", e);
+            tracing::error!(error = %e, "Error creating backup");
             Ok(warp::reply::json(&MessageResponse {
                 message: format!("Error creating backup: {}", e),
             }))
@@ -103,7 +103,7 @@ pub async fn delete_backup_handler(
             message: format!("Backup {} deleted successfully", filename),
         })),
         Err(e) => {
-            eprintln!("Error deleting backup: {}", e);
+            tracing::error!(error = %e, "Error deleting backup");
             Ok(warp::reply::json(&MessageResponse {
                 message: format!("Error deleting backup: {}", e),
             }))
@@ -117,7 +117,7 @@ pub async fn restore_backup_handler(
     pool: DbPool,
 ) -> Result<impl Reply, Rejection> {
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::reject()
     })?;
 
@@ -126,7 +126,7 @@ pub async fn restore_backup_handler(
             message: "Backup restored successfully. Please refresh the page.".to_string(),
         })),
         Err(e) => {
-            eprintln!("Error restoring backup: {}", e);
+            tracing::error!(error = %e, "Error restoring backup");
             Ok(warp::reply::json(&MessageResponse {
                 message: format!("Error restoring backup: {}", e),
             }))
@@ -183,7 +183,7 @@ pub async fn upload_backup(
 
             // Write to file
             tokio::fs::write(&backup_path, &buffer).await.map_err(|e| {
-                eprintln!("Error writing file: {}", e);
+                tracing::error!(error = %e, "Error writing file");
                 warp::reject::reject()
             })?;
 
@@ -241,18 +241,18 @@ pub async fn setup_restore_backup(
 
             // Write to file
             tokio::fs::write(&backup_path, &buffer).await.map_err(|e| {
-                eprintln!("Error writing file: {}", e);
+                tracing::error!(error = %e, "Error writing file");
                 warp::reject::reject()
             })?;
 
             // Now restore the backup
             let db = pool.get().await.map_err(|e| {
-                eprintln!("Failed to get database connection: {}", e);
+                tracing::error!(error = %e, "Failed to get database connection");
                 warp::reject::reject()
             })?;
 
             let backup_path_str = backup_path.to_str().ok_or_else(|| {
-                eprintln!("Invalid path");
+                tracing::error!("Invalid path");
                 warp::reject::reject()
             })?;
 
@@ -271,7 +271,7 @@ pub async fn setup_restore_backup(
                     }));
                 }
                 Err(error_msg) => {
-                    eprintln!("{}", error_msg);
+                    tracing::error!(message = %error_msg, "Backup error");
                     return Ok(warp::reply::json(&MessageResponse {
                         message: error_msg,
                     }));

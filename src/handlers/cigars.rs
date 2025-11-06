@@ -138,7 +138,7 @@ pub async fn get_cigars(
             Ok(warp::reply::json(&response))
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             Ok(warp::reply::json(
                 &json!({"error": "Failed to fetch cigars"}),
             ))
@@ -155,7 +155,7 @@ pub async fn create_cigar(
     create_cigar.validate().map_err(warp::reject::custom)?;
 
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError(
             "Database connection failed".to_string(),
         ))
@@ -199,7 +199,7 @@ pub async fn create_cigar(
             Ok(warp::reply::json(&cigar))
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             Ok(warp::reply::json(&json!({"error": "Failed to create cigar"})))
         }
     }
@@ -211,7 +211,7 @@ pub async fn get_cigar(
     pool: DbPool,
 ) -> Result<impl Reply, Rejection> {
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError(
             "Database connection failed".to_string(),
         ))
@@ -248,7 +248,7 @@ pub async fn get_cigar(
             Ok(warp::reply::json(&cigar))
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             Ok(warp::reply::json(&json!({"error": "Cigar not found"})))
         }
     }
@@ -264,7 +264,7 @@ pub async fn update_cigar(
     update_cigar.validate().map_err(warp::reject::custom)?;
 
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError(
             "Database connection failed".to_string(),
         ))
@@ -330,7 +330,7 @@ pub async fn update_cigar(
             Ok(warp::reply::json(&cigar))
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             Ok(warp::reply::json(&json!({"error": "Failed to update cigar"})))
         }
     }
@@ -342,7 +342,7 @@ pub async fn delete_cigar(
     pool: DbPool,
 ) -> Result<impl Reply, Rejection> {
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError(
             "Database connection failed".to_string(),
         ))
@@ -361,7 +361,7 @@ pub async fn delete_cigar(
             }
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             Ok(warp::reply::json(
                 &json!({"error": "Failed to delete cigar"}),
             ))
@@ -383,7 +383,7 @@ pub async fn scrape_cigar_url(
     match scrape_cigar_url(&body.url).await {
         Ok(data) => Ok(warp::reply::json(&data)),
         Err(e) => {
-            eprintln!("Scraping error: {}", e);
+            tracing::error!(error = %e, "Scraping error");
             Ok(warp::reply::json(
                 &json!({"error": "Failed to scrape cigar information"}),
             ))

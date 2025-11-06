@@ -87,7 +87,11 @@ impl EmailService {
 
         mailer.send(&email)?;
 
-        eprintln!("✉️  Password reset email sent to: {}", to_email);
+        tracing::info!(
+            recipient = %to_email,
+            subject = "Reset Your Humidor Password",
+            "Password reset email sent successfully"
+        );
         Ok(())
     }
 }

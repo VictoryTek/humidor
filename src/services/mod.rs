@@ -477,20 +477,22 @@ impl CigarScraper {
 }
 
 pub async fn scrape_cigar_url(url: &str) -> Result<ScrapedCigarData, Box<dyn std::error::Error>> {
-    eprintln!("🔍 Starting scrape for URL: {}", url);
+    tracing::debug!(url = %url, "Starting cigar scrape");
+    
     let scraper = CigarScraper::new();
     let result = scraper.scrape(url).await?;
     
-    // Log what we found
-    eprintln!("📊 Scrape results:");
-    eprintln!("  - Brand: {:?}", result.brand);
-    eprintln!("  - Name: {:?}", result.name);
-    eprintln!("  - Size: {:?}", result.size);
-    eprintln!("  - Length: {:?}", result.length);
-    eprintln!("  - Ring Gauge: {:?}", result.ring_gauge);
-    eprintln!("  - Strength: {:?}", result.strength);
-    eprintln!("  - Origin: {:?}", result.origin);
-    eprintln!("  - Wrapper: {:?}", result.wrapper);
+    tracing::info!(
+        brand = ?result.brand,
+        name = ?result.name,
+        size = ?result.size,
+        length = ?result.length,
+        ring_gauge = ?result.ring_gauge,
+        strength = ?result.strength,
+        origin = ?result.origin,
+        wrapper = ?result.wrapper,
+        "Cigar scrape completed successfully"
+    );
     
     Ok(result)
 }

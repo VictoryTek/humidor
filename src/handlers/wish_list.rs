@@ -28,7 +28,7 @@ pub struct UpdateWishListNotesRequest {
 // Get all wish list items for the current user
 pub async fn get_wish_list(auth: AuthContext, pool: DbPool) -> Result<impl Reply, Rejection> {
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError("Database connection failed".to_string()))
     })?;
     
@@ -47,7 +47,7 @@ pub async fn get_wish_list(auth: AuthContext, pool: DbPool) -> Result<impl Reply
         )
         .await
         .map_err(|e| {
-            eprintln!("Database error getting wish list: {}", e);
+            tracing::error!(error = %e, "Database error getting wish list");
             warp::reject::reject()
         })?;
 
@@ -99,12 +99,12 @@ pub async fn add_to_wish_list(
     auth: AuthContext,
     pool: DbPool,
 ) -> Result<impl Reply, Rejection> {
-    eprintln!("=== ADD_TO_WISH_LIST HANDLER CALLED ===");
-    eprintln!("User ID: {}", auth.user_id);
-    eprintln!("Cigar ID: {}", request.cigar_id);
+    tracing::debug!("add_to_wish_list handler called");
+    tracing::debug!(user_id = %auth.user_id, "Processing wish list request");
+    tracing::debug!(cigar_id = %request.cigar_id, "Adding cigar to wish list");
     
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError("Database connection failed".to_string()))
     })?;
     
@@ -114,7 +114,7 @@ pub async fn add_to_wish_list(
     // Parse cigar_id from string to ensure it's a proper Uuid type
     let cigar_id = Uuid::parse_str(&request.cigar_id.to_string())
         .map_err(|e| {
-            eprintln!("Invalid cigar_id format: {}", e);
+            tracing::error!(error = %e, "Invalid cigar_id format");
             warp::reject::custom(AppError::ValidationError("Invalid cigar ID format".to_string()))
         })?;
 
@@ -123,12 +123,12 @@ pub async fn add_to_wish_list(
         .query_opt("SELECT id FROM cigars WHERE id = $1", &[&cigar_id])
         .await
         .map_err(|e| {
-            eprintln!("Database error checking cigar: {}", e);
+            tracing::error!(error = %e, "Database error checking cigar");
             warp::reject::reject()
         })?;
 
     if cigar_exists.is_none() {
-        eprintln!("Cigar not found: {}", cigar_id);
+        tracing::warn!(cigar_id = %cigar_id, "Cigar not found");
         return Err(warp::reject::custom(AppError::NotFound("Cigar not found".to_string())));
     }
 
@@ -143,7 +143,7 @@ pub async fn add_to_wish_list(
         )
         .await
         .map_err(|e| {
-            eprintln!("Database error adding to wish list: {}", e);
+            tracing::error!(error = %e, "Database error adding to wish list");
             warp::reject::reject()
         })?;
 
@@ -185,7 +185,7 @@ pub async fn add_to_wish_list(
                 ))
             }
             Err(e) => {
-                eprintln!("Database error fetching existing wish list item: {}", e);
+                tracing::error!(error = %e, "Database error fetching existing wish list item");
                 Err(warp::reject::reject())
             }
         }
@@ -199,7 +199,7 @@ pub async fn remove_from_wish_list(
     pool: DbPool,
 ) -> Result<impl Reply, Rejection> {
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError("Database connection failed".to_string()))
     })?;
     
@@ -210,7 +210,7 @@ pub async fn remove_from_wish_list(
         )
         .await
         .map_err(|e| {
-            eprintln!("Database error removing from wish list: {}", e);
+            tracing::error!(error = %e, "Database error removing from wish list");
             warp::reject::reject()
         })?;
 
@@ -231,7 +231,7 @@ pub async fn check_wish_list(
     pool: DbPool,
 ) -> Result<impl Reply, Rejection> {
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError("Database connection failed".to_string()))
     })?;
     
@@ -247,7 +247,7 @@ pub async fn check_wish_list(
             Ok(json(&serde_json::json!({"in_wish_list": in_wish_list})))
         }
         Err(e) => {
-            eprintln!("Database error checking wish list: {}", e);
+            tracing::error!(error = %e, "Database error checking wish list");
             Err(warp::reject::reject())
         }
     }
@@ -261,7 +261,7 @@ pub async fn update_wish_list_notes(
     pool: DbPool,
 ) -> Result<impl Reply, Rejection> {
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError("Database connection failed".to_string()))
     })?;
     
@@ -288,7 +288,7 @@ pub async fn update_wish_list_notes(
             Err(warp::reject::custom(AppError::NotFound("Wish list item not found".to_string())))
         }
         Err(e) => {
-            eprintln!("Database error updating wish list notes: {}", e);
+            tracing::error!(error = %e, "Database error updating wish list notes");
             Err(warp::reject::reject())
         }
     }
