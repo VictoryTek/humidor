@@ -206,6 +206,8 @@ async fn export_database(
         "strengths",
         "origins",
         "cigars",
+        "favorites",
+        "wish_list",
     ];
 
     for table in tables {
@@ -237,6 +239,8 @@ async fn import_database(
 
     // Clear existing data (in reverse order of dependencies)
     let tables = vec![
+        "wish_list",
+        "favorites",
         "cigars",
         "origins",
         "strengths",
@@ -262,6 +266,8 @@ async fn import_database(
         "strengths",
         "origins",
         "cigars",
+        "favorites",
+        "wish_list",
     ];
 
     for table in import_order {
