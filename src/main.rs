@@ -996,7 +996,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .or(api)
         .with(log_requests())
         .recover(handle_rejection)
-        .with(cors);
+        .with(cors)
+        .map(|reply| warp::reply::with_header(reply, "Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload"))
+        .map(|reply| warp::reply::with_header(reply, "X-Content-Type-Options", "nosniff"))
+        .map(|reply| warp::reply::with_header(reply, "X-Frame-Options", "DENY"))
+        .map(|reply| warp::reply::with_header(reply, "X-XSS-Protection", "1; mode=block"))
+        .map(|reply| warp::reply::with_header(reply, "Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'"))
+        .map(|reply| warp::reply::with_header(reply, "Referrer-Policy", "no-referrer-when-downgrade"))
+        .map(|reply| warp::reply::with_header(reply, "Permissions-Policy", "geolocation=(), microphone=(), camera=()"));
 
     let port = env::var("PORT")
         .unwrap_or_else(|_| "3000".to_string())
