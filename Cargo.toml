@@ -3,6 +3,14 @@ name = "humidor"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "humidor"
+path = "src/main.rs"
+
+[lib]
+name = "humidor"
+path = "src/lib.rs"
+
 [dependencies]
 tokio = { version = "1.40", features = ["full"] }
 warp = "0.3"
