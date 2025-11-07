@@ -9,7 +9,7 @@ mod validation;
 
 use anyhow::{anyhow, bail};
 use deadpool_postgres::{Config, ManagerConfig, Pool, RecyclingMethod, Runtime};
-use middleware::{handle_rejection, with_current_user};
+use middleware::{handle_rejection, with_current_user, RateLimiter};
 use refinery::embed_migrations;
 use std::env;
 use std::fs;
@@ -293,11 +293,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Configuring server"
     );
 
+    // Initialize rate limiter for authentication (5 attempts per 15 minutes)
+    let rate_limiter = RateLimiter::default();
+    
+    // Spawn cleanup task to remove expired rate limit entries
+    rate_limiter.clone().spawn_cleanup_task();
+    
+    tracing::info!(
+        max_attempts = 5,
+        window_minutes = 15,
+        "Rate limiter initialized for authentication endpoints"
+    );
+
     // Helper function to pass database pool to handlers
     fn with_db(
         db: DbPool,
     ) -> impl Filter<Extract = (DbPool,), Error = std::convert::Infallible> + Clone {
         warp::any().map(move || db.clone())
+    }
+
+    // Helper function to pass rate limiter to handlers
+    fn with_rate_limiter(
+        limiter: RateLimiter,
+    ) -> impl Filter<Extract = (RateLimiter,), Error = std::convert::Infallible> + Clone {
+        warp::any().map(move || limiter.clone())
+    }
+
+    // Helper function to extract client IP address
+    fn with_client_ip() -> impl Filter<Extract = (Option<std::net::IpAddr>,), Error = std::convert::Infallible> + Clone {
+        warp::addr::remote().map(|addr: Option<std::net::SocketAddr>| {
+            addr.map(|socket| socket.ip())
+        })
     }
 
     // Helper function to extract UUID from path
@@ -585,6 +611,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and(warp::post())
         .and(warp::body::json())
         .and(with_db(db_pool.clone()))
+        .and(with_rate_limiter(rate_limiter.clone()))
+        .and(with_client_ip())
         .and_then(handlers::login_user);
 
     // Password reset routes (public)

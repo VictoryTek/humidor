@@ -257,7 +257,32 @@ pub async fn create_setup_user(
 pub async fn login_user(
     login_req: LoginRequest,
     pool: DbPool,
+    rate_limiter: crate::middleware::RateLimiter,
+    client_ip: Option<std::net::IpAddr>,
 ) -> Result<impl Reply, warp::Rejection> {
+    // Get client IP (default to localhost if not available, e.g., in tests)
+    let ip = client_ip.unwrap_or_else(|| {
+        use std::net::{IpAddr, Ipv4Addr};
+        IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))
+    });
+
+    // Check rate limit before processing login
+    if rate_limiter.is_rate_limited(ip).await {
+        tracing::warn!(
+            ip = %ip,
+            username = %login_req.username,
+            "Login attempt blocked due to rate limiting"
+        );
+        
+        return Ok(warp::reply::with_status(
+            warp::reply::json(&json!({
+                "error": "Too many failed login attempts. Please try again later."
+            })),
+            warp::http::StatusCode::TOO_MANY_REQUESTS,
+        )
+        .into_response());
+    }
+
     let db = pool.get().await.map_err(|e| {
         tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError("Database connection failed".to_string()))
@@ -320,15 +345,36 @@ pub async fn login_user(
                         token,
                     };
 
+                    // Clear rate limit records on successful login
+                    rate_limiter.clear_attempts(ip).await;
+                    
+                    tracing::info!(
+                        ip = %ip,
+                        username = %login_req.username,
+                        user_id = %user_id,
+                        "Successful login"
+                    );
+
                     Ok(warp::reply::json(&response).into_response())
                 }
-                Ok(false) => Ok(warp::reply::with_status(
-                    warp::reply::json(&json!({
-                        "error": "Invalid username or password"
-                    })),
-                    warp::http::StatusCode::UNAUTHORIZED,
-                )
-                .into_response()),
+                Ok(false) => {
+                    // Record failed login attempt
+                    rate_limiter.record_attempt(ip).await;
+                    
+                    tracing::warn!(
+                        ip = %ip,
+                        username = %login_req.username,
+                        "Failed login attempt - invalid password"
+                    );
+                    
+                    Ok(warp::reply::with_status(
+                        warp::reply::json(&json!({
+                            "error": "Invalid username or password"
+                        })),
+                        warp::http::StatusCode::UNAUTHORIZED,
+                    )
+                    .into_response())
+                }
                 Err(e) => {
                     tracing::error!(error = %e, "Password verification error");
                     Ok(warp::reply::with_status(
@@ -341,13 +387,24 @@ pub async fn login_user(
                 }
             }
         }
-        Ok(None) => Ok(warp::reply::with_status(
-            warp::reply::json(&json!({
-                "error": "Invalid username or password"
-            })),
-            warp::http::StatusCode::UNAUTHORIZED,
-        )
-        .into_response()),
+        Ok(None) => {
+            // Record failed login attempt for non-existent user
+            rate_limiter.record_attempt(ip).await;
+            
+            tracing::warn!(
+                ip = %ip,
+                username = %login_req.username,
+                "Failed login attempt - user not found"
+            );
+            
+            Ok(warp::reply::with_status(
+                warp::reply::json(&json!({
+                    "error": "Invalid username or password"
+                })),
+                warp::http::StatusCode::UNAUTHORIZED,
+            )
+            .into_response())
+        }
         Err(e) => {
             tracing::error!(error = %e, "Database error");
             Ok(warp::reply::with_status(
