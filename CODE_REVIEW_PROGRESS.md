@@ -247,11 +247,11 @@
 
 ## Progress Summary
 
-**Critical Issues**: 7/7 ✅ (100% Complete)  
+**Critical Issues**: 8/8 ✅ (100% Complete)  
 **High Priority Issues**: 0/6 ⏸️ (0% Complete)  
 **Medium Priority Issues**: 0/5 ⏸️ (0% Complete)
 
-**Overall Progress**: 7/18 (39% Complete)
+**Overall Progress**: 8/19 (42% Complete)
 
 ---
 
@@ -289,6 +289,31 @@
 - Easier to locate and modify specific routes
 - Reduced cognitive load when working with routing
 - Each module is self-contained with clear responsibilities
+
+---
+
+### ✅ Critical Issue #8: Add automated password reset token expiration
+**Status**: COMPLETED  
+**Priority**: Critical  
+**Files Modified**: `src/main.rs`
+
+**Implementation**:
+- **Token Expiration**: Already implemented - tokens expire after 30 minutes
+- **Validation**: Existing code in `reset_password` handler checks token age and rejects expired tokens
+- **Automated Cleanup**: Added background task that runs every hour to remove expired tokens from database
+
+**Background Task Details**:
+- Runs every 60 minutes
+- Deletes tokens older than 30 minutes using SQL query
+- Logs cleanup activity (info level for deletions, debug for no-ops)
+- Handles database connection errors gracefully
+- Non-blocking - runs in separate tokio task
+
+**Security Benefits**:
+- Prevents token accumulation in database
+- Reduces attack surface by removing old tokens
+- Maintains clean database state
+- Follows security best practice of time-limited reset tokens
 
 ---
 

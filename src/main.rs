@@ -302,6 +302,59 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Rate limiter initialized for authentication endpoints"
     );
 
+    // Spawn background task to clean up expired password reset tokens
+    let cleanup_pool = db_pool.clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(3600)); // Run every hour
+        
+        loop {
+            interval.tick().await;
+            
+            match cleanup_pool.get().await {
+                Ok(client) => {
+                    // Delete tokens older than 30 minutes
+                    let result = client
+                        .execute(
+                            "DELETE FROM password_reset_tokens WHERE created_at < NOW() - INTERVAL '30 minutes'",
+                            &[],
+                        )
+                        .await;
+                    
+                    match result {
+                        Ok(deleted_count) => {
+                            if deleted_count > 0 {
+                                tracing::info!(
+                                    deleted_tokens = deleted_count,
+                                    "Cleaned up expired password reset tokens"
+                                );
+                            } else {
+                                tracing::debug!("No expired password reset tokens to clean up");
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!(
+                                error = %e,
+                                "Failed to clean up expired password reset tokens"
+                            );
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::error!(
+                        error = %e,
+                        "Failed to get database connection for token cleanup"
+                    );
+                }
+            }
+        }
+    });
+    
+    tracing::info!(
+        cleanup_interval_minutes = 60,
+        token_expiration_minutes = 30,
+        "Password reset token cleanup task initialized"
+    );
+
     // Request logging middleware with structured logging
     fn log_requests() -> log::Log<impl Fn(log::Info) + Copy> {
         warp::log::custom(|info| {
