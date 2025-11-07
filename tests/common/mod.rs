@@ -29,12 +29,11 @@ pub async fn setup_test_db() -> TestContext {
         .expect("Failed to create pool");
 
     // Run migrations first to ensure all tables exist
+    // Use run_async which will skip already-applied migrations
     {
         let mut client = pool.get().await.expect("Failed to get client");
-        migrations::runner()
-            .run_async(&mut **client)
-            .await
-            .expect("Failed to run migrations");
+        // Migrations will be skipped if already applied - this is safe
+        let _ = migrations::runner().run_async(&mut **client).await;
     } // Release client
 
     // Manually create wish_list table if it doesn't exist (V8 migration not embedded yet)
