@@ -1,0 +1,58 @@
+# Auto-label PRs based on changed files
+
+CI/CD:
+  - changed-files:
+    - any-glob-to-any-file:
+      - '.github/workflows/**'
+      - 'Dockerfile'
+      - 'docker-compose.yml'
+      - '.dockerignore'
+
+dependencies:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+
+documentation:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'docs/**'
+      - 'README.md'
+      - '**/*.md'
+
+security:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'src/middleware/auth.rs'
+      - 'src/middleware/rate_limiter.rs'
+      - 'src/handlers/auth.rs'
+
+database:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'migrations/**'
+      - 'src/models/**'
+
+frontend:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'static/**'
+
+tests:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'tests/**'
+      - '**/*_test.rs'
+      - '**/*_tests.rs'
+
+handlers:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'src/handlers/**'
+
+routes:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'src/routes/**'
+

@@ -40,14 +40,14 @@ pub async fn create_backup(db: &Client) -> Result<String, Box<dyn std::error::Er
 
     // Export database to JSON
     let database_json = export_database(db).await?;
-    
+
     // Add metadata
     let metadata = BackupMetadata {
         version: env!("CARGO_PKG_VERSION").to_string(),
         created_at: Utc::now().to_rfc3339(),
         database_type: "postgresql".to_string(),
     };
-    
+
     zip.start_file("metadata.json", options)?;
     zip.write_all(serde_json::to_string_pretty(&metadata)?.as_bytes())?;
 
@@ -96,7 +96,11 @@ pub async fn restore_backup(
         serde_json::from_str(&contents)?
     };
 
-    eprintln!("Restoring backup created at: {}", metadata.created_at);
+    tracing::info!(
+        backup_created_at = %metadata.created_at,
+        backup_version = %metadata.version,
+        "Restoring backup"
+    );
 
     // Read database JSON
     let database_json: serde_json::Value = {
@@ -141,7 +145,7 @@ pub async fn restore_backup(
 
 pub fn list_backups() -> Result<Vec<BackupInfo>, Box<dyn std::error::Error>> {
     let backups_dir = Path::new("backups");
-    
+
     if !backups_dir.exists() {
         fs::create_dir_all(backups_dir)?;
         return Ok(Vec::new());
@@ -190,9 +194,7 @@ pub fn delete_backup(backup_name: &str) -> Result<(), Box<dyn std::error::Error>
     Ok(())
 }
 
-async fn export_database(
-    db: &Client,
-) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+async fn export_database(db: &Client) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
     let mut export = serde_json::Map::new();
 
     // Export all tables using pg_dump-like approach
@@ -217,7 +219,7 @@ async fn export_database(
             table
         );
         let row = db.query_one(&query, &[]).await?;
-        
+
         // Get the JSON value as a string and parse it
         let json_str: String = row.get(0);
         let table_data: serde_json::Value = serde_json::from_str(&json_str)?;
@@ -287,27 +289,41 @@ async fn import_row(
     table: &str,
     row: &serde_json::Value,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Convert JSON value to string for PostgreSQL
-    let json_str = serde_json::to_string(row)?;
-    
-    eprintln!("DEBUG: Importing row into table '{}': {}", table, &json_str[..100.min(json_str.len())]);
-    
-    // Use a simpler approach: cast the JSON text to jsonb and use json_populate_record
-    // The key is to pass the JSON as TEXT, not try to bind it as a parameter
+    // Use parameterized query to prevent SQL injection
+    // PostgreSQL's tokio-postgres driver handles proper escaping
     let query = format!(
-        "INSERT INTO {} SELECT * FROM json_populate_record(NULL::{}, '{}'::json)",
-        table, table, json_str.replace("'", "''")  // Escape single quotes
+        "INSERT INTO {} SELECT * FROM json_populate_record(NULL::{}, $1::json)",
+        table, table
     );
-    
-    match db.execute(&query, &[]).await {
+
+    // Convert to JSON value - the driver will serialize it safely
+    let json_value = row.clone();
+
+    tracing::debug!(
+        table = %table,
+        row_preview = %serde_json::to_string(&json_value)
+            .unwrap_or_default()
+            .chars()
+            .take(100)
+            .collect::<String>(),
+        "Importing row into table"
+    );
+
+    match db.execute(&query, &[&json_value]).await {
         Ok(count) => {
-            eprintln!("DEBUG: Successfully inserted {} row(s) into '{}'", count, table);
+            tracing::debug!(
+                table = %table,
+                rows_inserted = count,
+                "Successfully inserted row"
+            );
             Ok(())
         }
         Err(e) => {
-            eprintln!("ERROR: Failed to insert into '{}': {}", table, e);
-            eprintln!("ERROR: Query was: {}", query);
-            eprintln!("ERROR: JSON was: {}", &json_str[..200.min(json_str.len())]);
+            tracing::error!(
+                table = %table,
+                error = %e,
+                "Failed to insert row during backup restore"
+            );
             Err(Box::new(e))
         }
     }

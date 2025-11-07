@@ -4,33 +4,31 @@ mod errors;
 mod handlers;
 mod middleware;
 mod models;
+mod routes;
 mod services;
 mod validation;
 
+use anyhow::{anyhow, bail};
 use deadpool_postgres::{Config, ManagerConfig, Pool, RecyclingMethod, Runtime};
-use middleware::{handle_rejection, with_current_user};
+use middleware::{handle_rejection, RateLimiter};
 use refinery::embed_migrations;
 use std::env;
 use std::fs;
 use tokio_postgres::NoTls;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
-use warp::{Filter, Reply};
 use warp::log;
+use warp::{Filter, Reply};
 
 // Embed migrations from the migrations directory
 embed_migrations!("migrations");
 
 type DbPool = Pool;
 
-#[derive(Debug)]
-struct InvalidUuid;
-impl warp::reject::Reject for InvalidUuid {}
-
 /// Read a secret from Docker secrets or fall back to environment variable
 /// Docker secrets are mounted at /run/secrets/<secret_name>
 fn read_secret(secret_name: &str, env_var: &str) -> Option<String> {
     let secret_path = format!("/run/secrets/{}", secret_name);
-    
+
     // Try Docker secret file first
     if let Ok(content) = fs::read_to_string(&secret_path) {
         tracing::debug!(
@@ -40,7 +38,7 @@ fn read_secret(secret_name: &str, env_var: &str) -> Option<String> {
         );
         return Some(content.trim().to_string());
     }
-    
+
     // Fall back to environment variable
     if let Ok(value) = env::var(env_var) {
         tracing::debug!(
@@ -51,13 +49,138 @@ fn read_secret(secret_name: &str, env_var: &str) -> Option<String> {
         );
         return Some(value);
     }
-    
+
     tracing::warn!(
         secret_name = secret_name,
         env_var = env_var,
         "Failed to read secret from both Docker secrets and environment"
     );
     None
+}
+
+/// Validate JWT secret at startup - fail fast before accepting requests
+fn validate_jwt_secret() -> anyhow::Result<()> {
+    let secret = read_secret("jwt_secret", "JWT_SECRET").ok_or_else(|| {
+        anyhow!(
+            "JWT_SECRET not found in /run/secrets/jwt_secret or JWT_SECRET environment variable. \
+                 Generate a secure secret with: openssl rand -base64 32"
+        )
+    })?;
+
+    // Validate minimum length for cryptographic security
+    if secret.len() < 32 {
+        bail!(
+            "JWT_SECRET must be at least 32 characters for cryptographic security. \
+             Current length: {}. Generate a secure secret with: openssl rand -base64 32",
+            secret.len()
+        );
+    }
+
+    tracing::info!(
+        secret_length = secret.len(),
+        "JWT secret validated successfully"
+    );
+
+    Ok(())
+}
+
+/// Validate database connection at startup - fail fast if database is unreachable
+async fn validate_database_connection(pool: &DbPool) -> anyhow::Result<()> {
+    match pool.get().await {
+        Ok(client) => {
+            // Test query to verify database is actually working
+            match client.query_one("SELECT 1 as test", &[]).await {
+                Ok(_) => {
+                    tracing::info!("Database connection validated successfully");
+                    Ok(())
+                }
+                Err(e) => {
+                    bail!(
+                        "Database connection test query failed: {}. \
+                         Verify database is running and schema is initialized.",
+                        e
+                    );
+                }
+            }
+        }
+        Err(e) => {
+            bail!(
+                "Failed to acquire database connection from pool: {}. \
+                 Check DATABASE_URL configuration and verify PostgreSQL is running.",
+                e
+            );
+        }
+    }
+}
+
+/// Validate SMTP configuration if email service is enabled
+fn validate_smtp_config() -> anyhow::Result<()> {
+    // Check if SMTP is intended to be used
+    let smtp_enabled = env::var("SMTP_ENABLED")
+        .unwrap_or_else(|_| "false".to_string())
+        .to_lowercase()
+        == "true";
+
+    if !smtp_enabled {
+        tracing::info!("SMTP email service disabled (SMTP_ENABLED=false or not set)");
+        return Ok(());
+    }
+
+    // If SMTP is enabled, validate required configuration
+    let mut missing = Vec::new();
+
+    if env::var("SMTP_HOST").is_err() {
+        missing.push("SMTP_HOST");
+    }
+    if env::var("SMTP_PORT").is_err() {
+        missing.push("SMTP_PORT");
+    }
+    if env::var("SMTP_USERNAME").is_err() {
+        missing.push("SMTP_USERNAME");
+    }
+    if env::var("SMTP_PASSWORD").is_err() {
+        missing.push("SMTP_PASSWORD");
+    }
+    if env::var("SMTP_FROM").is_err() {
+        missing.push("SMTP_FROM");
+    }
+
+    if !missing.is_empty() {
+        bail!(
+            "SMTP is enabled but required configuration is missing: {}. \
+             Either set SMTP_ENABLED=false or provide all SMTP configuration variables.",
+            missing.join(", ")
+        );
+    }
+
+    tracing::info!(
+        smtp_host = env::var("SMTP_HOST").unwrap(),
+        smtp_port = env::var("SMTP_PORT").unwrap(),
+        smtp_from = env::var("SMTP_FROM").unwrap(),
+        "SMTP configuration validated successfully"
+    );
+
+    Ok(())
+}
+
+/// Comprehensive startup configuration validation - fail fast with clear errors
+async fn validate_environment(pool: &DbPool) -> anyhow::Result<()> {
+    tracing::info!("Starting environment validation...");
+
+    // Validate JWT secret
+    tracing::debug!("Validating JWT secret configuration...");
+    validate_jwt_secret()?;
+
+    // Validate database connectivity
+    tracing::debug!("Validating database connection...");
+    validate_database_connection(pool).await?;
+
+    // Validate SMTP configuration if enabled
+    tracing::debug!("Validating SMTP configuration...");
+    validate_smtp_config()?;
+
+    tracing::info!("✅ All environment validations passed successfully");
+    Ok(())
 }
 
 #[tokio::main]
@@ -68,14 +191,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::registry()
         .with(
             EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "humidor=info,warp=info,refinery=info".into())
+                .unwrap_or_else(|_| "humidor=info,warp=info,refinery=info".into()),
         )
         .with(
             tracing_subscriber::fmt::layer()
                 .with_target(true)
                 .with_thread_ids(true)
                 .with_line_number(true)
-                .json()
+                .json(),
         )
         .init();
 
@@ -86,13 +209,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Build DATABASE_URL from secrets or environment
-    let database_url = if let Some(template) = env::var("DATABASE_URL_TEMPLATE").ok() {
+    let database_url = if let Ok(template) = env::var("DATABASE_URL_TEMPLATE") {
         // Using Docker secrets - read username and password from secret files
-        let db_user = read_secret("db_user", "DB_USER")
-            .unwrap_or_else(|| "humidor_user".to_string());
-        let db_password = read_secret("db_password", "DB_PASSWORD")
-            .unwrap_or_else(|| "humidor_pass".to_string());
-        
+        let db_user =
+            read_secret("db_user", "DB_USER").unwrap_or_else(|| "humidor_user".to_string());
+        let db_password =
+            read_secret("db_password", "DB_PASSWORD").unwrap_or_else(|| "humidor_pass".to_string());
+
         template
             .replace("{{DB_USER}}", &db_user)
             .replace("{{DB_PASSWORD}}", &db_password)
@@ -109,7 +232,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         recycling_method = "Fast",
         "Creating database connection pool"
     );
-    
+
     let mut config = Config::new();
     config.url = Some(database_url.clone());
     config.manager = Some(ManagerConfig {
@@ -150,6 +273,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Use the pool for all handlers
     let db_pool = pool;
 
+    // Validate all environment configuration before accepting requests
+    // This ensures the application fails fast with clear error messages
+    // if any required configuration is missing or invalid
+    validate_environment(&db_pool).await?;
+
     // Get server port from environment
     let port: u16 = env::var("PORT")
         .ok()
@@ -162,19 +290,70 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Configuring server"
     );
 
-    // Helper function to pass database pool to handlers
-    fn with_db(
-        db: DbPool,
-    ) -> impl Filter<Extract = (DbPool,), Error = std::convert::Infallible> + Clone {
-        warp::any().map(move || db.clone())
-    }
+    // Initialize rate limiter for authentication (5 attempts per 15 minutes)
+    let rate_limiter = RateLimiter::default();
 
-    // Helper function to extract UUID from path
-    fn with_uuid() -> impl Filter<Extract = (uuid::Uuid,), Error = warp::Rejection> + Copy {
-        warp::path::param::<String>().and_then(|id: String| async move {
-            uuid::Uuid::parse_str(&id).map_err(|_| warp::reject::custom(InvalidUuid))
-        })
-    }
+    // Spawn cleanup task to remove expired rate limit entries
+    rate_limiter.clone().spawn_cleanup_task();
+
+    tracing::info!(
+        max_attempts = 5,
+        window_minutes = 15,
+        "Rate limiter initialized for authentication endpoints"
+    );
+
+    // Spawn background task to clean up expired password reset tokens
+    let cleanup_pool = db_pool.clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(3600)); // Run every hour
+
+        loop {
+            interval.tick().await;
+
+            match cleanup_pool.get().await {
+                Ok(client) => {
+                    // Delete tokens older than 30 minutes
+                    let result = client
+                        .execute(
+                            "DELETE FROM password_reset_tokens WHERE created_at < NOW() - INTERVAL '30 minutes'",
+                            &[],
+                        )
+                        .await;
+
+                    match result {
+                        Ok(deleted_count) => {
+                            if deleted_count > 0 {
+                                tracing::info!(
+                                    deleted_tokens = deleted_count,
+                                    "Cleaned up expired password reset tokens"
+                                );
+                            } else {
+                                tracing::debug!("No expired password reset tokens to clean up");
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!(
+                                error = %e,
+                                "Failed to clean up expired password reset tokens"
+                            );
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::error!(
+                        error = %e,
+                        "Failed to get database connection for token cleanup"
+                    );
+                }
+            }
+        }
+    });
+
+    tracing::info!(
+        cleanup_interval_minutes = 60,
+        token_expiration_minutes = 30,
+        "Password reset token cleanup task initialized"
+    );
 
     // Request logging middleware with structured logging
     fn log_requests() -> log::Log<impl Fn(log::Info) + Copy> {
@@ -193,625 +372,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Serve static files
     let static_files = warp::path("static").and(warp::fs::dir("static"));
 
-    // Cigar API routes (authenticated)
-    let get_cigars = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("cigars"))
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(warp::query::<std::collections::HashMap<String, String>>())
-        .and(with_current_user(db_pool.clone()))
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::get_cigars);
-
-    let create_cigar = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("cigars"))
-        .and(warp::path::end())
-        .and(warp::post())
-        .and(warp::body::json())
-        .and(with_current_user(db_pool.clone()))
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::create_cigar);
-
-    let scrape_cigar = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("cigars"))
-        .and(warp::path("scrape"))
-        .and(warp::path::end())
-        .and(warp::post())
-        .and(warp::body::json())
-        .and(with_current_user(db_pool.clone()))
-        .and_then(handlers::scrape_cigar_url);
-
-    let get_cigar = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("cigars"))
-        .and(with_uuid())
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(with_current_user(db_pool.clone()))
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::get_cigar);
-
-    let update_cigar = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("cigars"))
-        .and(with_uuid())
-        .and(warp::path::end())
-        .and(warp::put())
-        .and(warp::body::json())
-        .and(with_current_user(db_pool.clone()))
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::update_cigar);
-
-    let delete_cigar = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("cigars"))
-        .and(with_uuid())
-        .and(warp::path::end())
-        .and(warp::delete())
-        .and(with_current_user(db_pool.clone()))
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::delete_cigar);
-
-    // Brand API routes
-    let get_brands = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("brands"))
-        .and(warp::get())
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::get_brands);
-
-    let create_brand = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("brands"))
-        .and(warp::post())
-        .and(warp::body::json())
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::create_brand);
-
-    let update_brand = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("brands"))
-        .and(with_uuid())
-        .and(warp::put())
-        .and(warp::body::json())
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::update_brand);
-
-    let delete_brand = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("brands"))
-        .and(with_uuid())
-        .and(warp::delete())
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::delete_brand);
-
-    // Size API routes
-    let get_sizes = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("sizes"))
-        .and(warp::get())
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::get_sizes);
-
-    let create_size = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("sizes"))
-        .and(warp::post())
-        .and(warp::body::json())
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::create_size);
-
-    let update_size = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("sizes"))
-        .and(with_uuid())
-        .and(warp::put())
-        .and(warp::body::json())
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::update_size);
-
-    let delete_size = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("sizes"))
-        .and(with_uuid())
-        .and(warp::delete())
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::delete_size);
-
-    // Origin API routes
-    let get_origins = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("origins"))
-        .and(warp::get())
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::get_origins);
-
-    let create_origin = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("origins"))
-        .and(warp::post())
-        .and(warp::body::json())
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::create_origin);
-
-    let update_origin = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("origins"))
-        .and(with_uuid())
-        .and(warp::put())
-        .and(warp::body::json())
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::update_origin);
-
-    let delete_origin = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("origins"))
-        .and(with_uuid())
-        .and(warp::delete())
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::delete_origin);
-
-    // Strength API routes
-    let get_strengths = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("strengths"))
-        .and(warp::get())
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::get_strengths);
-
-    let create_strength = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("strengths"))
-        .and(warp::post())
-        .and(warp::body::json())
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::create_strength);
-
-    let update_strength = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("strengths"))
-        .and(with_uuid())
-        .and(warp::put())
-        .and(warp::body::json())
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::update_strength);
-
-    let delete_strength = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("strengths"))
-        .and(with_uuid())
-        .and(warp::delete())
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::delete_strength);
-
-    // Ring Gauge API routes
-    let get_ring_gauges = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("ring-gauges"))
-        .and(warp::get())
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::get_ring_gauges);
-
-    let create_ring_gauge = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("ring-gauges"))
-        .and(warp::post())
-        .and(warp::body::json())
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::create_ring_gauge);
-
-    let update_ring_gauge = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("ring-gauges"))
-        .and(with_uuid())
-        .and(warp::put())
-        .and(warp::body::json())
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::update_ring_gauge);
-
-    let delete_ring_gauge = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("ring-gauges"))
-        .and(with_uuid())
-        .and(warp::delete())
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::delete_ring_gauge);
-
-    // Authentication and Setup routes
-    let get_setup_status = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("setup"))
-        .and(warp::path("status"))
-        .and(warp::get())
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::get_setup_status);
-
-    let create_setup_user = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("setup"))
-        .and(warp::path("user"))
-        .and(warp::post())
-        .and(warp::body::json())
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::create_setup_user);
-
-    let setup_restore = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("setup"))
-        .and(warp::path("restore"))
-        .and(warp::post())
-        .and(warp::multipart::form().max_length(100_000_000)) // 100MB max
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::backups::setup_restore_backup);
-
-    let login_user = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("auth"))
-        .and(warp::path("login"))
-        .and(warp::post())
-        .and(warp::body::json())
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::login_user);
-
-    // Password reset routes (public)
-    let forgot_password = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("auth"))
-        .and(warp::path("forgot-password"))
-        .and(warp::post())
-        .and(warp::body::json())
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::forgot_password);
-
-    let reset_password = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("auth"))
-        .and(warp::path("reset-password"))
-        .and(warp::post())
-        .and(warp::body::json())
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::reset_password);
-
-    let email_config_status = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("auth"))
-        .and(warp::path("email-config"))
-        .and(warp::get())
-        .and_then(handlers::check_email_config);
-
-    // User profile API routes (authenticated)
-    let get_current_user = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("users"))
-        .and(warp::path("self"))
-        .and(warp::get())
-        .and(with_current_user(db_pool.clone()))
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::get_current_user);
-
-    let update_current_user = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("users"))
-        .and(warp::path("self"))
-        .and(warp::put())
-        .and(warp::body::json())
-        .and(with_current_user(db_pool.clone()))
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::update_current_user);
-
-    let change_password = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("users"))
-        .and(warp::path("password"))
-        .and(warp::put())
-        .and(warp::body::json())
-        .and(with_current_user(db_pool.clone()))
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::change_password);
-
-    // Backup/Restore API routes (authenticated)
-    let get_backups = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("backups"))
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(with_current_user(db_pool.clone()))
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::backups::get_backups);
-
-    let create_backup = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("backups"))
-        .and(warp::path::end())
-        .and(warp::post())
-        .and(with_current_user(db_pool.clone()))
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::backups::create_backup_handler);
-
-    let download_backup = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("backups"))
-        .and(warp::path::param())
-        .and(warp::path("download"))
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(with_current_user(db_pool.clone()))
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::backups::download_backup);
-
-    let delete_backup = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("backups"))
-        .and(warp::path::param())
-        .and(warp::path::end())
-        .and(warp::delete())
-        .and(with_current_user(db_pool.clone()))
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::backups::delete_backup_handler);
-
-    let restore_backup = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("backups"))
-        .and(warp::path::param())
-        .and(warp::path("restore"))
-        .and(warp::path::end())
-        .and(warp::post())
-        .and(with_current_user(db_pool.clone()))
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::backups::restore_backup_handler);
-
-    let upload_backup = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("backups"))
-        .and(warp::path("upload"))
-        .and(warp::path::end())
-        .and(warp::post())
-        .and(warp::multipart::form().max_length(100_000_000)) // 100MB max
-        .and(with_current_user(db_pool.clone()))
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::backups::upload_backup);
-
-    // Humidor API routes (authenticated)
-    let get_humidors = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("humidors"))
-        .and(warp::get())
-        .and(with_current_user(db_pool.clone()))
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::get_humidors);
-
-    let get_humidor = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("humidors"))
-        .and(with_uuid())
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(with_current_user(db_pool.clone()))
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::get_humidor);
-
-    let create_humidor = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("humidors"))
-        .and(warp::post())
-        .and(warp::body::json())
-        .and(with_current_user(db_pool.clone()))
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::create_humidor);
-
-    let update_humidor = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("humidors"))
-        .and(with_uuid())
-        .and(warp::put())
-        .and(warp::body::json())
-        .and(with_current_user(db_pool.clone()))
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::update_humidor);
-
-    let delete_humidor = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("humidors"))
-        .and(with_uuid())
-        .and(warp::delete())
-        .and(with_current_user(db_pool.clone()))
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::delete_humidor);
-
-    let get_humidor_cigars = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("humidors"))
-        .and(with_uuid())
-        .and(warp::path("cigars"))
-        .and(warp::get())
-        .and(with_current_user(db_pool.clone()))
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::get_humidor_cigars);
-
-    // Favorites routes
-    let get_favorites = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("favorites"))
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(with_current_user(db_pool.clone()))
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::get_favorites);
-
-    let add_favorite = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("favorites"))
-        .and(warp::path::end())
-        .and(warp::post())
-        .and(warp::body::json())
-        .and(with_current_user(db_pool.clone()))
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::add_favorite);
-
-    let remove_favorite = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("favorites"))
-        .and(with_uuid())
-        .and(warp::path::end())
-        .and(warp::delete())
-        .and(with_current_user(db_pool.clone()))
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::remove_favorite);
-
-    let check_favorite = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("favorites"))
-        .and(with_uuid())
-        .and(warp::path("check"))
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(with_current_user(db_pool.clone()))
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::is_favorite);
-
-    // Wish List routes
-    let get_wish_list = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("wish_list"))
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(with_current_user(db_pool.clone()))
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::get_wish_list);
-
-    let add_to_wish_list = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("wish_list"))
-        .and(warp::path::end())
-        .and(warp::post())
-        .and(warp::body::json())
-        .and(with_current_user(db_pool.clone()))
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::add_to_wish_list);
-
-    let remove_from_wish_list = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("wish_list"))
-        .and(with_uuid())
-        .and(warp::path::end())
-        .and(warp::delete())
-        .and(with_current_user(db_pool.clone()))
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::remove_from_wish_list);
-
-    let check_wish_list = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("wish_list"))
-        .and(with_uuid())
-        .and(warp::path("check"))
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(with_current_user(db_pool.clone()))
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::check_wish_list);
-
-    let update_wish_list_notes = warp::path("api")
-        .and(warp::path("v1"))
-        .and(warp::path("wish_list"))
-        .and(with_uuid())
-        .and(warp::path::end())
-        .and(warp::put())
-        .and(warp::body::json())
-        .and(with_current_user(db_pool.clone()))
-        .and(with_db(db_pool.clone()))
-        .and_then(handlers::update_wish_list_notes);
+    // Create all API routes using route modules
+    let auth_routes = routes::create_auth_routes(db_pool.clone(), rate_limiter.clone()).boxed();
+    let user_routes = routes::create_user_routes(db_pool.clone()).boxed();
+    let cigar_routes = routes::create_cigar_routes(db_pool.clone()).boxed();
+    let organizer_routes = routes::create_organizer_routes(db_pool.clone()).boxed();
+    let humidor_routes = routes::create_humidor_routes(db_pool.clone()).boxed();
+    let favorite_routes = routes::create_favorite_routes(db_pool.clone()).boxed();
+    let backup_routes = routes::create_backup_routes(db_pool.clone()).boxed();
 
     // Combine all API routes
-    // Group routes to reduce type complexity
-    let backup_routes = get_backups
-        .or(create_backup)
-        .or(download_backup)
-        .or(delete_backup)
-        .or(restore_backup)
-        .or(upload_backup)
-        .boxed();
-    
-    let cigar_routes = scrape_cigar
-        .or(create_cigar)
-        .or(update_cigar)
-        .or(delete_cigar)
-        .or(get_cigar)
-        .or(get_cigars)
-        .boxed();
-    
-    let organizer_routes = get_brands
-        .or(create_brand)
-        .or(update_brand)
-        .or(delete_brand)
-        .or(get_sizes)
-        .or(create_size)
-        .or(update_size)
-        .or(delete_size)
-        .or(get_origins)
-        .or(create_origin)
-        .or(update_origin)
-        .or(delete_origin)
-        .or(get_strengths)
-        .or(create_strength)
-        .or(update_strength)
-        .or(delete_strength)
-        .or(get_ring_gauges)
-        .or(create_ring_gauge)
-        .or(update_ring_gauge)
-        .or(delete_ring_gauge)
-        .boxed();
-    
-    let auth_routes = get_setup_status
-        .or(create_setup_user)
-        .or(login_user)
-        .or(forgot_password)
-        .or(reset_password)
-        .or(email_config_status)
-        .or(get_current_user)
-        .or(update_current_user)
-        .or(change_password)
-        .boxed();
-    
-    let humidor_routes = get_humidors
-        .or(get_humidor_cigars) // Must come before get_humidor (more specific route)
-        .or(create_humidor)
-        .or(update_humidor)
-        .or(delete_humidor)
-        .or(get_humidor) // Less specific, should be last
-        .boxed();
-    
-    let favorite_routes = check_favorite // Must come before remove_favorite (more specific route)
-        .or(get_favorites)
-        .or(add_favorite)
-        .or(remove_favorite)
-        .or(check_wish_list) // Must come before remove_from_wish_list (more specific route)
-        .or(update_wish_list_notes) // Must come before remove_from_wish_list (both have UUID path)
-        .or(get_wish_list)
-        .or(add_to_wish_list)
-        .or(remove_from_wish_list)
-        .boxed();
-    
-    // Combine all routes
-    let api = backup_routes
+    let api = auth_routes
+        .or(user_routes)
         .or(cigar_routes)
         .or(organizer_routes)
-        .or(auth_routes)
-        .or(setup_restore)
         .or(humidor_routes)
-        .or(favorite_routes);
+        .or(favorite_routes)
+        .or(backup_routes);
 
     // Health check endpoint (no auth required)
-    let health = warp::path("health")
-        .and(warp::get())
-        .map(|| {
-            warp::reply::json(&serde_json::json!({
-                "status": "ok",
-                "service": "humidor"
-            }))
-        });
+    let health = warp::path("health").and(warp::get()).map(|| {
+        warp::reply::json(&serde_json::json!({
+            "status": "ok",
+            "service": "humidor"
+        }))
+    });
 
     // Root route
     let root = warp::path::end().and(warp::get()).and_then(serve_index);
@@ -837,14 +422,55 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Configure CORS - restrictive by default for security
     // Use ALLOWED_ORIGINS env var for production (comma-separated list)
-    let allowed_origins: Vec<String> = env::var("ALLOWED_ORIGINS")
-        .unwrap_or_else(|_| "http://localhost:9898,http://127.0.0.1:9898".to_string())
+    let raw_origins = env::var("ALLOWED_ORIGINS")
+        .unwrap_or_else(|_| "http://localhost:9898,http://127.0.0.1:9898".to_string());
+
+    // Validate and filter CORS origins
+    let allowed_origins: Vec<String> = raw_origins
         .split(',')
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
+        .filter_map(|origin| {
+            // Validate origin format
+            if origin == "*" {
+                tracing::warn!(
+                    "Wildcard CORS origin (*) is not recommended for production. \
+                     Consider specifying explicit origins for security."
+                );
+                Some(origin)
+            } else if origin.starts_with("http://") || origin.starts_with("https://") {
+                // Basic URL validation - ensure no path, query, or fragment
+                if origin.contains('?') || origin.contains('#') || origin.matches('/').count() > 2 {
+                    tracing::error!(
+                        origin = %origin,
+                        "Invalid CORS origin: must not contain path, query, or fragment. \
+                         Expected format: http(s)://domain:port"
+                    );
+                    None
+                } else {
+                    Some(origin)
+                }
+            } else {
+                tracing::error!(
+                    origin = %origin,
+                    "Invalid CORS origin: must start with http:// or https://"
+                );
+                None
+            }
+        })
         .collect();
 
-    println!("CORS: Allowing origins: {:?}", allowed_origins);
+    if allowed_origins.is_empty() {
+        tracing::error!(
+            "No valid CORS origins configured. API will reject all cross-origin requests. \
+             Set ALLOWED_ORIGINS environment variable with valid origins."
+        );
+    }
+
+    tracing::info!(
+        allowed_origins = ?allowed_origins,
+        "CORS configuration loaded and validated"
+    );
 
     let cors = warp::cors()
         .allow_origins(allowed_origins.iter().map(|s| s.as_str()))
@@ -862,7 +488,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .or(api)
         .with(log_requests())
         .recover(handle_rejection)
-        .with(cors);
+        .with(cors)
+        .map(|reply| warp::reply::with_header(reply, "Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload"))
+        .map(|reply| warp::reply::with_header(reply, "X-Content-Type-Options", "nosniff"))
+        .map(|reply| warp::reply::with_header(reply, "X-Frame-Options", "DENY"))
+        .map(|reply| warp::reply::with_header(reply, "X-XSS-Protection", "1; mode=block"))
+        .map(|reply| warp::reply::with_header(reply, "Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; connect-src 'self'; frame-ancestors 'none'"))
+        .map(|reply| warp::reply::with_header(reply, "Referrer-Policy", "no-referrer-when-downgrade"))
+        .map(|reply| warp::reply::with_header(reply, "Permissions-Policy", "geolocation=(), microphone=(), camera=()"));
 
     let port = env::var("PORT")
         .unwrap_or_else(|_| "3000".to_string())
@@ -872,10 +505,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!(
         addr = %format!("0.0.0.0:{}", port),
         port = port,
+        url = %format!("http://0.0.0.0:{}", port),
         "Server started successfully, listening for connections"
     );
-    
-    println!("Server running on http://0.0.0.0:{}", port);
 
     warp::serve(routes).run(([0, 0, 0, 0], port)).await;
 

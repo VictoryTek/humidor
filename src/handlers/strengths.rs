@@ -7,7 +7,7 @@ use crate::{errors::AppError, models::*, validation::Validate, DbPool};
 
 pub async fn get_strengths(pool: DbPool) -> Result<impl Reply, Rejection> {
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError(
             "Database connection failed".to_string(),
         ))
@@ -33,7 +33,7 @@ pub async fn get_strengths(pool: DbPool) -> Result<impl Reply, Rejection> {
             Ok(warp::reply::json(&strengths))
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             Ok(warp::reply::json(&json!({"error": "Failed to fetch strengths"})))
         }
     }
@@ -50,7 +50,7 @@ pub async fn create_strength(
     let now = Utc::now();
 
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError(
             "Database connection failed".to_string(),
         ))
@@ -84,7 +84,7 @@ pub async fn create_strength(
             Ok(warp::reply::json(&strength))
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             Ok(warp::reply::json(
                 &json!({"error": "Failed to create strength"}),
             ))
@@ -103,7 +103,7 @@ pub async fn update_strength(
     let now = Utc::now();
 
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError(
             "Database connection failed".to_string(),
         ))
@@ -140,7 +140,7 @@ pub async fn update_strength(
             Ok(warp::reply::json(&strength))
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             Ok(warp::reply::json(
                 &json!({"error": "Failed to update strength"}),
             ))
@@ -150,7 +150,7 @@ pub async fn update_strength(
 
 pub async fn delete_strength(id: Uuid, pool: DbPool) -> Result<impl Reply, Rejection> {
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError(
             "Database connection failed".to_string(),
         ))
@@ -170,7 +170,7 @@ pub async fn delete_strength(id: Uuid, pool: DbPool) -> Result<impl Reply, Rejec
             }
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             Ok(warp::reply::json(
                 &json!({"error": "Failed to delete strength"}),
             ))

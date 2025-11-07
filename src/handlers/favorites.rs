@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use warp::{reply::json, Rejection, Reply};
 
-use crate::{DbPool, middleware::auth::AuthContext, errors::AppError};
+use crate::{errors::AppError, middleware::auth::AuthContext, DbPool};
 
 #[derive(Debug, Serialize)]
 pub struct FavoriteResponse {
@@ -21,10 +21,12 @@ pub struct AddFavoriteRequest {
 // Get all favorites for the current user
 pub async fn get_favorites(auth: AuthContext, pool: DbPool) -> Result<impl Reply, Rejection> {
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
-        warp::reject::custom(AppError::DatabaseError("Database connection failed".to_string()))
+        tracing::error!(error = %e, "Failed to get database connection");
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
     })?;
-    
+
     let rows = db
         .query(
             "SELECT f.id, f.user_id, f.cigar_id, f.created_at,
@@ -43,7 +45,7 @@ pub async fn get_favorites(auth: AuthContext, pool: DbPool) -> Result<impl Reply
         )
         .await
         .map_err(|e| {
-            eprintln!("Database error getting favorites: {}", e);
+            tracing::error!(error = %e, "Database error getting favorites");
             warp::reject::reject()
         })?;
 
@@ -119,10 +121,12 @@ pub async fn add_favorite(
     pool: DbPool,
 ) -> Result<impl Reply, Rejection> {
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
-        warp::reject::custom(AppError::DatabaseError("Database connection failed".to_string()))
+        tracing::error!(error = %e, "Failed to get database connection");
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
     })?;
-    
+
     let id = Uuid::new_v4();
     let now = Utc::now();
 
@@ -135,16 +139,25 @@ pub async fn add_favorite(
         )
         .await
         .map_err(|e| {
-            eprintln!("Database error fetching cigar for snapshot: {}", e);
+            tracing::error!(
+                cigar_id = %request.cigar_id,
+                error = %e,
+                "Database error fetching cigar for snapshot"
+            );
             warp::reject::reject()
         })?;
 
-    if cigar.is_none() {
-        eprintln!("Cigar not found: {}", request.cigar_id);
-        return Err(warp::reject::reject());
-    }
+    let cigar = match cigar {
+        Some(row) => row,
+        None => {
+            tracing::warn!(
+                cigar_id = %request.cigar_id,
+                "Attempted to favorite non-existent cigar"
+            );
+            return Err(warp::reject::reject());
+        }
+    };
 
-    let cigar = cigar.unwrap();
     let snapshot_name: String = cigar.get(0);
     let snapshot_brand_id: Option<Uuid> = cigar.get(1);
     let snapshot_size_id: Option<Uuid> = cigar.get(2);
@@ -191,7 +204,7 @@ pub async fn add_favorite(
             ))
         }
         Err(e) => {
-            eprintln!("Database error adding favorite: {}", e);
+            tracing::error!(error = %e, "Database error adding favorite");
             Err(warp::reject::reject())
         }
     }
@@ -205,10 +218,12 @@ pub async fn remove_favorite(
     pool: DbPool,
 ) -> Result<impl Reply, Rejection> {
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
-        warp::reject::custom(AppError::DatabaseError("Database connection failed".to_string()))
+        tracing::error!(error = %e, "Failed to get database connection");
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
     })?;
-    
+
     // Try to delete by cigar_id first
     let rows_deleted = db
         .execute(
@@ -217,7 +232,7 @@ pub async fn remove_favorite(
         )
         .await
         .map_err(|e| {
-            eprintln!("Database error removing favorite by cigar_id: {}", e);
+            tracing::error!(error = %e, "Database error removing favorite by cigar_id");
             warp::reject::reject()
         })?;
 
@@ -229,7 +244,7 @@ pub async fn remove_favorite(
         )
         .await
         .map_err(|e| {
-            eprintln!("Database error removing favorite by id: {}", e);
+            tracing::error!(error = %e, "Database error removing favorite by id");
             warp::reject::reject()
         })?;
     }
@@ -247,10 +262,12 @@ pub async fn is_favorite(
     pool: DbPool,
 ) -> Result<impl Reply, Rejection> {
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
-        warp::reject::custom(AppError::DatabaseError("Database connection failed".to_string()))
+        tracing::error!(error = %e, "Failed to get database connection");
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
     })?;
-    
+
     match db
         .query_opt(
             "SELECT id FROM favorites WHERE user_id = $1 AND cigar_id = $2",
@@ -263,7 +280,7 @@ pub async fn is_favorite(
             Ok(json(&serde_json::json!({"is_favorite": is_favorite})))
         }
         Err(e) => {
-            eprintln!("Database error checking favorite: {}", e);
+            tracing::error!(error = %e, "Database error checking favorite");
             Err(warp::reject::reject())
         }
     }

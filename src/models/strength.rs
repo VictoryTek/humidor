@@ -56,7 +56,7 @@ impl Validate for UpdateStrength {
         }
 
         if let Some(level) = self.level {
-            if level < 1 || level > 5 {
+            if !(1..=5).contains(&level) {
                 return Err(crate::errors::AppError::ValidationError(
                     "level must be between 1 and 5".to_string(),
                 ));

@@ -121,4 +121,3 @@ For production deployments, consider using:
 - Docker Swarm secrets
 - Kubernetes secrets
 - Cloud provider secret managers (AWS Secrets Manager, Azure Key Vault, etc.)
-- HashiCorp Vault

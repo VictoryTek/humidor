@@ -1,0 +1,208 @@
+name: Scheduled Maintenance
+
+on:
+  schedule:
+    # Run every Monday at 9 AM UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+jobs:
+  # Check for dependency updates
+  dependency-updates:
+    name: Check Dependency Updates
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-outdated
+        run: cargo install cargo-outdated
+
+      - name: Check for outdated dependencies
+        id: outdated
+        run: |
+          cargo outdated --format json > outdated.json
+          cat outdated.json
+          
+          # Count outdated dependencies
+          OUTDATED_COUNT=$(jq '.dependencies | length' outdated.json)
+          echo "outdated_count=$OUTDATED_COUNT" >> $GITHUB_OUTPUT
+
+      - name: Create issue if dependencies are outdated
+        if: steps.outdated.outputs.outdated_count > 0
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const outdated = JSON.parse(fs.readFileSync('outdated.json', 'utf8'));
+            
+            // Helper function to check if update is a major version change
+            function isMajorUpdate(current, latest) {
+              const currentMajor = parseInt(current.split('.')[0]);
+              const latestMajor = parseInt(latest.split('.')[0]);
+              return latestMajor > currentMajor;
+            }
+            
+            // Filter for only major version updates
+            const majorUpdates = outdated.dependencies.filter(dep => 
+              isMajorUpdate(dep.project, dep.latest)
+            );
+            
+            // Only create issue if there are major updates
+            if (majorUpdates.length === 0) {
+              console.log('No major version updates found. Skipping issue creation.');
+              console.log(`Total outdated: ${outdated.dependencies.length}, but all are minor/patch updates.`);
+              return;
+            }
+            
+            let body = '## Major Dependency Updates Available\n\n';
+            body += `Found ${majorUpdates.length} major version updates that require attention:\n\n`;
+            body += '| Package | Current | Latest | Kind |\n';
+            body += '|---------|---------|--------|------|\n';
+            
+            for (const dep of majorUpdates) {
+              body += `| ${dep.name} | ${dep.project} | ${dep.latest} | ${dep.kind} |\n`;
+            }
+            
+            if (outdated.dependencies.length > majorUpdates.length) {
+              const minorCount = outdated.dependencies.length - majorUpdates.length;
+              body += `\n\n_Note: ${minorCount} minor/patch updates are also available but not shown here. Run \`cargo outdated\` locally to see all updates._\n`;
+            }
+            
+            body += '\n\n**Action Required:**\n';
+            body += '1. Review breaking changes in the changelog for each package\n';
+            body += '2. Update `Cargo.toml` with new version requirements\n';
+            body += '3. Run `cargo update` and fix any compilation errors\n';
+            body += '4. Run full test suite to verify compatibility\n';
+            body += '5. Consider minor/patch updates with `cargo update`\n';
+            
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🔼 Major Dependency Updates Available - ${new Date().toISOString().split('T')[0]}`,
+              body: body,
+              labels: ['dependencies', 'maintenance', 'breaking-change']
+            });
+
+  # Weekly security audit
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit
+
+      - name: Run security audit
+        id: audit
+        continue-on-error: true
+        run: |
+          cargo audit --json > audit.json
+          cat audit.json
+
+      - name: Create issue if vulnerabilities found
+        if: steps.audit.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const audit = JSON.parse(fs.readFileSync('audit.json', 'utf8'));
+            
+            let body = '## Security Vulnerabilities Found\n\n';
+            body += '⚠️ **Action Required**: Security vulnerabilities detected in dependencies.\n\n';
+            
+            if (audit.vulnerabilities && audit.vulnerabilities.list) {
+              for (const vuln of audit.vulnerabilities.list) {
+                body += `### ${vuln.advisory.id}: ${vuln.advisory.title}\n`;
+                body += `- **Package**: ${vuln.package.name} ${vuln.package.version}\n`;
+                body += `- **Severity**: ${vuln.advisory.severity}\n`;
+                body += `- **Patched**: ${vuln.advisory.patched_versions.join(', ')}\n`;
+                body += `- **Description**: ${vuln.advisory.description}\n`;
+                body += `- **URL**: ${vuln.advisory.url}\n\n`;
+              }
+            }
+            
+            body += '\n\n**Action Items:**\n';
+            body += '1. Review each vulnerability\n';
+            body += '2. Update affected dependencies\n';
+            body += '3. Test thoroughly after updates\n';
+            body += '4. Deploy updated version\n';
+            
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🚨 Security Vulnerabilities Detected - ${new Date().toISOString().split('T')[0]}`,
+              body: body,
+              labels: ['security', 'critical', 'dependencies']
+            });
+
+  # Check Docker base image updates
+  docker-updates:
+    name: Check Docker Base Image Updates
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for newer Rust version
+        id: rust-check
+        run: |
+          CURRENT_RUST=$(grep -oP 'FROM rust:\K[0-9.]+' Dockerfile | head -1)
+          LATEST_RUST=$(curl -s https://static.rust-lang.org/dist/channel-rust-stable.toml | grep -oP 'version = "\K[0-9.]+')
+          
+          echo "current=$CURRENT_RUST" >> $GITHUB_OUTPUT
+          echo "latest=$LATEST_RUST" >> $GITHUB_OUTPUT
+          
+          if [ "$CURRENT_RUST" != "$LATEST_RUST" ]; then
+            echo "update_available=true" >> $GITHUB_OUTPUT
+          else
+            echo "update_available=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create issue if Rust update available
+        if: steps.rust-check.outputs.update_available == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const current = '${{ steps.rust-check.outputs.current }}';
+            const latest = '${{ steps.rust-check.outputs.latest }}';
+            
+            const body = `## Rust Version Update Available\n\n` +
+              `A new stable version of Rust is available.\n\n` +
+              `- **Current**: ${current}\n` +
+              `- **Latest**: ${latest}\n\n` +
+              `**Steps to update:**\n` +
+              `1. Update \`Dockerfile\` to use \`rust:${latest}-slim\`\n` +
+              `2. Test the build locally\n` +
+              `3. Run full test suite\n` +
+              `4. Update CI/CD if needed\n`;
+            
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Rust ${latest} Available (currently on ${current})`,
+              body: body,
+              labels: ['dependencies', 'docker', 'maintenance']
+            });
+
+  # Health check
+  health-summary:
+    name: Project Health Summary
+    runs-on: ubuntu-latest
+    needs: [dependency-updates, security-audit, docker-updates]
+    if: always()
+    steps:
+      - name: Project health summary
+        run: |
+          echo "## Project Health Check Complete"
+          echo "Dependency Updates: ${{ needs.dependency-updates.result }}"
+          echo "Security Audit: ${{ needs.security-audit.result }}"
+          echo "Docker Updates: ${{ needs.docker-updates.result }}"

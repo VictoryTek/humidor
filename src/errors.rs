@@ -79,10 +79,7 @@ impl AppError {
                 StatusCode::NOT_FOUND,
                 ErrorResponse::new("NOT_FOUND", &format!("{} not found", resource)),
             ),
-            AppError::Conflict(msg) => (
-                StatusCode::CONFLICT,
-                ErrorResponse::new("CONFLICT", msg),
-            ),
+            AppError::Conflict(msg) => (StatusCode::CONFLICT, ErrorResponse::new("CONFLICT", msg)),
             // Never expose database errors externally
             AppError::DatabaseError(internal_msg) => {
                 tracing::error!(
@@ -92,9 +89,12 @@ impl AppError {
                 );
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    ErrorResponse::new("INTERNAL_ERROR", "An error occurred processing your request"),
+                    ErrorResponse::new(
+                        "INTERNAL_ERROR",
+                        "An error occurred processing your request",
+                    ),
                 )
-            },
+            }
             // Never expose internal server errors externally
             AppError::InternalServerError(internal_msg) => {
                 tracing::error!(
@@ -106,7 +106,7 @@ impl AppError {
                     StatusCode::INTERNAL_SERVER_ERROR,
                     ErrorResponse::new("INTERNAL_ERROR", "An error occurred"),
                 )
-            },
+            }
             AppError::BadRequest(msg) => (
                 StatusCode::BAD_REQUEST,
                 ErrorResponse::new("BAD_REQUEST", msg),
@@ -148,10 +148,7 @@ pub async fn handle_rejection(
             ErrorResponse::new("INVALID_BODY", "Invalid request body"),
         )
     } else if err.find::<warp::reject::InvalidQuery>().is_some() {
-        tracing::warn!(
-            error_type = "invalid_query",
-            "Invalid query parameters"
-        );
+        tracing::warn!(error_type = "invalid_query", "Invalid query parameters");
         (
             StatusCode::BAD_REQUEST,
             ErrorResponse::new("INVALID_QUERY", "Invalid query parameters"),

@@ -7,7 +7,7 @@ use crate::{errors::AppError, models::*, validation::Validate, DbPool};
 
 pub async fn get_ring_gauges(pool: DbPool) -> Result<impl Reply, Rejection> {
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError(
             "Database connection failed".to_string(),
         ))
@@ -33,7 +33,7 @@ pub async fn get_ring_gauges(pool: DbPool) -> Result<impl Reply, Rejection> {
             Ok(warp::reply::json(&ring_gauges))
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             Ok(warp::reply::json(&json!({"error": "Failed to fetch ring gauges"})))
         }
     }
@@ -50,7 +50,7 @@ pub async fn create_ring_gauge(
     let now = Utc::now();
 
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError(
             "Database connection failed".to_string(),
         ))
@@ -74,7 +74,7 @@ pub async fn create_ring_gauge(
             Ok(warp::reply::json(&ring_gauge))
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             Ok(warp::reply::json(&json!({"error": "Failed to create ring gauge"})))
         }
     }
@@ -91,7 +91,7 @@ pub async fn update_ring_gauge(
     let now = Utc::now();
 
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError(
             "Database connection failed".to_string(),
         ))
@@ -128,7 +128,7 @@ pub async fn update_ring_gauge(
             Ok(warp::reply::json(&ring_gauge))
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             Ok(warp::reply::json(
                 &json!({"error": "Failed to update ring gauge"}),
             ))
@@ -138,7 +138,7 @@ pub async fn update_ring_gauge(
 
 pub async fn delete_ring_gauge(id: Uuid, pool: DbPool) -> Result<impl Reply, Rejection> {
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError(
             "Database connection failed".to_string(),
         ))
@@ -158,7 +158,7 @@ pub async fn delete_ring_gauge(id: Uuid, pool: DbPool) -> Result<impl Reply, Rej
             }
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             Ok(warp::reply::json(
                 &json!({"error": "Failed to delete ring gauge"}),
             ))

@@ -39,13 +39,22 @@ pub struct CigarScraper {
     client: reqwest::Client,
 }
 
+impl Default for CigarScraper {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CigarScraper {
     pub fn new() -> Self {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(15))
             .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
             .build()
-            .unwrap();
+            .unwrap_or_else(|e| {
+                tracing::error!(error = %e, "Failed to build HTTP client, using default");
+                reqwest::Client::new()
+            });
 
         Self { client }
     }
@@ -108,7 +117,15 @@ impl CigarScraper {
 
     fn extract_size_info(&self, text: &str) -> (Option<String>, Option<String>) {
         // Look for size pattern like "6 x 52" or "6.5 x 52"
-        let size_re = Regex::new(r"(\d+\.?\d*)\s*x\s*(\d+)").unwrap();
+        // Regex pattern is known to be valid, so this should never fail
+        let size_re = match Regex::new(r"(\d+\.?\d*)\s*x\s*(\d+)") {
+            Ok(re) => re,
+            Err(e) => {
+                tracing::error!(error = %e, "Failed to compile size regex - this should never happen");
+                return (None, None);
+            }
+        };
+
         if let Some(caps) = size_re.captures(text) {
             return (Some(caps[1].to_string()), Some(caps[2].to_string()));
         }
@@ -215,7 +232,7 @@ impl CigarScraper {
 
         // Try multiple h1 selectors
         let title_selectors = vec!["h1.product-name", "h1.product-title", "h1"];
-        
+
         for selector_str in title_selectors {
             if let Ok(selector) = Selector::parse(selector_str) {
                 if let Some(title) = document.select(&selector).next() {
@@ -232,7 +249,7 @@ impl CigarScraper {
 
         // Look for product specifications/attributes
         let spec_selectors = vec![
-            ".product-specs", 
+            ".product-specs",
             ".product-attributes",
             ".specifications",
             "table.specs",
@@ -242,17 +259,17 @@ impl CigarScraper {
             if let Ok(selector) = Selector::parse(selector_str) {
                 if let Some(specs) = document.select(&selector).next() {
                     let specs_text = specs.text().collect::<String>();
-                    
+
                     let (length, ring_gauge) = self.extract_size_info(&specs_text);
                     if length.is_some() {
                         result.length = length;
                         result.ring_gauge = ring_gauge;
                     }
-                    
+
                     if result.strength.is_none() {
                         result.strength = self.extract_strength(&specs_text);
                     }
-                    
+
                     if result.origin.is_none() {
                         result.origin = self.extract_origin(&specs_text);
                     }
@@ -263,17 +280,17 @@ impl CigarScraper {
         // Fall back to body text
         if result.length.is_none() || result.strength.is_none() || result.origin.is_none() {
             let body_text = document.root_element().text().collect::<String>();
-            
+
             if result.length.is_none() {
                 let (length, ring_gauge) = self.extract_size_info(&body_text);
                 result.length = length;
                 result.ring_gauge = ring_gauge;
             }
-            
+
             if result.strength.is_none() {
                 result.strength = self.extract_strength(&body_text);
             }
-            
+
             if result.origin.is_none() {
                 result.origin = self.extract_origin(&body_text);
             }
@@ -292,7 +309,7 @@ impl CigarScraper {
         // Try multiple selectors for product title
         let title_selectors = vec![
             "h1.product-name",
-            "h1.product-title", 
+            "h1.product-title",
             "h1[itemprop='name']",
             ".product-info h1",
             "h1",
@@ -324,18 +341,18 @@ impl CigarScraper {
             if let Ok(selector) = Selector::parse(selector_str) {
                 if let Some(details) = document.select(&selector).next() {
                     let details_text = details.text().collect::<String>();
-                    
+
                     // Extract size, strength, origin from details
                     let (length, ring_gauge) = self.extract_size_info(&details_text);
                     if length.is_some() {
                         result.length = length;
                         result.ring_gauge = ring_gauge;
                     }
-                    
+
                     if result.strength.is_none() {
                         result.strength = self.extract_strength(&details_text);
                     }
-                    
+
                     if result.origin.is_none() {
                         result.origin = self.extract_origin(&details_text);
                     }
@@ -345,17 +362,17 @@ impl CigarScraper {
 
         // Fall back to searching all body text if we didn't find details
         let body_text = document.root_element().text().collect::<String>();
-        
+
         if result.length.is_none() {
             let (length, ring_gauge) = self.extract_size_info(&body_text);
             result.length = length;
             result.ring_gauge = ring_gauge;
         }
-        
+
         if result.strength.is_none() {
             result.strength = self.extract_strength(&body_text);
         }
-        
+
         if result.origin.is_none() {
             result.origin = self.extract_origin(&body_text);
         }
@@ -372,7 +389,7 @@ impl CigarScraper {
 
         // Try to find product title
         let title_selectors = vec!["h1.product-title", "h1.prod-title", "h1"];
-        
+
         for selector_str in title_selectors {
             if let Ok(selector) = Selector::parse(selector_str) {
                 if let Some(title) = document.select(&selector).next() {
@@ -388,27 +405,23 @@ impl CigarScraper {
         }
 
         // Look for detailed specs
-        let detail_selectors = vec![
-            ".product-details",
-            ".prod-specs",
-            ".specifications",
-        ];
+        let detail_selectors = vec![".product-details", ".prod-specs", ".specifications"];
 
         for selector_str in detail_selectors {
             if let Ok(selector) = Selector::parse(selector_str) {
                 if let Some(details) = document.select(&selector).next() {
                     let details_text = details.text().collect::<String>();
-                    
+
                     let (length, ring_gauge) = self.extract_size_info(&details_text);
                     if length.is_some() {
                         result.length = length;
                         result.ring_gauge = ring_gauge;
                     }
-                    
+
                     if result.strength.is_none() {
                         result.strength = self.extract_strength(&details_text);
                     }
-                    
+
                     if result.origin.is_none() {
                         result.origin = self.extract_origin(&details_text);
                     }
@@ -418,17 +431,17 @@ impl CigarScraper {
 
         // Fall back to all text
         let body_text = document.root_element().text().collect::<String>();
-        
+
         if result.length.is_none() {
             let (length, ring_gauge) = self.extract_size_info(&body_text);
             result.length = length;
             result.ring_gauge = ring_gauge;
         }
-        
+
         if result.strength.is_none() {
             result.strength = self.extract_strength(&body_text);
         }
-        
+
         if result.origin.is_none() {
             result.origin = self.extract_origin(&body_text);
         }
@@ -466,20 +479,22 @@ impl CigarScraper {
 }
 
 pub async fn scrape_cigar_url(url: &str) -> Result<ScrapedCigarData, Box<dyn std::error::Error>> {
-    eprintln!("🔍 Starting scrape for URL: {}", url);
+    tracing::debug!(url = %url, "Starting cigar scrape");
+
     let scraper = CigarScraper::new();
     let result = scraper.scrape(url).await?;
-    
-    // Log what we found
-    eprintln!("📊 Scrape results:");
-    eprintln!("  - Brand: {:?}", result.brand);
-    eprintln!("  - Name: {:?}", result.name);
-    eprintln!("  - Size: {:?}", result.size);
-    eprintln!("  - Length: {:?}", result.length);
-    eprintln!("  - Ring Gauge: {:?}", result.ring_gauge);
-    eprintln!("  - Strength: {:?}", result.strength);
-    eprintln!("  - Origin: {:?}", result.origin);
-    eprintln!("  - Wrapper: {:?}", result.wrapper);
-    
+
+    tracing::info!(
+        brand = ?result.brand,
+        name = ?result.name,
+        size = ?result.size,
+        length = ?result.length,
+        ring_gauge = ?result.ring_gauge,
+        strength = ?result.strength,
+        origin = ?result.origin,
+        wrapper = ?result.wrapper,
+        "Cigar scrape completed successfully"
+    );
+
     Ok(result)
 }

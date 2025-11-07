@@ -1,0 +1,19 @@
+# cargo-audit configuration
+# https://github.com/rustsec/rustsec/blob/main/cargo-audit/audit.toml.example
+
+[advisories]
+# Treat unmaintained advisories as warnings rather than errors
+unmaintained = "warn"
+
+# Ignore specific advisories that are acceptable
+ignore = [
+    # fxhash unmaintained - transitive dependency via selectors crate
+    # Dependency chain: humidor -> scraper 0.24 -> selectors 0.31 -> fxhash 0.2.1
+    # Rationale for ignoring:
+    # - Not a security vulnerability, only unmaintained status
+    # - Transitive dependency we don't control directly
+    # - selectors crate is actively maintained by Mozilla Servo project
+    # - Latest scraper version (0.24) still uses selectors 0.31
+    # - Unmaintained ≠ vulnerable - no known security issues
+    "RUSTSEC-2025-0057",
+]

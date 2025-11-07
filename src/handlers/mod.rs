@@ -12,7 +12,7 @@ pub mod wish_list;
 
 // Re-export handler functions with specific names to avoid conflicts
 pub use auth::{
-    change_password, check_email_config, create_setup_user, forgot_password, get_current_user, 
+    change_password, check_email_config, create_setup_user, forgot_password, get_current_user,
     get_setup_status, login_user, reset_password, update_current_user,
 };
 pub use cigars::{
@@ -36,6 +36,5 @@ pub use humidors::{
 pub use favorites::{add_favorite, get_favorites, is_favorite, remove_favorite};
 
 pub use wish_list::{
-    add_to_wish_list, check_wish_list, get_wish_list, remove_from_wish_list,
-    update_wish_list_notes,
+    add_to_wish_list, check_wish_list, get_wish_list, remove_from_wish_list, update_wish_list_notes,
 };

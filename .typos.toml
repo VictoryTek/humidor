@@ -1,0 +1,36 @@
+# Typos configuration for spell checking
+
+[default]
+extend-ignore-re = [
+  # Ignore UUID patterns
+  "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+  # Ignore hex strings
+  "0x[0-9a-fA-F]+",
+]
+
+[files]
+extend-exclude = [
+  "target/",
+  "Cargo.lock",
+  "*.min.js",
+  "*.min.css",
+  "node_modules/",
+  ".git/",
+]
+
+[default.extend-words]
+# Add project-specific words that are valid but might be flagged
+humidor = "humidor"
+Humidor = "Humidor"
+cigars = "cigars"
+cigar = "cigar"
+Warp = "Warp"
+tokio = "tokio"
+postgres = "postgres"
+PostgreSQL = "PostgreSQL"
+Vec = "Vec"
+Ok = "Ok"
+Err = "Err"
+# Cigar-specific measurements
+64ths = "64ths"
+ths = "ths"  # Part of "64ths"

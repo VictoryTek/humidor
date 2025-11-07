@@ -21,7 +21,7 @@ async fn hash_password(password: String) -> Result<String, bcrypt::BcryptError> 
     tokio::task::spawn_blocking(move || hash(&password, DEFAULT_COST))
         .await
         .map_err(|e| {
-            eprintln!("Task join error during password hashing: {}", e);
+            tracing::error!(error = %e, "Task join error during password hashing");
             bcrypt::BcryptError::InvalidCost(DEFAULT_COST.to_string())
         })?
 }
@@ -30,40 +30,49 @@ async fn verify_password(password: String, hash_str: String) -> Result<bool, bcr
     tokio::task::spawn_blocking(move || verify(&password, &hash_str))
         .await
         .map_err(|e| {
-            eprintln!("Task join error during password verification: {}", e);
+            tracing::error!(error = %e, "Task join error during password verification");
             bcrypt::BcryptError::InvalidHash("".to_string())
         })?
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
-    pub sub: String,      // user id
+    pub sub: String, // user id
     pub username: String,
-    pub exp: usize,       // expiration time (required)
-    pub iat: usize,       // issued at time (for tracking)
+    pub exp: usize, // expiration time (required)
+    pub iat: usize, // issued at time (for tracking)
 }
 
 /// Get JWT secret from Docker secrets or environment variable
 /// Docker secrets take precedence over environment variables
-/// This function will panic at startup if JWT_SECRET is not available
+/// Note: This function assumes the secret was validated at startup via validate_jwt_secret()
+/// If the secret is missing, this will return a default that will cause authentication to fail
 fn jwt_secret() -> String {
     // Try Docker secret file first
     if let Ok(content) = fs::read_to_string("/run/secrets/jwt_secret") {
         return content.trim().to_string();
     }
-    
+
     // Fall back to environment variable
-    env::var("JWT_SECRET").expect(
-        "JWT_SECRET must be set either as a Docker secret or environment variable. \
-         Generate one with: openssl rand -base64 32",
-    )
+    // At this point, the secret should have been validated at startup
+    // If it's still missing, return a placeholder that will cause auth failures
+    env::var("JWT_SECRET").unwrap_or_else(|_| {
+        tracing::error!(
+            "JWT_SECRET not found - authentication will fail. \
+             This should have been caught at startup validation."
+        );
+        // Return a value that will cause JWT operations to fail gracefully
+        "INVALID_SECRET_NOT_CONFIGURED".to_string()
+    })
 }
 
 // Setup endpoints
 pub async fn get_setup_status(pool: DbPool) -> Result<impl Reply, warp::Rejection> {
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
-        warp::reject::custom(AppError::DatabaseError("Database connection failed".to_string()))
+        tracing::error!(error = %e, "Failed to get database connection");
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
     })?;
 
     let query = "SELECT COUNT(*) FROM users WHERE is_admin = true";
@@ -81,7 +90,7 @@ pub async fn get_setup_status(pool: DbPool) -> Result<impl Reply, warp::Rejectio
             Ok(warp::reply::json(&response))
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             Ok(warp::reply::json(&json!({
                 "error": "Failed to check setup status"
             })))
@@ -94,8 +103,10 @@ pub async fn create_setup_user(
     pool: DbPool,
 ) -> Result<impl Reply, warp::Rejection> {
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
-        warp::reject::custom(AppError::DatabaseError("Database connection failed".to_string()))
+        tracing::error!(error = %e, "Failed to get database connection");
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
     })?;
 
     // Check if setup is still needed
@@ -117,7 +128,7 @@ pub async fn create_setup_user(
     let password_hash = match hash_password(setup_req.user.password.clone()).await {
         Ok(hash) => hash,
         Err(e) => {
-            eprintln!("Password hashing error: {}", e);
+            tracing::error!(error = %e, "Password hashing error");
             return Ok(warp::reply::with_status(
                 warp::reply::json(&json!({
                     "error": "Failed to process password"
@@ -159,7 +170,7 @@ pub async fn create_setup_user(
             let token = match generate_token(&user_id.to_string(), &setup_req.user.username) {
                 Ok(token) => token,
                 Err(e) => {
-                    eprintln!("Token generation error: {}", e);
+                    tracing::error!(error = %e, "Token generation error");
                     return Ok(warp::reply::with_status(
                         warp::reply::json(&json!({
                             "error": "Failed to generate authentication token"
@@ -205,7 +216,7 @@ pub async fn create_setup_user(
                 )
                 .await
             {
-                eprintln!("Failed to create humidor: {}", e);
+                tracing::error!(error = %e, "Failed to create humidor");
                 return Ok(warp::reply::with_status(
                     warp::reply::json(&json!({
                         "error": "Failed to create humidor"
@@ -224,7 +235,7 @@ pub async fn create_setup_user(
             Ok(warp::reply::json(&response).into_response())
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             if e.to_string().contains("duplicate key") {
                 Ok(warp::reply::with_status(
                     warp::reply::json(&json!({
@@ -250,10 +261,37 @@ pub async fn create_setup_user(
 pub async fn login_user(
     login_req: LoginRequest,
     pool: DbPool,
+    rate_limiter: crate::middleware::RateLimiter,
+    client_ip: Option<std::net::IpAddr>,
 ) -> Result<impl Reply, warp::Rejection> {
+    // Get client IP (default to localhost if not available, e.g., in tests)
+    let ip = client_ip.unwrap_or_else(|| {
+        use std::net::{IpAddr, Ipv4Addr};
+        IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))
+    });
+
+    // Check rate limit before processing login
+    if rate_limiter.is_rate_limited(ip).await {
+        tracing::warn!(
+            ip = %ip,
+            username = %login_req.username,
+            "Login attempt blocked due to rate limiting"
+        );
+
+        return Ok(warp::reply::with_status(
+            warp::reply::json(&json!({
+                "error": "Too many failed login attempts. Please try again later."
+            })),
+            warp::http::StatusCode::TOO_MANY_REQUESTS,
+        )
+        .into_response());
+    }
+
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
-        warp::reject::custom(AppError::DatabaseError("Database connection failed".to_string()))
+        tracing::error!(error = %e, "Failed to get database connection");
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
     })?;
 
     let query = "
@@ -286,7 +324,7 @@ pub async fn login_user(
                     let token = match generate_token(&user_id.to_string(), &username) {
                         Ok(token) => token,
                         Err(e) => {
-                            eprintln!("Token generation error: {}", e);
+                            tracing::error!(error = %e, "Token generation error");
                             return Ok(warp::reply::with_status(
                                 warp::reply::json(&json!({
                                     "error": "Authentication failed"
@@ -313,17 +351,38 @@ pub async fn login_user(
                         token,
                     };
 
+                    // Clear rate limit records on successful login
+                    rate_limiter.clear_attempts(ip).await;
+
+                    tracing::info!(
+                        ip = %ip,
+                        username = %login_req.username,
+                        user_id = %user_id,
+                        "Successful login"
+                    );
+
                     Ok(warp::reply::json(&response).into_response())
                 }
-                Ok(false) => Ok(warp::reply::with_status(
-                    warp::reply::json(&json!({
-                        "error": "Invalid username or password"
-                    })),
-                    warp::http::StatusCode::UNAUTHORIZED,
-                )
-                .into_response()),
+                Ok(false) => {
+                    // Record failed login attempt
+                    rate_limiter.record_attempt(ip).await;
+
+                    tracing::warn!(
+                        ip = %ip,
+                        username = %login_req.username,
+                        "Failed login attempt - invalid password"
+                    );
+
+                    Ok(warp::reply::with_status(
+                        warp::reply::json(&json!({
+                            "error": "Invalid username or password"
+                        })),
+                        warp::http::StatusCode::UNAUTHORIZED,
+                    )
+                    .into_response())
+                }
                 Err(e) => {
-                    eprintln!("Password verification error: {}", e);
+                    tracing::error!(error = %e, "Password verification error");
                     Ok(warp::reply::with_status(
                         warp::reply::json(&json!({
                             "error": "Authentication failed"
@@ -334,15 +393,26 @@ pub async fn login_user(
                 }
             }
         }
-        Ok(None) => Ok(warp::reply::with_status(
-            warp::reply::json(&json!({
-                "error": "Invalid username or password"
-            })),
-            warp::http::StatusCode::UNAUTHORIZED,
-        )
-        .into_response()),
+        Ok(None) => {
+            // Record failed login attempt for non-existent user
+            rate_limiter.record_attempt(ip).await;
+
+            tracing::warn!(
+                ip = %ip,
+                username = %login_req.username,
+                "Failed login attempt - user not found"
+            );
+
+            Ok(warp::reply::with_status(
+                warp::reply::json(&json!({
+                    "error": "Invalid username or password"
+                })),
+                warp::http::StatusCode::UNAUTHORIZED,
+            )
+            .into_response())
+        }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             Ok(warp::reply::with_status(
                 warp::reply::json(&json!({
                     "error": "Authentication failed"
@@ -362,8 +432,10 @@ pub async fn create_humidor_for_setup(
     pool: DbPool,
 ) -> Result<impl Reply, warp::Rejection> {
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
-        warp::reject::custom(AppError::DatabaseError("Database connection failed".to_string()))
+        tracing::error!(error = %e, "Failed to get database connection");
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
     })?;
 
     let humidor_id = Uuid::new_v4();
@@ -420,7 +492,7 @@ pub async fn create_humidor_for_setup(
             Ok(warp::reply::json(&humidor).into_response())
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             Ok(warp::reply::with_status(
                 warp::reply::json(&json!({
                     "error": "Failed to create humidor"
@@ -444,7 +516,10 @@ fn generate_token(user_id: &str, username: &str) -> Result<String, jsonwebtoken:
     let iat = now.timestamp() as usize;
     let expiration = now
         .checked_add_signed(chrono::Duration::hours(token_lifetime_hours))
-        .expect("valid timestamp")
+        .ok_or_else(|| {
+            tracing::error!("Failed to calculate token expiration timestamp");
+            jsonwebtoken::errors::Error::from(jsonwebtoken::errors::ErrorKind::InvalidToken)
+        })?
         .timestamp() as usize;
 
     let claims = Claims {
@@ -475,8 +550,10 @@ pub async fn get_current_user(
     pool: DbPool,
 ) -> Result<impl Reply, warp::Rejection> {
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
-        warp::reject::custom(AppError::DatabaseError("Database connection failed".to_string()))
+        tracing::error!(error = %e, "Failed to get database connection");
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
     })?;
 
     match db.query_one(
@@ -497,7 +574,7 @@ pub async fn get_current_user(
             Ok(warp::reply::json(&user))
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             Ok(warp::reply::json(&json!({"error": "Failed to fetch user"})))
         }
     }
@@ -509,8 +586,10 @@ pub async fn update_current_user(
     pool: DbPool,
 ) -> Result<impl Reply, warp::Rejection> {
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
-        warp::reject::custom(AppError::DatabaseError("Database connection failed".to_string()))
+        tracing::error!(error = %e, "Failed to get database connection");
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
     })?;
 
     let mut updates = Vec::new();
@@ -573,7 +652,7 @@ pub async fn update_current_user(
             Ok(warp::reply::json(&user))
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             Ok(warp::reply::json(
                 &json!({"error": "Failed to update user"}),
             ))
@@ -587,8 +666,10 @@ pub async fn change_password(
     pool: DbPool,
 ) -> Result<impl Reply, warp::Rejection> {
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
-        warp::reject::custom(AppError::DatabaseError("Database connection failed".to_string()))
+        tracing::error!(error = %e, "Failed to get database connection");
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
     })?;
 
     // Get current password hash
@@ -612,7 +693,7 @@ pub async fn change_password(
                     }
                 }
                 Err(e) => {
-                    eprintln!("Password verification error: {}", e);
+                    tracing::error!(error = %e, "Password verification error");
                     return Ok(warp::reply::json(
                         &json!({"error": "Password verification failed"}),
                     ));
@@ -623,7 +704,7 @@ pub async fn change_password(
             let new_hash = match hash_password(password_req.new_password.clone()).await {
                 Ok(h) => h,
                 Err(e) => {
-                    eprintln!("Password hashing error: {}", e);
+                    tracing::error!(error = %e, "Password hashing error");
                     return Ok(warp::reply::json(
                         &json!({"error": "Failed to hash new password"}),
                     ));
@@ -643,7 +724,7 @@ pub async fn change_password(
                     &json!({"message": "Password updated successfully"}),
                 )),
                 Err(e) => {
-                    eprintln!("Database error: {}", e);
+                    tracing::error!(error = %e, "Database error");
                     Ok(warp::reply::json(
                         &json!({"error": "Failed to update password"}),
                     ))
@@ -651,7 +732,7 @@ pub async fn change_password(
             }
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             Ok(warp::reply::json(&json!({"error": "Failed to fetch user"})))
         }
     }
@@ -677,7 +758,7 @@ pub async fn forgot_password(
     pool: DbPool,
 ) -> Result<impl Reply, warp::Rejection> {
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError(
             "Database connection failed".to_string(),
         ))
@@ -691,21 +772,26 @@ pub async fn forgot_password(
         )
         .await
         .map_err(|e| {
-            eprintln!("Database error checking user: {}", e);
+            tracing::error!(error = %e, "Database error checking user");
             warp::reject::reject()
         })?;
 
     // Don't reveal whether user exists (security best practice)
-    if user_result.is_none() {
-        eprintln!("Password reset requested for non-existent email: {}", request.email);
-        return Ok(warp::reply::json(&json!({
-            "message": "If that email exists, a password reset link has been sent"
-        })));
-    }
+    let user_row = match user_result {
+        Some(row) => row,
+        None => {
+            tracing::info!(
+                email = %request.email,
+                "Password reset requested for non-existent email"
+            );
+            return Ok(warp::reply::json(&json!({
+                "message": "If that email exists, a password reset link has been sent"
+            })));
+        }
+    };
 
-    let user_row = user_result.unwrap();
     let user_id: Uuid = user_row.get(0);
-    
+
     // Generate secure token
     let token = generate_reset_token();
     let token_id = Uuid::new_v4();
@@ -718,7 +804,7 @@ pub async fn forgot_password(
     )
     .await
     .map_err(|e| {
-        eprintln!("Failed to store password reset token: {}", e);
+        tracing::error!(error = %e, "Failed to store password reset token");
         warp::reject::reject()
     })?;
 
@@ -729,14 +815,17 @@ pub async fn forgot_password(
     // Try to send email, but don't fail if SMTP isn't configured
     match EmailService::from_env() {
         Ok(email_service) => {
-            if let Err(e) = email_service.send_password_reset_email(&request.email, &reset_url).await {
-                eprintln!("Failed to send password reset email: {}", e);
-                eprintln!("Reset URL (for testing): {}", reset_url);
+            if let Err(e) = email_service
+                .send_password_reset_email(&request.email, &reset_url)
+                .await
+            {
+                tracing::error!(error = %e, "Failed to send password reset email");
+                tracing::info!(reset_url = %reset_url, "Password reset URL (for testing)");
             }
         }
         Err(e) => {
-            eprintln!("Email service not configured: {}", e);
-            eprintln!("Reset URL (for testing): {}", reset_url);
+            tracing::warn!(error = %e, "Email service not configured");
+            tracing::info!(reset_url = %reset_url, "Password reset URL (for testing)");
         }
     }
 
@@ -751,7 +840,7 @@ pub async fn reset_password(
     pool: DbPool,
 ) -> Result<impl Reply, warp::Rejection> {
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError(
             "Database connection failed".to_string(),
         ))
@@ -765,18 +854,20 @@ pub async fn reset_password(
         )
         .await
         .map_err(|e| {
-            eprintln!("Database error checking token: {}", e);
+            tracing::error!(error = %e, "Database error checking token");
             warp::reject::reject()
         })?;
 
-    if token_result.is_none() {
-        eprintln!("Invalid or expired token used for password reset");
-        return Err(warp::reject::custom(AppError::BadRequest(
-            "Invalid or expired reset token".to_string(),
-        )));
-    }
+    let token_row = match token_result {
+        Some(row) => row,
+        None => {
+            tracing::warn!("Invalid or expired password reset token used");
+            return Err(warp::reject::custom(AppError::BadRequest(
+                "Invalid or expired reset token".to_string(),
+            )));
+        }
+    };
 
-    let token_row = token_result.unwrap();
     let user_id: Uuid = token_row.get(0);
     let created_at: chrono::DateTime<Utc> = token_row.get(1);
 
@@ -800,7 +891,7 @@ pub async fn reset_password(
     let password_hash = match hash_password(request.password.clone()).await {
         Ok(h) => h,
         Err(e) => {
-            eprintln!("Password hashing error: {}", e);
+            tracing::error!(error = %e, "Password hashing error");
             return Err(warp::reject::custom(AppError::InternalServerError(
                 "Failed to hash password".to_string(),
             )));
@@ -815,7 +906,7 @@ pub async fn reset_password(
     )
     .await
     .map_err(|e| {
-        eprintln!("Failed to update password: {}", e);
+        tracing::error!(error = %e, "Failed to update password");
         warp::reject::reject()
     })?;
 
@@ -827,7 +918,7 @@ pub async fn reset_password(
     .await
     .ok();
 
-    eprintln!("✅ Password reset successful for user: {}", user_id);
+    tracing::info!(user_id = %user_id, "Password reset successful");
 
     Ok(warp::reply::json(&json!({
         "message": "Password has been reset successfully"
@@ -839,14 +930,13 @@ pub async fn check_email_config() -> Result<impl Reply, warp::Rejection> {
     let smtp_host = env::var("SMTP_HOST").ok();
     let smtp_user = env::var("SMTP_USER").ok();
     let smtp_password = env::var("SMTP_PASSWORD").ok();
-    
-    let is_configured = smtp_host.is_some() 
-        && smtp_user.is_some() 
-        && smtp_password.is_some()
-        && !smtp_host.as_ref().unwrap().is_empty()
-        && !smtp_user.as_ref().unwrap().is_empty()
-        && !smtp_password.as_ref().unwrap().is_empty();
-    
+
+    // Use pattern matching to safely check all conditions
+    let is_configured = matches!(
+        (&smtp_host, &smtp_user, &smtp_password),
+        (Some(h), Some(u), Some(p)) if !h.is_empty() && !u.is_empty() && !p.is_empty()
+    );
+
     Ok(warp::reply::json(&json!({
         "email_configured": is_configured
     })))

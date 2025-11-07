@@ -7,7 +7,7 @@ use crate::{errors::AppError, models::*, validation::Validate, DbPool};
 
 pub async fn get_sizes(pool: DbPool) -> Result<impl Reply, Rejection> {
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError(
             "Database connection failed".to_string(),
         ))
@@ -34,7 +34,7 @@ pub async fn get_sizes(pool: DbPool) -> Result<impl Reply, Rejection> {
             Ok(warp::reply::json(&sizes))
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             Ok(warp::reply::json(&json!({"error": "Failed to fetch sizes"})))
         }
     }
@@ -48,7 +48,7 @@ pub async fn create_size(create_size: CreateSize, pool: DbPool) -> Result<impl R
     let now = Utc::now();
 
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError(
             "Database connection failed".to_string(),
         ))
@@ -73,7 +73,7 @@ pub async fn create_size(create_size: CreateSize, pool: DbPool) -> Result<impl R
             Ok(warp::reply::json(&size))
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             Ok(warp::reply::json(&json!({"error": "Failed to create size"})))
         }
     }
@@ -90,7 +90,7 @@ pub async fn update_size(
     let now = Utc::now();
 
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError(
             "Database connection failed".to_string(),
         ))
@@ -130,7 +130,7 @@ pub async fn update_size(
             Ok(warp::reply::json(&size))
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             Ok(warp::reply::json(
                 &json!({"error": "Failed to update size"}),
             ))
@@ -140,7 +140,7 @@ pub async fn update_size(
 
 pub async fn delete_size(id: Uuid, pool: DbPool) -> Result<impl Reply, Rejection> {
     let db = pool.get().await.map_err(|e| {
-        eprintln!("Failed to get database connection: {}", e);
+        tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError(
             "Database connection failed".to_string(),
         ))
@@ -157,7 +157,7 @@ pub async fn delete_size(id: Uuid, pool: DbPool) -> Result<impl Reply, Rejection
             }
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            tracing::error!(error = %e, "Database error");
             Ok(warp::reply::json(
                 &json!({"error": "Failed to delete size"}),
             ))
