@@ -8,7 +8,7 @@ use uuid::Uuid;
 #[serial]
 async fn test_add_favorite() {
     let ctx = setup_test_db().await;
-    
+
     // Create user and cigar
     let (user_id, _username) = create_test_user(&ctx.pool, "testuser", "password123", false)
         .await
@@ -16,7 +16,7 @@ async fn test_add_favorite() {
     let cigar_id = create_test_cigar(&ctx.pool, "Favorite Cigar", 5, None)
         .await
         .unwrap();
-    
+
     // Add to favorites
     let client = ctx.pool.get().await.unwrap();
     let row = client
@@ -28,7 +28,7 @@ async fn test_add_favorite() {
         )
         .await
         .unwrap();
-    
+
     let favorite_id: Uuid = row.get(0);
     assert!(!favorite_id.to_string().is_empty());
 }
@@ -37,15 +37,21 @@ async fn test_add_favorite() {
 #[serial]
 async fn test_get_user_favorites() {
     let ctx = setup_test_db().await;
-    
+
     // Create user and multiple cigars
     let (user_id, _username) = create_test_user(&ctx.pool, "testuser", "password123", false)
         .await
         .unwrap();
-    let cigar1_id = create_test_cigar(&ctx.pool, "Cigar 1", 5, None).await.unwrap();
-    let cigar2_id = create_test_cigar(&ctx.pool, "Cigar 2", 3, None).await.unwrap();
-    let _cigar3_id = create_test_cigar(&ctx.pool, "Cigar 3", 7, None).await.unwrap();
-    
+    let cigar1_id = create_test_cigar(&ctx.pool, "Cigar 1", 5, None)
+        .await
+        .unwrap();
+    let cigar2_id = create_test_cigar(&ctx.pool, "Cigar 2", 3, None)
+        .await
+        .unwrap();
+    let _cigar3_id = create_test_cigar(&ctx.pool, "Cigar 3", 7, None)
+        .await
+        .unwrap();
+
     // Add to favorites
     let client = ctx.pool.get().await.unwrap();
     client
@@ -62,7 +68,7 @@ async fn test_get_user_favorites() {
         )
         .await
         .unwrap();
-    
+
     // Get favorites count
     let rows = client
         .query(
@@ -71,7 +77,7 @@ async fn test_get_user_favorites() {
         )
         .await
         .unwrap();
-    
+
     let count: i64 = rows[0].get(0);
     assert_eq!(count, 2);
 }
@@ -80,7 +86,7 @@ async fn test_get_user_favorites() {
 #[serial]
 async fn test_remove_favorite() {
     let ctx = setup_test_db().await;
-    
+
     // Create user and cigar
     let (user_id, _username) = create_test_user(&ctx.pool, "testuser", "password123", false)
         .await
@@ -88,7 +94,7 @@ async fn test_remove_favorite() {
     let cigar_id = create_test_cigar(&ctx.pool, "Favorite Cigar", 5, None)
         .await
         .unwrap();
-    
+
     // Add to favorites
     let client = ctx.pool.get().await.unwrap();
     let row = client
@@ -100,23 +106,23 @@ async fn test_remove_favorite() {
         )
         .await
         .unwrap();
-    
+
     let favorite_id: Uuid = row.get(0);
-    
+
     // Remove from favorites
     let rows_affected = client
         .execute("DELETE FROM favorites WHERE id = $1", &[&favorite_id])
         .await
         .unwrap();
-    
+
     assert_eq!(rows_affected, 1);
-    
+
     // Verify it's removed
     let result = client
         .query_opt("SELECT id FROM favorites WHERE id = $1", &[&favorite_id])
         .await
         .unwrap();
-    
+
     assert!(result.is_none());
 }
 
@@ -124,7 +130,7 @@ async fn test_remove_favorite() {
 #[serial]
 async fn test_duplicate_favorite_prevention() {
     let ctx = setup_test_db().await;
-    
+
     // Create user and cigar
     let (user_id, _username) = create_test_user(&ctx.pool, "testuser", "password123", false)
         .await
@@ -132,7 +138,7 @@ async fn test_duplicate_favorite_prevention() {
     let cigar_id = create_test_cigar(&ctx.pool, "Favorite Cigar", 5, None)
         .await
         .unwrap();
-    
+
     // Add to favorites
     let client = ctx.pool.get().await.unwrap();
     client
@@ -142,7 +148,7 @@ async fn test_duplicate_favorite_prevention() {
         )
         .await
         .unwrap();
-    
+
     // Try to add same cigar again
     let result = client
         .execute(
@@ -150,7 +156,7 @@ async fn test_duplicate_favorite_prevention() {
             &[&Uuid::new_v4(), &user_id, &cigar_id],
         )
         .await;
-    
+
     // Should fail due to unique constraint on (user_id, cigar_id)
     assert!(result.is_err());
 }
@@ -159,7 +165,7 @@ async fn test_duplicate_favorite_prevention() {
 #[serial]
 async fn test_check_if_cigar_is_favorited() {
     let ctx = setup_test_db().await;
-    
+
     // Create user and cigar
     let (user_id, _username) = create_test_user(&ctx.pool, "testuser", "password123", false)
         .await
@@ -170,7 +176,7 @@ async fn test_check_if_cigar_is_favorited() {
     let not_favorited_cigar_id = create_test_cigar(&ctx.pool, "Not Favorited", 3, None)
         .await
         .unwrap();
-    
+
     // Add one to favorites
     let client = ctx.pool.get().await.unwrap();
     client
@@ -180,7 +186,7 @@ async fn test_check_if_cigar_is_favorited() {
         )
         .await
         .unwrap();
-    
+
     // Check if favorited
     let result = client
         .query_opt(
@@ -190,7 +196,7 @@ async fn test_check_if_cigar_is_favorited() {
         .await
         .unwrap();
     assert!(result.is_some());
-    
+
     // Check if not favorited
     let result = client
         .query_opt(
@@ -206,7 +212,7 @@ async fn test_check_if_cigar_is_favorited() {
 #[serial]
 async fn test_favorites_separated_by_user() {
     let ctx = setup_test_db().await;
-    
+
     // Create two users
     let (user1_id, _username1) = create_test_user(&ctx.pool, "user1", "password1", false)
         .await
@@ -214,12 +220,12 @@ async fn test_favorites_separated_by_user() {
     let (user2_id, _username2) = create_test_user(&ctx.pool, "user2", "password2", false)
         .await
         .unwrap();
-    
+
     // Create cigar
     let cigar_id = create_test_cigar(&ctx.pool, "Popular Cigar", 10, None)
         .await
         .unwrap();
-    
+
     // Both users favorite the same cigar
     let client = ctx.pool.get().await.unwrap();
     client
@@ -236,7 +242,7 @@ async fn test_favorites_separated_by_user() {
         )
         .await
         .unwrap();
-    
+
     // Each user should see their own favorite
     let rows = client
         .query(
@@ -246,7 +252,7 @@ async fn test_favorites_separated_by_user() {
         .await
         .unwrap();
     let user1_count: i64 = rows[0].get(0);
-    
+
     let rows = client
         .query(
             "SELECT COUNT(*) FROM favorites WHERE user_id = $1",
@@ -255,7 +261,7 @@ async fn test_favorites_separated_by_user() {
         .await
         .unwrap();
     let user2_count: i64 = rows[0].get(0);
-    
+
     assert_eq!(user1_count, 1);
     assert_eq!(user2_count, 1);
 }
@@ -264,7 +270,7 @@ async fn test_favorites_separated_by_user() {
 #[serial]
 async fn test_get_favorites_with_cigar_details() {
     let ctx = setup_test_db().await;
-    
+
     // Create user and cigars
     let (user_id, _username) = create_test_user(&ctx.pool, "testuser", "password123", false)
         .await
@@ -272,7 +278,7 @@ async fn test_get_favorites_with_cigar_details() {
     let cigar_id = create_test_cigar(&ctx.pool, "Premium Cigar", 5, None)
         .await
         .unwrap();
-    
+
     // Add to favorites
     let client = ctx.pool.get().await.unwrap();
     client
@@ -282,7 +288,7 @@ async fn test_get_favorites_with_cigar_details() {
         )
         .await
         .unwrap();
-    
+
     // Get favorites with cigar details (JOIN)
     let rows = client
         .query(
@@ -294,12 +300,12 @@ async fn test_get_favorites_with_cigar_details() {
         )
         .await
         .unwrap();
-    
+
     assert_eq!(rows.len(), 1);
-    
+
     let cigar_name: String = rows[0].get(1);
     let quantity: i32 = rows[0].get(2);
-    
+
     assert_eq!(cigar_name, "Premium Cigar");
     assert_eq!(quantity, 5);
 }

@@ -14,7 +14,7 @@ pub async fn get_humidors(auth: AuthContext, pool: DbPool) -> Result<impl Reply,
             tracing::error!(error = %e, "Failed to get database connection");
             return Ok(reply::with_status(
                 reply::json(&json!({"error": "Database connection failed"})),
-                StatusCode::INTERNAL_SERVER_ERROR
+                StatusCode::INTERNAL_SERVER_ERROR,
             ));
         }
     };
@@ -71,7 +71,7 @@ pub async fn get_humidor(
             tracing::error!(error = %e, "Failed to get database connection");
             return Ok(reply::with_status(
                 reply::json(&json!({"error": "Database connection failed"})),
-                StatusCode::INTERNAL_SERVER_ERROR
+                StatusCode::INTERNAL_SERVER_ERROR,
             ));
         }
     };
@@ -133,7 +133,7 @@ pub async fn create_humidor(
             tracing::error!(error = %e, "Failed to get database connection");
             return Ok(reply::with_status(
                 reply::json(&json!({"error": "Database connection failed"})),
-                StatusCode::INTERNAL_SERVER_ERROR
+                StatusCode::INTERNAL_SERVER_ERROR,
             ));
         }
     };
@@ -217,7 +217,7 @@ pub async fn update_humidor(
             tracing::error!(error = %e, "Failed to get database connection");
             return Ok(reply::with_status(
                 reply::json(&json!({"error": "Database connection failed"})),
-                StatusCode::INTERNAL_SERVER_ERROR
+                StatusCode::INTERNAL_SERVER_ERROR,
             ));
         }
     };
@@ -305,7 +305,7 @@ pub async fn delete_humidor(
             tracing::error!(error = %e, "Failed to get database connection");
             return Ok(reply::with_status(
                 reply::json(&json!({"error": "Database connection failed"})),
-                StatusCode::INTERNAL_SERVER_ERROR
+                StatusCode::INTERNAL_SERVER_ERROR,
             ));
         }
     };
@@ -358,7 +358,7 @@ pub async fn get_humidor_cigars(
             tracing::error!(error = %e, "Failed to get database connection");
             return Ok(reply::with_status(
                 reply::json(&json!({"error": "Database connection failed"})),
-                StatusCode::INTERNAL_SERVER_ERROR
+                StatusCode::INTERNAL_SERVER_ERROR,
             ));
         }
     };

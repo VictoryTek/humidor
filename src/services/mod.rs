@@ -39,6 +39,12 @@ pub struct CigarScraper {
     client: reqwest::Client,
 }
 
+impl Default for CigarScraper {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CigarScraper {
     pub fn new() -> Self {
         let client = reqwest::Client::builder()
@@ -119,7 +125,7 @@ impl CigarScraper {
                 return (None, None);
             }
         };
-        
+
         if let Some(caps) = size_re.captures(text) {
             return (Some(caps[1].to_string()), Some(caps[2].to_string()));
         }
@@ -226,7 +232,7 @@ impl CigarScraper {
 
         // Try multiple h1 selectors
         let title_selectors = vec!["h1.product-name", "h1.product-title", "h1"];
-        
+
         for selector_str in title_selectors {
             if let Ok(selector) = Selector::parse(selector_str) {
                 if let Some(title) = document.select(&selector).next() {
@@ -243,7 +249,7 @@ impl CigarScraper {
 
         // Look for product specifications/attributes
         let spec_selectors = vec![
-            ".product-specs", 
+            ".product-specs",
             ".product-attributes",
             ".specifications",
             "table.specs",
@@ -253,17 +259,17 @@ impl CigarScraper {
             if let Ok(selector) = Selector::parse(selector_str) {
                 if let Some(specs) = document.select(&selector).next() {
                     let specs_text = specs.text().collect::<String>();
-                    
+
                     let (length, ring_gauge) = self.extract_size_info(&specs_text);
                     if length.is_some() {
                         result.length = length;
                         result.ring_gauge = ring_gauge;
                     }
-                    
+
                     if result.strength.is_none() {
                         result.strength = self.extract_strength(&specs_text);
                     }
-                    
+
                     if result.origin.is_none() {
                         result.origin = self.extract_origin(&specs_text);
                     }
@@ -274,17 +280,17 @@ impl CigarScraper {
         // Fall back to body text
         if result.length.is_none() || result.strength.is_none() || result.origin.is_none() {
             let body_text = document.root_element().text().collect::<String>();
-            
+
             if result.length.is_none() {
                 let (length, ring_gauge) = self.extract_size_info(&body_text);
                 result.length = length;
                 result.ring_gauge = ring_gauge;
             }
-            
+
             if result.strength.is_none() {
                 result.strength = self.extract_strength(&body_text);
             }
-            
+
             if result.origin.is_none() {
                 result.origin = self.extract_origin(&body_text);
             }
@@ -303,7 +309,7 @@ impl CigarScraper {
         // Try multiple selectors for product title
         let title_selectors = vec![
             "h1.product-name",
-            "h1.product-title", 
+            "h1.product-title",
             "h1[itemprop='name']",
             ".product-info h1",
             "h1",
@@ -335,18 +341,18 @@ impl CigarScraper {
             if let Ok(selector) = Selector::parse(selector_str) {
                 if let Some(details) = document.select(&selector).next() {
                     let details_text = details.text().collect::<String>();
-                    
+
                     // Extract size, strength, origin from details
                     let (length, ring_gauge) = self.extract_size_info(&details_text);
                     if length.is_some() {
                         result.length = length;
                         result.ring_gauge = ring_gauge;
                     }
-                    
+
                     if result.strength.is_none() {
                         result.strength = self.extract_strength(&details_text);
                     }
-                    
+
                     if result.origin.is_none() {
                         result.origin = self.extract_origin(&details_text);
                     }
@@ -356,17 +362,17 @@ impl CigarScraper {
 
         // Fall back to searching all body text if we didn't find details
         let body_text = document.root_element().text().collect::<String>();
-        
+
         if result.length.is_none() {
             let (length, ring_gauge) = self.extract_size_info(&body_text);
             result.length = length;
             result.ring_gauge = ring_gauge;
         }
-        
+
         if result.strength.is_none() {
             result.strength = self.extract_strength(&body_text);
         }
-        
+
         if result.origin.is_none() {
             result.origin = self.extract_origin(&body_text);
         }
@@ -383,7 +389,7 @@ impl CigarScraper {
 
         // Try to find product title
         let title_selectors = vec!["h1.product-title", "h1.prod-title", "h1"];
-        
+
         for selector_str in title_selectors {
             if let Ok(selector) = Selector::parse(selector_str) {
                 if let Some(title) = document.select(&selector).next() {
@@ -399,27 +405,23 @@ impl CigarScraper {
         }
 
         // Look for detailed specs
-        let detail_selectors = vec![
-            ".product-details",
-            ".prod-specs",
-            ".specifications",
-        ];
+        let detail_selectors = vec![".product-details", ".prod-specs", ".specifications"];
 
         for selector_str in detail_selectors {
             if let Ok(selector) = Selector::parse(selector_str) {
                 if let Some(details) = document.select(&selector).next() {
                     let details_text = details.text().collect::<String>();
-                    
+
                     let (length, ring_gauge) = self.extract_size_info(&details_text);
                     if length.is_some() {
                         result.length = length;
                         result.ring_gauge = ring_gauge;
                     }
-                    
+
                     if result.strength.is_none() {
                         result.strength = self.extract_strength(&details_text);
                     }
-                    
+
                     if result.origin.is_none() {
                         result.origin = self.extract_origin(&details_text);
                     }
@@ -429,17 +431,17 @@ impl CigarScraper {
 
         // Fall back to all text
         let body_text = document.root_element().text().collect::<String>();
-        
+
         if result.length.is_none() {
             let (length, ring_gauge) = self.extract_size_info(&body_text);
             result.length = length;
             result.ring_gauge = ring_gauge;
         }
-        
+
         if result.strength.is_none() {
             result.strength = self.extract_strength(&body_text);
         }
-        
+
         if result.origin.is_none() {
             result.origin = self.extract_origin(&body_text);
         }
@@ -478,10 +480,10 @@ impl CigarScraper {
 
 pub async fn scrape_cigar_url(url: &str) -> Result<ScrapedCigarData, Box<dyn std::error::Error>> {
     tracing::debug!(url = %url, "Starting cigar scrape");
-    
+
     let scraper = CigarScraper::new();
     let result = scraper.scrape(url).await?;
-    
+
     tracing::info!(
         brand = ?result.brand,
         name = ?result.name,
@@ -493,6 +495,6 @@ pub async fn scrape_cigar_url(url: &str) -> Result<ScrapedCigarData, Box<dyn std
         wrapper = ?result.wrapper,
         "Cigar scrape completed successfully"
     );
-    
+
     Ok(result)
 }

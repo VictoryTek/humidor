@@ -36,11 +36,16 @@ pub async fn setup_test_db() -> TestContext {
             .await
             .expect("Failed to run migrations");
     } // Release client
-    
+
     // Manually create wish_list table if it doesn't exist (V8 migration not embedded yet)
     {
-        let client = pool.get().await.expect("Failed to get client for wish_list setup");
-        let _ = client.batch_execute("
+        let client = pool
+            .get()
+            .await
+            .expect("Failed to get client for wish_list setup");
+        let _ = client
+            .batch_execute(
+                "
             CREATE TABLE IF NOT EXISTS wish_list (
                 id UUID PRIMARY KEY,
                 user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -52,9 +57,11 @@ pub async fn setup_test_db() -> TestContext {
             CREATE INDEX IF NOT EXISTS idx_wish_list_user_id ON wish_list(user_id);
             CREATE INDEX IF NOT EXISTS idx_wish_list_cigar_id ON wish_list(cigar_id);
             CREATE INDEX IF NOT EXISTS idx_wish_list_created ON wish_list(created_at DESC);
-        ").await;
+        ",
+            )
+            .await;
     }
-    
+
     // Now clean up any existing test data with a fresh client
     {
         let client = pool.get().await.expect("Failed to get client for cleanup");
@@ -78,13 +85,13 @@ pub async fn create_test_user(
     is_admin: bool,
 ) -> Result<(Uuid, String), Box<dyn std::error::Error>> {
     let client = pool.get().await?;
-    
+
     // Make username unique by appending UUID
     let unique_username = format!("{}_{}", username, Uuid::new_v4());
-    
+
     // Hash password
     let password_hash = bcrypt::hash(password, bcrypt::DEFAULT_COST)?;
-    
+
     let row = client
         .query_one(
             "INSERT INTO users (id, username, email, full_name, password_hash, is_admin, created_at, updated_at) 
@@ -112,7 +119,7 @@ pub async fn create_user_and_login(
     password: &str,
 ) -> Result<String, Box<dyn std::error::Error>> {
     let (user_id, unique_username) = create_test_user(pool, username, password, false).await?;
-    
+
     // Create a simple JWT token for testing
     // In real tests, you'd call the actual login endpoint
     let token = create_test_jwt(user_id, &unique_username)?;
@@ -124,7 +131,7 @@ pub async fn create_user_and_login(
 fn create_test_jwt(user_id: Uuid, username: &str) -> Result<String, Box<dyn std::error::Error>> {
     use jsonwebtoken::{encode, EncodingKey, Header};
     use serde::{Deserialize, Serialize};
-    
+
     #[derive(Debug, Serialize, Deserialize)]
     struct Claims {
         sub: String,
@@ -133,10 +140,11 @@ fn create_test_jwt(user_id: Uuid, username: &str) -> Result<String, Box<dyn std:
         exp: usize,
         iat: usize,
     }
-    
-    let secret = env::var("JWT_SECRET").unwrap_or_else(|_| "test_secret_key_for_testing".to_string());
+
+    let secret =
+        env::var("JWT_SECRET").unwrap_or_else(|_| "test_secret_key_for_testing".to_string());
     let now = chrono::Utc::now().timestamp() as usize;
-    
+
     let claims = Claims {
         sub: user_id.to_string(),
         user_id: user_id.to_string(),
@@ -144,13 +152,13 @@ fn create_test_jwt(user_id: Uuid, username: &str) -> Result<String, Box<dyn std:
         exp: now + 3600, // 1 hour
         iat: now,
     };
-    
+
     let token = encode(
         &Header::default(),
         &claims,
         &EncodingKey::from_secret(secret.as_bytes()),
     )?;
-    
+
     Ok(token)
 }
 
@@ -162,7 +170,7 @@ pub async fn create_test_humidor(
     name: &str,
 ) -> Result<Uuid, Box<dyn std::error::Error>> {
     let client = pool.get().await?;
-    
+
     let row = client
         .query_one(
             "INSERT INTO humidors (id, name, user_id, created_at, updated_at) 
@@ -184,7 +192,7 @@ pub async fn create_test_cigar(
     humidor_id: Option<Uuid>,
 ) -> Result<Uuid, Box<dyn std::error::Error>> {
     let client = pool.get().await?;
-    
+
     let row = client
         .query_one(
             "INSERT INTO cigars (id, name, quantity, humidor_id, is_active, created_at, updated_at) 
@@ -201,13 +209,13 @@ pub async fn create_test_cigar(
 #[allow(dead_code)]
 pub async fn cleanup_db(pool: &Pool) -> Result<(), Box<dyn std::error::Error>> {
     let client = pool.get().await?;
-    
+
     // Delete in order to respect foreign key constraints
     client.execute("DELETE FROM favorites", &[]).await?;
     client.execute("DELETE FROM cigars", &[]).await?;
     client.execute("DELETE FROM humidors", &[]).await?;
     client.execute("DELETE FROM users", &[]).await?;
-    
+
     Ok(())
 }
 
@@ -218,7 +226,7 @@ mod tests {
     #[tokio::test]
     async fn test_setup_test_db() {
         let ctx = setup_test_db().await;
-        
+
         // Verify we can connect
         let client = ctx.pool.get().await.expect("Failed to get client");
         let row = client
@@ -232,18 +240,19 @@ mod tests {
     #[tokio::test]
     async fn test_create_test_user() {
         let ctx = setup_test_db().await;
-        
-        let (user_id, actual_username) = create_test_user(&ctx.pool, "testuser", "password123", false)
-            .await
-            .expect("Failed to create user");
-        
+
+        let (user_id, actual_username) =
+            create_test_user(&ctx.pool, "testuser", "password123", false)
+                .await
+                .expect("Failed to create user");
+
         // Verify user was created
         let client = ctx.pool.get().await.unwrap();
         let row = client
             .query_one("SELECT username FROM users WHERE id = $1", &[&user_id])
             .await
             .unwrap();
-        
+
         let username: String = row.get(0);
         assert_eq!(username, actual_username);
         assert!(username.starts_with("testuser_"));

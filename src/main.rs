@@ -16,8 +16,8 @@ use std::env;
 use std::fs;
 use tokio_postgres::NoTls;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
-use warp::{Filter, Reply};
 use warp::log;
+use warp::{Filter, Reply};
 
 // Embed migrations from the migrations directory
 embed_migrations!("migrations");
@@ -28,7 +28,7 @@ type DbPool = Pool;
 /// Docker secrets are mounted at /run/secrets/<secret_name>
 fn read_secret(secret_name: &str, env_var: &str) -> Option<String> {
     let secret_path = format!("/run/secrets/{}", secret_name);
-    
+
     // Try Docker secret file first
     if let Ok(content) = fs::read_to_string(&secret_path) {
         tracing::debug!(
@@ -38,7 +38,7 @@ fn read_secret(secret_name: &str, env_var: &str) -> Option<String> {
         );
         return Some(content.trim().to_string());
     }
-    
+
     // Fall back to environment variable
     if let Ok(value) = env::var(env_var) {
         tracing::debug!(
@@ -49,7 +49,7 @@ fn read_secret(secret_name: &str, env_var: &str) -> Option<String> {
         );
         return Some(value);
     }
-    
+
     tracing::warn!(
         secret_name = secret_name,
         env_var = env_var,
@@ -60,14 +60,13 @@ fn read_secret(secret_name: &str, env_var: &str) -> Option<String> {
 
 /// Validate JWT secret at startup - fail fast before accepting requests
 fn validate_jwt_secret() -> anyhow::Result<()> {
-    let secret = read_secret("jwt_secret", "JWT_SECRET")
-        .ok_or_else(|| {
-            anyhow!(
-                "JWT_SECRET not found in /run/secrets/jwt_secret or JWT_SECRET environment variable. \
+    let secret = read_secret("jwt_secret", "JWT_SECRET").ok_or_else(|| {
+        anyhow!(
+            "JWT_SECRET not found in /run/secrets/jwt_secret or JWT_SECRET environment variable. \
                  Generate a secure secret with: openssl rand -base64 32"
-            )
-        })?;
-    
+        )
+    })?;
+
     // Validate minimum length for cryptographic security
     if secret.len() < 32 {
         bail!(
@@ -76,12 +75,12 @@ fn validate_jwt_secret() -> anyhow::Result<()> {
             secret.len()
         );
     }
-    
+
     tracing::info!(
         secret_length = secret.len(),
         "JWT secret validated successfully"
     );
-    
+
     Ok(())
 }
 
@@ -119,16 +118,17 @@ fn validate_smtp_config() -> anyhow::Result<()> {
     // Check if SMTP is intended to be used
     let smtp_enabled = env::var("SMTP_ENABLED")
         .unwrap_or_else(|_| "false".to_string())
-        .to_lowercase() == "true";
-    
+        .to_lowercase()
+        == "true";
+
     if !smtp_enabled {
         tracing::info!("SMTP email service disabled (SMTP_ENABLED=false or not set)");
         return Ok(());
     }
-    
+
     // If SMTP is enabled, validate required configuration
     let mut missing = Vec::new();
-    
+
     if env::var("SMTP_HOST").is_err() {
         missing.push("SMTP_HOST");
     }
@@ -144,7 +144,7 @@ fn validate_smtp_config() -> anyhow::Result<()> {
     if env::var("SMTP_FROM").is_err() {
         missing.push("SMTP_FROM");
     }
-    
+
     if !missing.is_empty() {
         bail!(
             "SMTP is enabled but required configuration is missing: {}. \
@@ -152,33 +152,33 @@ fn validate_smtp_config() -> anyhow::Result<()> {
             missing.join(", ")
         );
     }
-    
+
     tracing::info!(
         smtp_host = env::var("SMTP_HOST").unwrap(),
         smtp_port = env::var("SMTP_PORT").unwrap(),
         smtp_from = env::var("SMTP_FROM").unwrap(),
         "SMTP configuration validated successfully"
     );
-    
+
     Ok(())
 }
 
 /// Comprehensive startup configuration validation - fail fast with clear errors
 async fn validate_environment(pool: &DbPool) -> anyhow::Result<()> {
     tracing::info!("Starting environment validation...");
-    
+
     // Validate JWT secret
     tracing::debug!("Validating JWT secret configuration...");
     validate_jwt_secret()?;
-    
+
     // Validate database connectivity
     tracing::debug!("Validating database connection...");
     validate_database_connection(pool).await?;
-    
+
     // Validate SMTP configuration if enabled
     tracing::debug!("Validating SMTP configuration...");
     validate_smtp_config()?;
-    
+
     tracing::info!("✅ All environment validations passed successfully");
     Ok(())
 }
@@ -191,14 +191,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::registry()
         .with(
             EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "humidor=info,warp=info,refinery=info".into())
+                .unwrap_or_else(|_| "humidor=info,warp=info,refinery=info".into()),
         )
         .with(
             tracing_subscriber::fmt::layer()
                 .with_target(true)
                 .with_thread_ids(true)
                 .with_line_number(true)
-                .json()
+                .json(),
         )
         .init();
 
@@ -209,13 +209,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Build DATABASE_URL from secrets or environment
-    let database_url = if let Some(template) = env::var("DATABASE_URL_TEMPLATE").ok() {
+    let database_url = if let Ok(template) = env::var("DATABASE_URL_TEMPLATE") {
         // Using Docker secrets - read username and password from secret files
-        let db_user = read_secret("db_user", "DB_USER")
-            .unwrap_or_else(|| "humidor_user".to_string());
-        let db_password = read_secret("db_password", "DB_PASSWORD")
-            .unwrap_or_else(|| "humidor_pass".to_string());
-        
+        let db_user =
+            read_secret("db_user", "DB_USER").unwrap_or_else(|| "humidor_user".to_string());
+        let db_password =
+            read_secret("db_password", "DB_PASSWORD").unwrap_or_else(|| "humidor_pass".to_string());
+
         template
             .replace("{{DB_USER}}", &db_user)
             .replace("{{DB_PASSWORD}}", &db_password)
@@ -232,7 +232,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         recycling_method = "Fast",
         "Creating database connection pool"
     );
-    
+
     let mut config = Config::new();
     config.url = Some(database_url.clone());
     config.manager = Some(ManagerConfig {
@@ -292,10 +292,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Initialize rate limiter for authentication (5 attempts per 15 minutes)
     let rate_limiter = RateLimiter::default();
-    
+
     // Spawn cleanup task to remove expired rate limit entries
     rate_limiter.clone().spawn_cleanup_task();
-    
+
     tracing::info!(
         max_attempts = 5,
         window_minutes = 15,
@@ -306,10 +306,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cleanup_pool = db_pool.clone();
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(3600)); // Run every hour
-        
+
         loop {
             interval.tick().await;
-            
+
             match cleanup_pool.get().await {
                 Ok(client) => {
                     // Delete tokens older than 30 minutes
@@ -319,7 +319,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             &[],
                         )
                         .await;
-                    
+
                     match result {
                         Ok(deleted_count) => {
                             if deleted_count > 0 {
@@ -348,7 +348,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
     });
-    
+
     tracing::info!(
         cleanup_interval_minutes = 60,
         token_expiration_minutes = 30,
@@ -391,14 +391,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .or(backup_routes);
 
     // Health check endpoint (no auth required)
-    let health = warp::path("health")
-        .and(warp::get())
-        .map(|| {
-            warp::reply::json(&serde_json::json!({
-                "status": "ok",
-                "service": "humidor"
-            }))
-        });
+    let health = warp::path("health").and(warp::get()).map(|| {
+        warp::reply::json(&serde_json::json!({
+            "status": "ok",
+            "service": "humidor"
+        }))
+    });
 
     // Root route
     let root = warp::path::end().and(warp::get()).and_then(serve_index);
@@ -426,7 +424,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Use ALLOWED_ORIGINS env var for production (comma-separated list)
     let raw_origins = env::var("ALLOWED_ORIGINS")
         .unwrap_or_else(|_| "http://localhost:9898,http://127.0.0.1:9898".to_string());
-    
+
     // Validate and filter CORS origins
     let allowed_origins: Vec<String> = raw_origins
         .split(',')

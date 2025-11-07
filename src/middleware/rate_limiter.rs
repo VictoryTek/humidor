@@ -26,24 +26,27 @@ impl RateLimiter {
             window_secs,
         }
     }
+}
 
-    /// Create a rate limiter with default settings (5 attempts per 15 minutes)
-    pub fn default() -> Self {
+impl Default for RateLimiter {
+    fn default() -> Self {
         Self::new(5, 900)
     }
+}
 
+impl RateLimiter {
     /// Check if an IP address is currently rate limited
     /// Returns true if the IP has exceeded the rate limit
     pub async fn is_rate_limited(&self, ip: IpAddr) -> bool {
         let mut attempts = self.attempts.write().await;
-        
+
         // Get or create the attempt list for this IP
         let ip_attempts = attempts.entry(ip).or_insert_with(Vec::new);
-        
+
         // Remove expired attempts (outside the time window)
         let cutoff_time = SystemTime::now() - Duration::from_secs(self.window_secs);
         ip_attempts.retain(|&attempt_time| attempt_time > cutoff_time);
-        
+
         // Check if we've exceeded the limit
         ip_attempts.len() >= self.max_attempts
     }
@@ -51,13 +54,13 @@ impl RateLimiter {
     /// Record a failed login attempt for an IP address
     pub async fn record_attempt(&self, ip: IpAddr) {
         let mut attempts = self.attempts.write().await;
-        
+
         // Get or create the attempt list for this IP
         let ip_attempts = attempts.entry(ip).or_insert_with(Vec::new);
-        
+
         // Add the current attempt
         ip_attempts.push(SystemTime::now());
-        
+
         tracing::debug!(
             ip = %ip,
             attempt_count = ip_attempts.len(),
@@ -68,7 +71,7 @@ impl RateLimiter {
     /// Clear rate limit records for an IP address (called on successful login)
     pub async fn clear_attempts(&self, ip: IpAddr) {
         let mut attempts = self.attempts.write().await;
-        
+
         if attempts.remove(&ip).is_some() {
             tracing::debug!(ip = %ip, "Cleared rate limit records after successful login");
         }
@@ -79,13 +82,13 @@ impl RateLimiter {
     pub async fn cleanup_expired(&self) {
         let mut attempts = self.attempts.write().await;
         let cutoff_time = SystemTime::now() - Duration::from_secs(self.window_secs);
-        
+
         // Remove IPs with no recent attempts
         attempts.retain(|_, ip_attempts| {
             ip_attempts.retain(|&attempt_time| attempt_time > cutoff_time);
             !ip_attempts.is_empty()
         });
-        
+
         tracing::debug!(
             remaining_ips = attempts.len(),
             "Cleaned up expired rate limit entries"
@@ -97,7 +100,7 @@ impl RateLimiter {
     pub fn spawn_cleanup_task(self) {
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(Duration::from_secs(300)); // 5 minutes
-            
+
             loop {
                 interval.tick().await;
                 self.cleanup_expired().await;
@@ -150,5 +153,4 @@ mod tests {
         // Should not be limited anymore
         assert!(!limiter.is_rate_limited(ip).await);
     }
-
 }

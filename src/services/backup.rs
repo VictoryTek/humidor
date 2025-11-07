@@ -40,14 +40,14 @@ pub async fn create_backup(db: &Client) -> Result<String, Box<dyn std::error::Er
 
     // Export database to JSON
     let database_json = export_database(db).await?;
-    
+
     // Add metadata
     let metadata = BackupMetadata {
         version: env!("CARGO_PKG_VERSION").to_string(),
         created_at: Utc::now().to_rfc3339(),
         database_type: "postgresql".to_string(),
     };
-    
+
     zip.start_file("metadata.json", options)?;
     zip.write_all(serde_json::to_string_pretty(&metadata)?.as_bytes())?;
 
@@ -145,7 +145,7 @@ pub async fn restore_backup(
 
 pub fn list_backups() -> Result<Vec<BackupInfo>, Box<dyn std::error::Error>> {
     let backups_dir = Path::new("backups");
-    
+
     if !backups_dir.exists() {
         fs::create_dir_all(backups_dir)?;
         return Ok(Vec::new());
@@ -194,9 +194,7 @@ pub fn delete_backup(backup_name: &str) -> Result<(), Box<dyn std::error::Error>
     Ok(())
 }
 
-async fn export_database(
-    db: &Client,
-) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+async fn export_database(db: &Client) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
     let mut export = serde_json::Map::new();
 
     // Export all tables using pg_dump-like approach
@@ -221,7 +219,7 @@ async fn export_database(
             table
         );
         let row = db.query_one(&query, &[]).await?;
-        
+
         // Get the JSON value as a string and parse it
         let json_str: String = row.get(0);
         let table_data: serde_json::Value = serde_json::from_str(&json_str)?;
@@ -297,10 +295,10 @@ async fn import_row(
         "INSERT INTO {} SELECT * FROM json_populate_record(NULL::{}, $1::json)",
         table, table
     );
-    
+
     // Convert to JSON value - the driver will serialize it safely
     let json_value = row.clone();
-    
+
     tracing::debug!(
         table = %table,
         row_preview = %serde_json::to_string(&json_value)
@@ -310,7 +308,7 @@ async fn import_row(
             .collect::<String>(),
         "Importing row into table"
     );
-    
+
     match db.execute(&query, &[&json_value]).await {
         Ok(count) => {
             tracing::debug!(

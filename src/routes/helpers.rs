@@ -25,10 +25,9 @@ pub fn with_rate_limiter(
 }
 
 /// Helper function to extract client IP address
-pub fn with_client_ip() -> impl Filter<Extract = (Option<IpAddr>,), Error = std::convert::Infallible> + Clone {
-    warp::addr::remote().map(|addr: Option<std::net::SocketAddr>| {
-        addr.map(|socket| socket.ip())
-    })
+pub fn with_client_ip(
+) -> impl Filter<Extract = (Option<IpAddr>,), Error = std::convert::Infallible> + Clone {
+    warp::addr::remote().map(|addr: Option<std::net::SocketAddr>| addr.map(|socket| socket.ip()))
 }
 
 /// Helper function to extract UUID from path

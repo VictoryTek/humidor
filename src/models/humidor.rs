@@ -57,7 +57,7 @@ impl Validate for CreateHumidorRequest {
         }
 
         if let Some(humidity) = self.target_humidity {
-            if humidity < 50 || humidity > 85 {
+            if !(50..=85).contains(&humidity) {
                 return Err(crate::errors::AppError::ValidationError(
                     "target_humidity must be between 50 and 85".to_string(),
                 ));
@@ -97,7 +97,7 @@ impl Validate for UpdateHumidorRequest {
         }
 
         if let Some(humidity) = self.target_humidity {
-            if humidity < 50 || humidity > 85 {
+            if !(50..=85).contains(&humidity) {
                 return Err(crate::errors::AppError::ValidationError(
                     "target_humidity must be between 50 and 85".to_string(),
                 ));

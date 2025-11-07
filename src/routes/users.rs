@@ -36,7 +36,5 @@ pub fn create_user_routes(
         .and(with_db(db_pool.clone()))
         .and_then(handlers::change_password);
 
-    get_current_user
-        .or(update_current_user)
-        .or(change_password)
+    get_current_user.or(update_current_user).or(change_password)
 }

@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use warp::{reply::json, Rejection, Reply};
 
-use crate::{DbPool, middleware::auth::AuthContext, errors::AppError};
+use crate::{errors::AppError, middleware::auth::AuthContext, DbPool};
 
 #[derive(Debug, Serialize)]
 pub struct WishListResponse {
@@ -29,9 +29,11 @@ pub struct UpdateWishListNotesRequest {
 pub async fn get_wish_list(auth: AuthContext, pool: DbPool) -> Result<impl Reply, Rejection> {
     let db = pool.get().await.map_err(|e| {
         tracing::error!(error = %e, "Failed to get database connection");
-        warp::reject::custom(AppError::DatabaseError("Database connection failed".to_string()))
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
     })?;
-    
+
     let rows = db
         .query(
             "SELECT w.id, w.user_id, w.cigar_id, w.notes, w.created_at,
@@ -51,44 +53,47 @@ pub async fn get_wish_list(auth: AuthContext, pool: DbPool) -> Result<impl Reply
             warp::reject::reject()
         })?;
 
-    let wish_list: Vec<serde_json::Value> = rows.iter().map(|row| {
-        let cigar_exists: Option<Uuid> = row.get(5); // c.id will be null if cigar doesn't exist
+    let wish_list: Vec<serde_json::Value> = rows
+        .iter()
+        .map(|row| {
+            let cigar_exists: Option<Uuid> = row.get(5); // c.id will be null if cigar doesn't exist
 
-        serde_json::json!({
-            "id": row.get::<_, Uuid>(0),
-            "user_id": row.get::<_, Uuid>(1),
-            "cigar_id": row.get::<_, Uuid>(2),
-            "notes": row.get::<_, Option<String>>(3),
-            "created_at": row.get::<_, chrono::DateTime<Utc>>(4),
-            "cigar": if cigar_exists.is_some() {
-                let is_active: bool = row.get(24);
-                serde_json::json!({
-                    "id": row.get::<_, Uuid>(5),
-                    "humidor_id": row.get::<_, Option<Uuid>>(6),
-                    "brand_id": row.get::<_, Option<Uuid>>(7),
-                    "name": row.get::<_, String>(8),
-                    "size_id": row.get::<_, Option<Uuid>>(9),
-                    "strength_id": row.get::<_, Option<Uuid>>(10),
-                    "origin_id": row.get::<_, Option<Uuid>>(11),
-                    "wrapper": row.get::<_, Option<String>>(12),
-                    "binder": row.get::<_, Option<String>>(13),
-                    "filler": row.get::<_, Option<String>>(14),
-                    "price": row.get::<_, Option<f64>>(15),
-                    "purchase_date": row.get::<_, Option<chrono::DateTime<Utc>>>(16),
-                    "notes": row.get::<_, Option<String>>(17),
-                    "quantity": row.get::<_, i32>(18),
-                    "ring_gauge_id": row.get::<_, Option<Uuid>>(19),
-                    "length": row.get::<_, Option<f64>>(20),
-                    "image_url": row.get::<_, Option<String>>(21),
-                    "created_at": row.get::<_, chrono::DateTime<Utc>>(22),
-                    "updated_at": row.get::<_, chrono::DateTime<Utc>>(23),
-                    "out_of_stock": !is_active
-                })
-            } else {
-                serde_json::json!(null)
-            }
+            serde_json::json!({
+                "id": row.get::<_, Uuid>(0),
+                "user_id": row.get::<_, Uuid>(1),
+                "cigar_id": row.get::<_, Uuid>(2),
+                "notes": row.get::<_, Option<String>>(3),
+                "created_at": row.get::<_, chrono::DateTime<Utc>>(4),
+                "cigar": if cigar_exists.is_some() {
+                    let is_active: bool = row.get(24);
+                    serde_json::json!({
+                        "id": row.get::<_, Uuid>(5),
+                        "humidor_id": row.get::<_, Option<Uuid>>(6),
+                        "brand_id": row.get::<_, Option<Uuid>>(7),
+                        "name": row.get::<_, String>(8),
+                        "size_id": row.get::<_, Option<Uuid>>(9),
+                        "strength_id": row.get::<_, Option<Uuid>>(10),
+                        "origin_id": row.get::<_, Option<Uuid>>(11),
+                        "wrapper": row.get::<_, Option<String>>(12),
+                        "binder": row.get::<_, Option<String>>(13),
+                        "filler": row.get::<_, Option<String>>(14),
+                        "price": row.get::<_, Option<f64>>(15),
+                        "purchase_date": row.get::<_, Option<chrono::DateTime<Utc>>>(16),
+                        "notes": row.get::<_, Option<String>>(17),
+                        "quantity": row.get::<_, i32>(18),
+                        "ring_gauge_id": row.get::<_, Option<Uuid>>(19),
+                        "length": row.get::<_, Option<f64>>(20),
+                        "image_url": row.get::<_, Option<String>>(21),
+                        "created_at": row.get::<_, chrono::DateTime<Utc>>(22),
+                        "updated_at": row.get::<_, chrono::DateTime<Utc>>(23),
+                        "out_of_stock": !is_active
+                    })
+                } else {
+                    serde_json::json!(null)
+                }
+            })
         })
-    }).collect();
+        .collect();
 
     Ok(json(&wish_list))
 }
@@ -102,21 +107,24 @@ pub async fn add_to_wish_list(
     tracing::debug!("add_to_wish_list handler called");
     tracing::debug!(user_id = %auth.user_id, "Processing wish list request");
     tracing::debug!(cigar_id = %request.cigar_id, "Adding cigar to wish list");
-    
+
     let db = pool.get().await.map_err(|e| {
         tracing::error!(error = %e, "Failed to get database connection");
-        warp::reject::custom(AppError::DatabaseError("Database connection failed".to_string()))
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
     })?;
-    
+
     let id = Uuid::new_v4();
     let now = Utc::now();
-    
+
     // Parse cigar_id from string to ensure it's a proper Uuid type
-    let cigar_id = Uuid::parse_str(&request.cigar_id.to_string())
-        .map_err(|e| {
-            tracing::error!(error = %e, "Invalid cigar_id format");
-            warp::reject::custom(AppError::ValidationError("Invalid cigar ID format".to_string()))
-        })?;
+    let cigar_id = Uuid::parse_str(&request.cigar_id.to_string()).map_err(|e| {
+        tracing::error!(error = %e, "Invalid cigar_id format");
+        warp::reject::custom(AppError::ValidationError(
+            "Invalid cigar ID format".to_string(),
+        ))
+    })?;
 
     // Check if cigar exists
     let cigar_exists = db
@@ -129,7 +137,9 @@ pub async fn add_to_wish_list(
 
     if cigar_exists.is_none() {
         tracing::warn!(cigar_id = %cigar_id, "Cigar not found");
-        return Err(warp::reject::custom(AppError::NotFound("Cigar not found".to_string())));
+        return Err(warp::reject::custom(AppError::NotFound(
+            "Cigar not found".to_string(),
+        )));
     }
 
     // Insert the wish list item with notes
@@ -139,7 +149,13 @@ pub async fn add_to_wish_list(
          VALUES ($1, $2, $3, $4, $5)
          ON CONFLICT (user_id, cigar_id) DO NOTHING
          RETURNING id, user_id, cigar_id, notes, created_at",
-            &[&id, &auth.user_id, &cigar_id, &request.notes.as_deref(), &now],
+            &[
+                &id,
+                &auth.user_id,
+                &cigar_id,
+                &request.notes.as_deref(),
+                &now,
+            ],
         )
         .await
         .map_err(|e| {
@@ -200,9 +216,11 @@ pub async fn remove_from_wish_list(
 ) -> Result<impl Reply, Rejection> {
     let db = pool.get().await.map_err(|e| {
         tracing::error!(error = %e, "Failed to get database connection");
-        warp::reject::custom(AppError::DatabaseError("Database connection failed".to_string()))
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
     })?;
-    
+
     let rows_deleted = db
         .execute(
             "DELETE FROM wish_list WHERE user_id = $1 AND cigar_id = $2",
@@ -215,7 +233,9 @@ pub async fn remove_from_wish_list(
         })?;
 
     if rows_deleted == 0 {
-        return Err(warp::reject::custom(AppError::NotFound("Wish list item not found".to_string())));
+        return Err(warp::reject::custom(AppError::NotFound(
+            "Wish list item not found".to_string(),
+        )));
     }
 
     Ok(warp::reply::with_status(
@@ -232,9 +252,11 @@ pub async fn check_wish_list(
 ) -> Result<impl Reply, Rejection> {
     let db = pool.get().await.map_err(|e| {
         tracing::error!(error = %e, "Failed to get database connection");
-        warp::reject::custom(AppError::DatabaseError("Database connection failed".to_string()))
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
     })?;
-    
+
     match db
         .query_opt(
             "SELECT id FROM wish_list WHERE user_id = $1 AND cigar_id = $2",
@@ -262,9 +284,11 @@ pub async fn update_wish_list_notes(
 ) -> Result<impl Reply, Rejection> {
     let db = pool.get().await.map_err(|e| {
         tracing::error!(error = %e, "Failed to get database connection");
-        warp::reject::custom(AppError::DatabaseError("Database connection failed".to_string()))
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
     })?;
-    
+
     match db
         .query_opt(
             "UPDATE wish_list SET notes = $1 
@@ -284,9 +308,9 @@ pub async fn update_wish_list_notes(
             };
             Ok(json(&wish_list_item))
         }
-        Ok(None) => {
-            Err(warp::reject::custom(AppError::NotFound("Wish list item not found".to_string())))
-        }
+        Ok(None) => Err(warp::reject::custom(AppError::NotFound(
+            "Wish list item not found".to_string(),
+        ))),
         Err(e) => {
             tracing::error!(error = %e, "Database error updating wish list notes");
             Err(warp::reject::reject())

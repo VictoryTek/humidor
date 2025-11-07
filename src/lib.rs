@@ -11,7 +11,7 @@ pub mod validation;
 
 // Re-export commonly used types
 pub use errors::AppError;
-pub use middleware::{RateLimiter, AuthContext};
+pub use middleware::{AuthContext, RateLimiter};
 pub use validation::{validate_email, validate_length, validate_positive};
 
 // Export DbPool type for handlers

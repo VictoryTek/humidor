@@ -35,8 +35,8 @@ fn extract_token_from_headers(headers: &warp::http::HeaderMap) -> Option<String>
     // First, try Authorization header
     if let Some(auth_header) = headers.get(warp::http::header::AUTHORIZATION) {
         if let Ok(auth_str) = auth_header.to_str() {
-            if auth_str.starts_with("Bearer ") {
-                return Some(auth_str[7..].to_string());
+            if let Some(stripped) = auth_str.strip_prefix("Bearer ") {
+                return Some(stripped.to_string());
             }
         }
     }
@@ -46,8 +46,8 @@ fn extract_token_from_headers(headers: &warp::http::HeaderMap) -> Option<String>
         if let Ok(cookie_str) = cookie_header.to_str() {
             for cookie in cookie_str.split(';') {
                 let cookie = cookie.trim();
-                if cookie.starts_with("humidor_token=") {
-                    return Some(cookie[14..].to_string());
+                if let Some(stripped) = cookie.strip_prefix("humidor_token=") {
+                    return Some(stripped.to_string());
                 }
             }
         }
@@ -90,7 +90,7 @@ pub fn with_current_user(
                     return Err(reject::custom(AppError::Unauthorized));
                 }
             };
-            
+
             // Fetch user data from database
             let query = "
                 SELECT id, username, email, full_name, is_admin, is_active, created_at, updated_at
