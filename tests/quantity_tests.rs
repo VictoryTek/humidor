@@ -300,7 +300,6 @@ async fn test_concurrent_quantity_updates() {
     let updates: Vec<_> = (0..5)
         .map(|_| {
             let pool = pool.clone();
-            let cigar_id = cigar_id;
             async move {
                 let client = pool.get().await.unwrap();
                 client
