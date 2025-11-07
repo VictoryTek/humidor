@@ -13,6 +13,9 @@ async fn test_create_cigar() {
         .await
         .expect("Failed to create cigar");
 
+    // Small delay to ensure transaction is committed
+    tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
     // Verify cigar exists
     let client = ctx.pool.get().await.unwrap();
     let row = client

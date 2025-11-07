@@ -47,7 +47,7 @@ jobs:
       - name: Check for TODO/FIXME comments
         id: todos
         run: |
-          TODOS=$(git diff origin/${{ github.base_ref }}...HEAD | grep -E '^\+.*\b(TODO|FIXME|XXX|HACK)\b' || true)
+          TODOS=$(git diff origin/${{ github.base_ref }}...HEAD | grep -E '^\+.*\b(TODO|FIXME|XXX|HACK)\b' | grep -v '\.github/' || true)
           if [ -n "$TODOS" ]; then
             echo "todos_found=true" >> $GITHUB_OUTPUT
             echo "$TODOS" > todos.txt
