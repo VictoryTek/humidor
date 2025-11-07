@@ -424,16 +424,54 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Configure CORS - restrictive by default for security
     // Use ALLOWED_ORIGINS env var for production (comma-separated list)
-    let allowed_origins: Vec<String> = env::var("ALLOWED_ORIGINS")
-        .unwrap_or_else(|_| "http://localhost:9898,http://127.0.0.1:9898".to_string())
+    let raw_origins = env::var("ALLOWED_ORIGINS")
+        .unwrap_or_else(|_| "http://localhost:9898,http://127.0.0.1:9898".to_string());
+    
+    // Validate and filter CORS origins
+    let allowed_origins: Vec<String> = raw_origins
         .split(',')
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
+        .filter_map(|origin| {
+            // Validate origin format
+            if origin == "*" {
+                tracing::warn!(
+                    "Wildcard CORS origin (*) is not recommended for production. \
+                     Consider specifying explicit origins for security."
+                );
+                Some(origin)
+            } else if origin.starts_with("http://") || origin.starts_with("https://") {
+                // Basic URL validation - ensure no path, query, or fragment
+                if origin.contains('?') || origin.contains('#') || origin.matches('/').count() > 2 {
+                    tracing::error!(
+                        origin = %origin,
+                        "Invalid CORS origin: must not contain path, query, or fragment. \
+                         Expected format: http(s)://domain:port"
+                    );
+                    None
+                } else {
+                    Some(origin)
+                }
+            } else {
+                tracing::error!(
+                    origin = %origin,
+                    "Invalid CORS origin: must start with http:// or https://"
+                );
+                None
+            }
+        })
         .collect();
+
+    if allowed_origins.is_empty() {
+        tracing::error!(
+            "No valid CORS origins configured. API will reject all cross-origin requests. \
+             Set ALLOWED_ORIGINS environment variable with valid origins."
+        );
+    }
 
     tracing::info!(
         allowed_origins = ?allowed_origins,
-        "CORS configuration loaded"
+        "CORS configuration loaded and validated"
     );
 
     let cors = warp::cors()
