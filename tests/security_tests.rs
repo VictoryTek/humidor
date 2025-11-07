@@ -314,15 +314,15 @@ async fn test_timestamps_set_on_creation() {
         .await
         .unwrap();
 
-    let created_at: chrono::NaiveDateTime = row.get(0);
-    let updated_at: chrono::NaiveDateTime = row.get(1);
+    let created_at: chrono::DateTime<chrono::Utc> = row.get(0);
+    let updated_at: chrono::DateTime<chrono::Utc> = row.get(1);
 
     // Timestamps should be set
     assert!(created_at.timestamp() > 0);
     assert!(updated_at.timestamp() > 0);
 
     // Timestamps should be recent (within last minute)
-    let now = chrono::Utc::now().naive_utc();
+    let now = chrono::Utc::now();
     let diff = now.timestamp() - created_at.timestamp();
     assert!(diff < 60, "Timestamp should be recent");
 }
