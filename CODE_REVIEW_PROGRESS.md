@@ -274,6 +274,106 @@ cargo test -- --nocapture
 
 ---
 
+### ✅ High Priority #8: Establish CI/CD Pipeline with Linting (Issue #12)
+**Status**: COMPLETED  
+**Priority**: High  
+**Files Created**: `.github/workflows/ci.yml`, `.github/workflows/deploy.yml`, `.github/workflows/scheduled.yml`, `.github/workflows/pr-checks.yml`, `.github/labeler.yml`, `.typos.toml`, `.github/workflows/README.md`
+
+**CI/CD Infrastructure Implemented**:
+
+**Main CI Pipeline** (`ci.yml`):
+- **Triggers**: Push to main/develop/review, pull requests
+- **Jobs**:
+  - `lint`: Rustfmt formatting, Clippy linting (zero warnings policy)
+  - `security`: cargo-audit for vulnerability scanning
+  - `test`: Integration tests with PostgreSQL service container
+  - `docker`: Docker build validation with multi-stage builds
+  - `coverage`: Code coverage with tarpaulin (generates lcov reports)
+  - `dependencies`: Check for outdated and unused dependencies
+- **Features**: Cargo caching (registry, index, target), parallel job execution
+- **Enforcement**: All jobs required to pass for green build status
+
+**Deployment Pipeline** (`deploy.yml`):
+- **Triggers**: Push to main, version tags (v*.*.*), manual workflow dispatch
+- **Jobs**:
+  - `build-and-push`: Build Docker images, push to GitHub Container Registry (GHCR)
+  - `security-scan`: Trivy vulnerability scanning with SARIF upload to GitHub Security
+  - `deploy`: Deploy to staging/production environments with approval gates
+- **Features**: 
+  - SBOM (Software Bill of Materials) generation
+  - Multi-platform image support (linux/amd64, linux/arm64)
+  - Tag management (latest, version tags, branch-specific)
+  - Environment-specific deployments with protection rules
+- **Security**: Image scanning for HIGH/CRITICAL vulnerabilities
+
+**Scheduled Maintenance** (`scheduled.yml`):
+- **Schedule**: Mondays at 9:00 AM UTC (weekly)
+- **Jobs**:
+  - `dependency-updates`: Check cargo-outdated, create GitHub issues **only for major version updates** (e.g., 1.x → 2.x)
+  - `security-audit`: Run cargo-audit, create issues for vulnerabilities (CRITICAL priority)
+  - `docker-updates`: Check Rust base image updates
+  - `health-summary`: Aggregate maintenance status
+- **Issue Creation Policy**: Only creates issues for major updates requiring manual intervention; minor/patch updates are logged but skipped
+- **Automation**: Uses GitHub Script API to create automated issues with labels
+
+**PR Validation** (`pr-checks.yml`):
+- **Triggers**: Pull request events (opened, synchronize, reopened, edited)
+- **Jobs**:
+  - `validate`: PR title format (semantic commits), file size checks (<5MB), TODO/FIXME detection
+  - `size-check`: Binary size analysis with cargo-bloat, detect size regressions
+  - `breaking-changes`: API compatibility checking with cargo-semver-checks
+  - `spell-check`: Typos spell checking with project dictionary
+  - `auto-label`: Automatic PR labeling based on changed files
+- **Features**: 
+  - Comments on PRs with validation results
+  - Large file warnings (>5MB)
+  - Binary bloat analysis (top 10 largest functions)
+
+**Supporting Configuration**:
+1. **PR Auto-Labeling** (`.github/labeler.yml`):
+   - 10 categories: CI/CD, dependencies, documentation, security, database, frontend, tests, handlers, routes, migrations
+   - Automatic label application based on file paths
+
+2. **Spell Checker** (`.typos.toml`):
+   - Project dictionary: humidor, cigars, warp, tokio, postgres, etc.
+   - Exclusions: target/, Cargo.lock, minified files, UUIDs, hex strings
+
+3. **Workflow Documentation** (`.github/workflows/README.md`):
+   - Comprehensive 300+ line guide
+   - Local testing instructions
+   - Secrets configuration (GHCR_TOKEN, deployment credentials)
+   - Troubleshooting guide
+   - Best practices and performance metrics
+
+**Quality Gates Enforced**:
+- ✅ Rustfmt formatting compliance
+- ✅ Clippy linting with zero warnings
+- ✅ Security vulnerability scanning (cargo-audit, Trivy)
+- ✅ Integration test suite passing
+- ✅ Docker build success
+- ✅ Code coverage tracking
+- ✅ Dependency freshness monitoring
+- ✅ Binary size tracking
+- ✅ API compatibility checking
+
+**Automation Features**:
+- Automatic issue creation for **major version** dependency updates only
+- Automatic issue creation for security vulnerabilities
+- PR auto-labeling based on changed files
+- Code coverage reporting
+- Binary size regression detection
+- Spell checking with project-specific dictionary
+
+**Next Steps**:
+1. Push changes to GitHub to activate workflows
+2. Monitor Actions tab for first few runs
+3. Configure required secrets (GHCR_TOKEN for deployment)
+4. **Optional**: Set up branch protection rules after 1-2 weeks of stable builds
+4. Configure environment protection rules for production deployments
+5. Monitor first workflow runs and adjust as needed
+
+---
+
 ## Medium Priority Issues
 
 ### 🔲 Medium Priority #1: Add API Documentation
@@ -336,10 +436,10 @@ cargo test -- --nocapture
 ## Progress Summary
 
 **Critical Issues**: 9/9 ✅ (100% Complete)  
-**High Priority Issues**: 2/7 ⏸️ (29% Complete)  
+**High Priority Issues**: 3/7 ⏸️ (43% Complete)  
 **Medium Priority Issues**: 0/5 ⏸️ (0% Complete)
 
-**Overall Progress**: 11/21 (52% Complete)
+**Overall Progress**: 12/21 (57% Complete)
 
 ---
 

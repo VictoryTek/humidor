@@ -1,0 +1,213 @@
+name: Pull Request Checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+jobs:
+  # PR validation
+  validate:
+    name: Validate PR
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check PR title
+        uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            docs
+            style
+            refactor
+            perf
+            test
+            chore
+            ci
+            security
+          requireScope: false
+
+      - name: Check for large files
+        run: |
+          # Fail if files larger than 5MB are added
+          LARGE_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | xargs ls -lh 2>/dev/null | awk '$5 ~ /M$/ && $5+0 > 5')
+          if [ -n "$LARGE_FILES" ]; then
+            echo "Error: Large files detected (>5MB):"
+            echo "$LARGE_FILES"
+            exit 1
+          fi
+
+      - name: Check for TODO/FIXME comments
+        id: todos
+        run: |
+          TODOS=$(git diff origin/${{ github.base_ref }}...HEAD | grep -E '^\+.*\b(TODO|FIXME|XXX|HACK)\b' || true)
+          if [ -n "$TODOS" ]; then
+            echo "todos_found=true" >> $GITHUB_OUTPUT
+            echo "$TODOS" > todos.txt
+          else
+            echo "todos_found=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Comment on TODOs
+        if: steps.todos.outputs.todos_found == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const todos = fs.readFileSync('todos.txt', 'utf8');
+            
+            const body = `## ⚠️ TODO/FIXME Comments Detected\n\n` +
+              `The following TODO/FIXME comments were found in this PR:\n\n` +
+              `\`\`\`\n${todos}\n\`\`\`\n\n` +
+              `Please ensure these are tracked or resolved before merging.`;
+            
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body
+            });
+
+  # Code size analysis
+  size-check:
+    name: Code Size Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-bloat
+        run: cargo install cargo-bloat
+
+      - name: Analyze binary size
+        run: |
+          cargo bloat --release > bloat.txt 2>&1 || echo "Bloat analysis may have warnings"
+          
+      - name: Comment size analysis
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const bloat = fs.readFileSync('bloat.txt', 'utf8');
+            
+            // Truncate if too long
+            const truncated = bloat.length > 2000 ? 
+              bloat.substring(0, 2000) + '\n\n... (truncated)' : 
+              bloat;
+            
+            const body = `## Binary Size Analysis\n\n` +
+              `<details>\n<summary>Click to expand</summary>\n\n` +
+              `\`\`\`\n${truncated}\n\`\`\`\n\n` +
+              `</details>`;
+            
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body
+            });
+
+  # Check for breaking changes
+  breaking-changes:
+    name: Check for Breaking Changes
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Checkout base
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          git checkout origin/${{ github.base_ref }}
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Generate base API
+        run: |
+          cargo doc --no-deps --document-private-items 2>&1 | tee base-api.txt || true
+
+      - name: Checkout PR branch
+        run: git checkout ${{ github.head_ref }}
+
+      - name: Generate PR API
+        run: |
+          cargo doc --no-deps --document-private-items 2>&1 | tee pr-api.txt || true
+
+      - name: Compare APIs
+        run: |
+          echo "API comparison between base and PR"
+          # This is a simple check - in production you might use cargo-public-api
+          diff base-api.txt pr-api.txt > api-diff.txt || true
+          
+          if [ -s api-diff.txt ]; then
+            echo "API changes detected"
+          else
+            echo "No API changes detected"
+          fi
+
+  # Spell check
+  spell-check:
+    name: Spell Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run spell check
+        uses: crate-ci/typos@master
+        with:
+          files: ./src ./docs ./README.md
+          config: ./.typos.toml
+
+  # Label PR based on changes
+  auto-label:
+    name: Auto Label PR
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Label based on files
+        uses: actions/labeler@v5
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          configuration-path: .github/labeler.yml
+
+  # Summary
+  pr-checks-complete:
+    name: PR Checks Complete
+    runs-on: ubuntu-latest
+    needs: [validate, size-check, breaking-changes, spell-check]
+    if: always()
+    steps:
+      - name: Check results
+        run: |
+          echo "Validation: ${{ needs.validate.result }}"
+          echo "Size Check: ${{ needs.size-check.result }}"
+          echo "Breaking Changes: ${{ needs.breaking-changes.result }}"
+          echo "Spell Check: ${{ needs.spell-check.result }}"
+          
+          if [ "${{ needs.validate.result }}" == "failure" ] || \
+             [ "${{ needs.spell-check.result }}" == "failure" ]; then
+            echo "❌ Some PR checks failed"
+            exit 1
+          fi
+          
+          echo "✅ PR checks passed"

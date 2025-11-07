@@ -1,0 +1,39 @@
+# Auto-label PRs based on changed files
+
+'CI/CD':
+  - '.github/workflows/**'
+  - 'Dockerfile'
+  - 'docker-compose.yml'
+  - '.dockerignore'
+
+'dependencies':
+  - 'Cargo.toml'
+  - 'Cargo.lock'
+
+'documentation':
+  - 'docs/**'
+  - 'README.md'
+  - '**/*.md'
+
+'security':
+  - 'src/middleware/auth.rs'
+  - 'src/middleware/rate_limiter.rs'
+  - 'src/handlers/auth.rs'
+
+'database':
+  - 'migrations/**'
+  - 'src/models/**'
+
+'frontend':
+  - 'static/**'
+
+'tests':
+  - 'tests/**'
+  - '**/*_test.rs'
+  - '**/*_tests.rs'
+
+'handlers':
+  - 'src/handlers/**'
+
+'routes':
+  - 'src/routes/**'
