@@ -1,4 +1,4 @@
-use super::helpers::{with_current_user, with_db, with_uuid};
+use super::helpers::{json_body, with_current_user, with_db, with_uuid};
 use crate::handlers;
 use crate::DbPool;
 use warp::Filter;
@@ -29,7 +29,7 @@ pub fn create_humidor_routes(
         .and(warp::path("v1"))
         .and(warp::path("humidors"))
         .and(warp::post())
-        .and(warp::body::json())
+        .and(json_body())
         .and(with_current_user(db_pool.clone()))
         .and(with_db(db_pool.clone()))
         .and_then(handlers::create_humidor);
@@ -39,7 +39,7 @@ pub fn create_humidor_routes(
         .and(warp::path("humidors"))
         .and(with_uuid())
         .and(warp::put())
-        .and(warp::body::json())
+        .and(json_body())
         .and(with_current_user(db_pool.clone()))
         .and(with_db(db_pool.clone()))
         .and_then(handlers::update_humidor);

@@ -151,14 +151,30 @@
 
 ---
 
-### 🔲 High Priority #4: Implement Request Size Limits
-**Status**: NOT STARTED  
-**Priority**: High
+### ✅ High Priority #4: Implement Request Size Limits (Issue #10)
+**Status**: COMPLETED  
+**Priority**: High  
+**Files Modified**: `src/routes/helpers.rs`, `src/routes/auth.rs`, `src/routes/users.rs`, `src/routes/cigars.rs`, `src/routes/organizers.rs`, `src/routes/humidors.rs`, `src/routes/favorites.rs`
 
-**Requirements**:
-- Add max body size limits to prevent memory exhaustion
-- Configure reasonable limits for file uploads
-- Return appropriate error messages when limits exceeded
+**Implementation Details**:
+- **JSON Request Limit**: 1MB for all JSON API endpoints (reasonable for typical API payloads)
+- **File Upload Limit**: 100MB for multipart file uploads (already configured in backups.rs)
+- **Helper Function**: Created `json_body()` helper in `routes/helpers.rs` that wraps `warp::body::content_length_limit(1024 * 1024)` and `warp::body::json()`
+- **Global Application**: Updated all 7 route modules to use the new `json_body()` helper instead of raw `warp::body::json()`
+
+**Security Benefits**:
+- Prevents memory exhaustion attacks via oversized request bodies
+- Protects against denial-of-service (DoS) attacks
+- Server automatically rejects requests exceeding limits with HTTP 413 (Payload Too Large)
+- No custom error handling needed - Warp handles rejection automatically
+
+**Affected Routes** (40+ endpoints):
+- Authentication: setup, login, forgot password, reset password
+- User management: profile updates, password changes
+- Cigars: create, update, scrape operations
+- Organizers: brands, origins, sizes, strengths, ring gauges (create/update operations)
+- Humidors: create and update operations
+- Favorites & Wish List: add operations and notes updates
 
 ---
 
@@ -247,11 +263,11 @@
 
 ## Progress Summary
 
-**Critical Issues**: 8/8 ✅ (100% Complete)  
-**High Priority Issues**: 0/6 ⏸️ (0% Complete)  
+**Critical Issues**: 9/9 ✅ (100% Complete)  
+**High Priority Issues**: 1/6 ⏸️ (17% Complete)  
 **Medium Priority Issues**: 0/5 ⏸️ (0% Complete)
 
-**Overall Progress**: 8/19 (42% Complete)
+**Overall Progress**: 10/20 (50% Complete)
 
 ---
 
@@ -317,21 +333,58 @@
 
 ---
 
+### ✅ Critical Issue #9: Strengthen CORS origin validation logic
+**Status**: COMPLETED  
+**Priority**: Critical  
+**Files Modified**: `src/main.rs`
+
+**Implementation Details**:
+- **URL Format Validation**: Rejects origins without `http://` or `https://` protocol
+- **Path/Query/Fragment Detection**: Blocks origins containing paths, queries, or fragments
+- **Wildcard Warning**: Logs warning when `*` is used, recommending explicit origins for production
+- **Empty Origin List Detection**: Logs error if no valid origins remain after validation
+- **Detailed Error Logging**: All rejected origins logged with specific reasons
+
+**Validation Rules**:
+- **Accepts**: Valid URLs like `http://localhost:9898`, `https://example.com`, `https://app.example.com:8443`
+- **Rejects**: 
+  - Missing protocol: `example.com`
+  - With path: `http://example.com/api`
+  - With query: `http://example.com?query=1`
+  - With fragment: `http://example.com#section`
+- **Warns**: `*` (wildcard - security risk in production)
+
+**Security Benefits**:
+- Prevents misconfigured CORS allowing unintended origins
+- Detects and warns about overly permissive configurations
+- Provides clear error messages for invalid configurations
+- Helps developers avoid common CORS security mistakes
+- Supports security auditing through comprehensive logging
+
+---
+
 ## Next Steps
 
-1. Begin High Priority issues
-2. Focus on input validation across all handlers
-3. Improve CORS configuration for production
-4. Add database connection pooling timeouts
-5. Implement request size limits
+1. Continue with remaining High Priority issues:
+   - **High Priority #1**: Add input validation to all handlers
+   - **High Priority #2**: Improve CORS configuration for production (partially complete)
+   - **High Priority #3**: Add database connection pooling timeouts
+   - **High Priority #5**: Add database transaction support
+   - **High Priority #6**: Implement comprehensive error types (partially complete)
+2. Move to Medium Priority issues after High Priority completion
+3. Focus on API documentation and audit logging
 
 ---
 
 ## Notes
 
-- All critical security issues have been addressed
+- **All 9 critical security issues completed** ✅
+- **1 of 6 high priority issues completed** (Request size limits)
 - Application now has proper startup validation
 - Comprehensive structured logging in place
-- Rate limiting prevents brute force attacks
-- Security headers protect against common web vulnerabilities
+- Rate limiting prevents brute force attacks (5 attempts/15 min)
+- Security headers protect against common web vulnerabilities (7 headers)
+- CORS validation prevents misconfiguration
+- Request size limits prevent DoS attacks (1MB JSON, 100MB files)
 - Zero panic-inducing code remains in production handlers
+- Code is well-modularized with 7 separate route modules

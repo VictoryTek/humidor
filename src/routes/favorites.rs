@@ -1,4 +1,4 @@
-use super::helpers::{with_current_user, with_db, with_uuid};
+use super::helpers::{json_body, with_current_user, with_db, with_uuid};
 use crate::handlers;
 use crate::DbPool;
 use warp::Filter;
@@ -22,7 +22,7 @@ pub fn create_favorite_routes(
         .and(warp::path("favorites"))
         .and(warp::path::end())
         .and(warp::post())
-        .and(warp::body::json())
+        .and(json_body())
         .and(with_current_user(db_pool.clone()))
         .and(with_db(db_pool.clone()))
         .and_then(handlers::add_favorite);
@@ -63,7 +63,7 @@ pub fn create_favorite_routes(
         .and(warp::path("wish_list"))
         .and(warp::path::end())
         .and(warp::post())
-        .and(warp::body::json())
+        .and(json_body())
         .and(with_current_user(db_pool.clone()))
         .and(with_db(db_pool.clone()))
         .and_then(handlers::add_to_wish_list);
@@ -95,7 +95,7 @@ pub fn create_favorite_routes(
         .and(with_uuid())
         .and(warp::path::end())
         .and(warp::put())
-        .and(warp::body::json())
+        .and(json_body())
         .and(with_current_user(db_pool.clone()))
         .and(with_db(db_pool.clone()))
         .and_then(handlers::update_wish_list_notes);

@@ -1,4 +1,4 @@
-use super::helpers::{with_current_user, with_db};
+use super::helpers::{json_body, with_current_user, with_db};
 use crate::handlers;
 use crate::DbPool;
 use warp::Filter;
@@ -21,7 +21,7 @@ pub fn create_user_routes(
         .and(warp::path("users"))
         .and(warp::path("self"))
         .and(warp::put())
-        .and(warp::body::json())
+        .and(json_body())
         .and(with_current_user(db_pool.clone()))
         .and(with_db(db_pool.clone()))
         .and_then(handlers::update_current_user);
@@ -31,7 +31,7 @@ pub fn create_user_routes(
         .and(warp::path("users"))
         .and(warp::path("password"))
         .and(warp::put())
-        .and(warp::body::json())
+        .and(json_body())
         .and(with_current_user(db_pool.clone()))
         .and(with_db(db_pool.clone()))
         .and_then(handlers::change_password);

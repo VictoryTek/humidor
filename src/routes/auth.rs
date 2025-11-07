@@ -1,4 +1,4 @@
-use super::helpers::{with_client_ip, with_db, with_rate_limiter};
+use super::helpers::{json_body, with_client_ip, with_db, with_rate_limiter};
 use crate::handlers;
 use crate::middleware::RateLimiter;
 use crate::DbPool;
@@ -22,7 +22,7 @@ pub fn create_auth_routes(
         .and(warp::path("setup"))
         .and(warp::path("user"))
         .and(warp::post())
-        .and(warp::body::json())
+        .and(json_body())
         .and(with_db(db_pool.clone()))
         .and_then(handlers::create_setup_user);
 
@@ -31,7 +31,7 @@ pub fn create_auth_routes(
         .and(warp::path("auth"))
         .and(warp::path("login"))
         .and(warp::post())
-        .and(warp::body::json())
+        .and(json_body())
         .and(with_db(db_pool.clone()))
         .and(with_rate_limiter(rate_limiter))
         .and(with_client_ip())
@@ -42,7 +42,7 @@ pub fn create_auth_routes(
         .and(warp::path("auth"))
         .and(warp::path("forgot-password"))
         .and(warp::post())
-        .and(warp::body::json())
+        .and(json_body())
         .and(with_db(db_pool.clone()))
         .and_then(handlers::forgot_password);
 
@@ -51,7 +51,7 @@ pub fn create_auth_routes(
         .and(warp::path("auth"))
         .and(warp::path("reset-password"))
         .and(warp::post())
-        .and(warp::body::json())
+        .and(json_body())
         .and(with_db(db_pool.clone()))
         .and_then(handlers::reset_password);
 
