@@ -321,6 +321,9 @@ async fn test_concurrent_quantity_updates() {
         handle.await.unwrap();
     }
 
+    // Add a small delay to ensure all transactions are committed
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
     // Verify final quantity
     let client = ctx.pool.get().await.unwrap();
     let row = client
