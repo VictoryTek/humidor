@@ -31,3 +31,6 @@ PostgreSQL = "PostgreSQL"
 Vec = "Vec"
 Ok = "Ok"
 Err = "Err"
+# Cigar-specific measurements
+64ths = "64ths"
+ths = "ths"  # Part of "64ths"

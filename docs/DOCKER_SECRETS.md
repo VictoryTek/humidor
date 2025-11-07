@@ -116,7 +116,6 @@ For production, use proper secrets management:
   - AWS: AWS Secrets Manager
   - Azure: Azure Key Vault
   - GCP: Google Secret Manager
-- **HashiCorp Vault**: For enterprise secret management
 
 ## Verification
 

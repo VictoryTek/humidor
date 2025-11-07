@@ -1,39 +1,58 @@
 # Auto-label PRs based on changed files
 
-'CI/CD':
-  - '.github/workflows/**'
-  - 'Dockerfile'
-  - 'docker-compose.yml'
-  - '.dockerignore'
+CI/CD:
+  - changed-files:
+    - any-glob-to-any-file:
+      - '.github/workflows/**'
+      - 'Dockerfile'
+      - 'docker-compose.yml'
+      - '.dockerignore'
 
-'dependencies':
-  - 'Cargo.toml'
-  - 'Cargo.lock'
+dependencies:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'Cargo.toml'
+      - 'Cargo.lock'
 
-'documentation':
-  - 'docs/**'
-  - 'README.md'
-  - '**/*.md'
+documentation:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'docs/**'
+      - 'README.md'
+      - '**/*.md'
 
-'security':
-  - 'src/middleware/auth.rs'
-  - 'src/middleware/rate_limiter.rs'
-  - 'src/handlers/auth.rs'
+security:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'src/middleware/auth.rs'
+      - 'src/middleware/rate_limiter.rs'
+      - 'src/handlers/auth.rs'
 
-'database':
-  - 'migrations/**'
-  - 'src/models/**'
+database:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'migrations/**'
+      - 'src/models/**'
 
-'frontend':
-  - 'static/**'
+frontend:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'static/**'
 
-'tests':
-  - 'tests/**'
-  - '**/*_test.rs'
-  - '**/*_tests.rs'
+tests:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'tests/**'
+      - '**/*_test.rs'
+      - '**/*_tests.rs'
 
-'handlers':
-  - 'src/handlers/**'
+handlers:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'src/handlers/**'
 
-'routes':
-  - 'src/routes/**'
+routes:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'src/routes/**'
+
