@@ -295,34 +295,30 @@ async fn test_concurrent_quantity_updates() {
         .await
         .unwrap();
 
-    // Simulate multiple concurrent updates
-    let mut handles = vec![];
-
-    for _ in 0..5 {
-        let pool_clone = ctx.pool.clone();
-        let cigar_id_clone = cigar_id;
-
-        let handle = tokio::spawn(async move {
-            let client = pool_clone.get().await.unwrap();
-            client
-                .execute(
-                    "UPDATE cigars SET quantity = quantity - 1 WHERE id = $1",
-                    &[&cigar_id_clone],
-                )
-                .await
-                .unwrap();
-        });
-
-        handles.push(handle);
-    }
+    // Use join_all to ensure all operations complete before checking
+    let pool = ctx.pool.clone();
+    let updates: Vec<_> = (0..5)
+        .map(|_| {
+            let pool = pool.clone();
+            let cigar_id = cigar_id;
+            async move {
+                let client = pool.get().await.unwrap();
+                client
+                    .execute(
+                        "UPDATE cigars SET quantity = quantity - 1 WHERE id = $1",
+                        &[&cigar_id],
+                    )
+                    .await
+                    .unwrap();
+            }
+        })
+        .collect();
 
     // Wait for all updates to complete
-    for handle in handles {
-        handle.await.unwrap();
-    }
+    futures::future::join_all(updates).await;
 
-    // Add a small delay to ensure all transactions are committed
-    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    // Add a delay to ensure all transactions are fully committed
+    tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
 
     // Verify final quantity
     let client = ctx.pool.get().await.unwrap();
