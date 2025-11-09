@@ -61,6 +61,22 @@ pub async fn setup_test_db() -> TestContext {
             .await;
     }
 
+    // Ensure retail_link column exists (V10 migration)
+    {
+        let client = pool
+            .get()
+            .await
+            .expect("Failed to get client for retail_link setup");
+        let _ = client
+            .batch_execute(
+                "
+            ALTER TABLE cigars ADD COLUMN IF NOT EXISTS retail_link TEXT;
+            CREATE INDEX IF NOT EXISTS idx_cigars_retail_link ON cigars(retail_link) WHERE retail_link IS NOT NULL;
+        ",
+            )
+            .await;
+    }
+
     // Now clean up any existing test data with a fresh client
     {
         let client = pool.get().await.expect("Failed to get client for cleanup");
@@ -192,10 +208,11 @@ pub async fn create_test_cigar(
 ) -> Result<Uuid, Box<dyn std::error::Error>> {
     let client = pool.get().await?;
 
+    // Don't explicitly list retail_link - let the database handle the default (NULL)
     let row = client
         .query_one(
-            "INSERT INTO cigars (id, name, quantity, humidor_id, is_active, created_at, updated_at, retail_link) 
-             VALUES ($1, $2, $3, $4, true, NOW(), NOW(), NULL) 
+            "INSERT INTO cigars (id, name, quantity, humidor_id, is_active, created_at, updated_at) 
+             VALUES ($1, $2, $3, $4, true, NOW(), NOW()) 
              RETURNING id",
             &[&Uuid::new_v4(), &name, &quantity, &humidor_id],
         )
