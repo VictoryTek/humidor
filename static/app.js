@@ -28,6 +28,81 @@ let selectedStrengths = [];
 let selectedRingGauges = [];
 let filteredCigars = [];
 
+// Pagination State
+let currentCigarPage = 1;
+let cigarPageSize = 50;
+let totalCigars = 0;
+let totalCigarPages = 0;
+
+// Router State
+let currentRoute = { view: 'hub', humidorId: null };
+
+// Router Functions
+function initializeRouter() {
+    // Handle hash changes
+    window.addEventListener('hashchange', handleRouteChange);
+    
+    // Handle initial route
+    handleRouteChange();
+}
+
+function handleRouteChange() {
+    const hash = window.location.hash.slice(1); // Remove the # character
+    console.log('Route changed to:', hash);
+    
+    if (!hash || hash === 'humidors') {
+        // Hub view (or default)
+        currentRoute = { view: 'hub', humidorId: null };
+        if (humidors.length === 1) {
+            // If only one humidor, go directly to it
+            console.log('Single humidor, showing detail');
+            showHumidorDetail(humidors[0].id);
+        } else if (humidors.length > 1) {
+            // Show hub with multiple humidors
+            console.log('Multiple humidors, showing hub');
+            showHumidorHub();
+        } else {
+            // No humidors yet, show existing empty state
+            console.log('No humidors, loading');
+            loadHumidors();
+        }
+    } else if (hash.startsWith('humidors/')) {
+        // Detail view for specific humidor
+        const humidorId = hash.split('/')[1];
+        console.log('Detail route, humidor ID:', humidorId);
+        if (humidorId) {
+            currentRoute = { view: 'detail', humidorId };
+            showHumidorDetail(humidorId);
+        } else {
+            // Invalid ID, go to hub
+            console.log('Invalid humidor ID');
+            navigateToHub();
+        }
+    } else {
+        // Unknown route, go to hub
+        console.log('Unknown route');
+        navigateToHub();
+    }
+}
+
+function navigateToHub() {
+    console.log('Navigating to hub');
+    window.location.hash = '#humidors';
+}
+
+function navigateToHumidorDetail(humidorId) {
+    console.log('Navigating to humidor detail:', humidorId);
+    window.location.hash = `#humidors/${humidorId}`;
+}
+
+// Utility function to escape HTML
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 // Helper functions to get organizer names from IDs
 function getBrandName(brandId) {
     if (!brandId) {
@@ -199,6 +274,10 @@ async function makeAuthenticatedRequest(url, options = {}) {
 // API Functions
 const API = {
     async getCigars(params = {}) {
+        // Add pagination parameters if not provided
+        if (!params.page) params.page = currentCigarPage;
+        if (!params.page_size) params.page_size = cigarPageSize;
+        
         const searchParams = new URLSearchParams(params);
         const response = await fetch(`/api/v1/cigars?${searchParams}`);
         if (!response.ok) throw new Error('Failed to fetch cigars');
@@ -693,6 +772,88 @@ function filterCigars() {
     renderCigars();
 }
 
+// Pagination Functions
+function updatePaginationControls() {
+    const paginationContainer = document.getElementById('paginationContainer');
+    const paginationInfo = document.getElementById('paginationInfo');
+    const paginationPages = document.getElementById('paginationPages');
+    const firstPageBtn = document.getElementById('firstPageBtn');
+    const prevPageBtn = document.getElementById('prevPageBtn');
+    const nextPageBtn = document.getElementById('nextPageBtn');
+    const lastPageBtn = document.getElementById('lastPageBtn');
+    
+    if (!paginationContainer) return;
+    
+    // Show/hide pagination based on whether we have cigars
+    if (totalCigars > 0) {
+        paginationContainer.style.display = 'flex';
+        
+        // Update info text
+        const startItem = (currentCigarPage - 1) * cigarPageSize + 1;
+        const endItem = Math.min(currentCigarPage * cigarPageSize, totalCigars);
+        paginationInfo.textContent = `Showing ${startItem}-${endItem} of ${totalCigars} cigars`;
+        
+        // Update button states
+        firstPageBtn.disabled = currentCigarPage === 1;
+        prevPageBtn.disabled = currentCigarPage === 1;
+        nextPageBtn.disabled = currentCigarPage === totalCigarPages;
+        lastPageBtn.disabled = currentCigarPage === totalCigarPages;
+        
+        // Generate page numbers
+        paginationPages.innerHTML = '';
+        const maxVisiblePages = 5;
+        let startPage = Math.max(1, currentCigarPage - Math.floor(maxVisiblePages / 2));
+        let endPage = Math.min(totalCigarPages, startPage + maxVisiblePages - 1);
+        
+        // Adjust start if we're near the end
+        if (endPage - startPage < maxVisiblePages - 1) {
+            startPage = Math.max(1, endPage - maxVisiblePages + 1);
+        }
+        
+        for (let i = startPage; i <= endPage; i++) {
+            const pageBtn = document.createElement('button');
+            pageBtn.className = 'pagination-page-btn' + (i === currentCigarPage ? ' active' : '');
+            pageBtn.textContent = i;
+            pageBtn.onclick = () => goToPage(i);
+            paginationPages.appendChild(pageBtn);
+        }
+    } else {
+        paginationContainer.style.display = 'none';
+    }
+}
+
+async function goToPage(page) {
+    if (page < 1 || page > totalCigarPages || page === currentCigarPage) return;
+    currentCigarPage = page;
+    await loadCigars();
+}
+
+async function nextPage() {
+    if (currentCigarPage < totalCigarPages) {
+        await goToPage(currentCigarPage + 1);
+    }
+}
+
+async function previousPage() {
+    if (currentCigarPage > 1) {
+        await goToPage(currentCigarPage - 1);
+    }
+}
+
+async function firstPage() {
+    await goToPage(1);
+}
+
+async function lastPage() {
+    await goToPage(totalCigarPages);
+}
+
+async function changePageSize(newSize) {
+    cigarPageSize = parseInt(newSize);
+    currentCigarPage = 1; // Reset to first page when changing page size
+    await loadCigars();
+}
+
 function closeCigarModal() {
     elements.cigarModal.classList.remove('show');
     document.body.style.overflow = 'auto';
@@ -779,12 +940,20 @@ async function loadCigars() {
         console.log('Loading cigars...');
         const response = await API.getCigars();
         console.log('Cigars loaded successfully:', response);
-        cigars = response.cigars;
+        
+        // Extract cigars and pagination metadata
+        cigars = response.cigars || [];
+        totalCigars = response.total || 0;
+        currentCigarPage = response.page || 1;
+        cigarPageSize = response.page_size || 50;
+        totalCigarPages = response.total_pages || 0;
+        
         filteredCigars = [...cigars];
         
         updateStats();
         updateFilters();
         renderCigars();
+        updatePaginationControls();
     } catch (error) {
         console.error('Detailed error loading cigars:', error);
         console.error('Error stack:', error.stack);
@@ -1254,8 +1423,9 @@ document.addEventListener('DOMContentLoaded', function() {
         toastContainer: document.getElementById('toastContainer')
     };
 
-    // Initialize navigation and load humidors
+    // Initialize navigation and router
     initializeNavigation();
+    initializeRouter();
     
     // Event listeners for new interface
     if (elements.createFirstHumidorBtn) {
@@ -1558,6 +1728,35 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    // Pagination event listeners
+    const firstPageBtn = document.getElementById('firstPageBtn');
+    const prevPageBtn = document.getElementById('prevPageBtn');
+    const nextPageBtn = document.getElementById('nextPageBtn');
+    const lastPageBtn = document.getElementById('lastPageBtn');
+    const pageSizeSelect = document.getElementById('pageSizeSelect');
+    
+    if (firstPageBtn) {
+        firstPageBtn.addEventListener('click', firstPage);
+    }
+    
+    if (prevPageBtn) {
+        prevPageBtn.addEventListener('click', previousPage);
+    }
+    
+    if (nextPageBtn) {
+        nextPageBtn.addEventListener('click', nextPage);
+    }
+    
+    if (lastPageBtn) {
+        lastPageBtn.addEventListener('click', lastPage);
+    }
+    
+    if (pageSizeSelect) {
+        pageSizeSelect.addEventListener('change', (e) => {
+            changePageSize(e.target.value);
+        });
+    }
+    
     // Initialize the interface
     // Note: loadHumidors() will call loadOrganizers() internally first
     loadHumidors();
@@ -1814,15 +2013,232 @@ function showAppropriateSection() {
         welcomeSection.style.display = 'block';
         mainContentSection.style.display = 'none';
     } else {
-        welcomeSection.style.display = 'none';
-        mainContentSection.style.display = 'block';
-        renderHumidorSections();
+        // Let the router handle displaying the correct view
+        handleRouteChange();
     }
 }
 
 function showWelcomeSection() {
     document.getElementById('welcomeSection').style.display = 'block';
     document.getElementById('mainContentSection').style.display = 'none';
+}
+
+// Humidor Hub View (for multiple humidors)
+function showHumidorHub() {
+    const welcomeSection = document.getElementById('welcomeSection');
+    const mainContentSection = document.getElementById('mainContentSection');
+    const humidorsContainer = document.getElementById('humidorsContainer');
+    const paginationContainer = document.getElementById('paginationContainer');
+    
+    welcomeSection.style.display = 'none';
+    mainContentSection.style.display = 'block';
+    
+    // Hide pagination on hub view
+    if (paginationContainer) {
+        paginationContainer.style.display = 'none';
+    }
+    
+    // Render humidor cards
+    humidorsContainer.innerHTML = `
+        <div class="humidor-hub">
+            <div class="humidor-hub-header">
+                <h2>Your Humidors</h2>
+                <p>Select a humidor to view its contents</p>
+            </div>
+            <div class="humidor-cards-grid">
+                ${humidors.map(humidor => {
+                    const humidorCigars = cigars.filter(c => c.humidor_id === humidor.id);
+                    const totalQuantity = humidorCigars.reduce((sum, c) => sum + (c.quantity || 0), 0);
+                    
+                    // Determine image source or use placeholder
+                    const imageHtml = humidor.image_url 
+                        ? `<img src="${humidor.image_url}" alt="${escapeHtml(humidor.name)}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                           <img src="/static/humidor-placeholder.png" alt="Humidor placeholder" style="display: none; width: 100%; height: 100%; object-fit: cover;">`
+                        : `<img src="/static/humidor-placeholder.png" alt="Humidor placeholder" style="width: 100%; height: 100%; object-fit: cover;">`;
+                    
+                    return `
+                        <div class="humidor-card" onclick="navigateToHumidorDetail('${humidor.id}')">
+                            <div class="humidor-card-image">
+                                ${imageHtml}
+                                <div class="humidor-card-actions" onclick="event.stopPropagation();">
+                                    <button class="btn-icon" onclick="editHumidor('${humidor.id}')" title="Edit Humidor">
+                                        <i class="mdi mdi-pencil"></i>
+                                    </button>
+                                    <button class="btn-icon" onclick="deleteHumidor('${humidor.id}')" title="Delete Humidor">
+                                        <i class="mdi mdi-delete"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="humidor-card-content">
+                                <div class="humidor-card-header">
+                                    <h3>${escapeHtml(humidor.name)}</h3>
+                                    ${humidor.location ? `<p class="humidor-location">${escapeHtml(humidor.location)}</p>` : ''}
+                                </div>
+                                <div class="humidor-card-stats">
+                                    <div class="stat">
+                                        <i class="mdi mdi-cigar"></i>
+                                        <span class="stat-value">${totalQuantity}</span>
+                                        <span class="stat-label">Cigars</span>
+                                    </div>
+                                    <div class="stat">
+                                        <i class="mdi mdi-format-list-bulleted"></i>
+                                        <span class="stat-value">${humidorCigars.length}</span>
+                                        <span class="stat-label">Types</span>
+                                    </div>
+                                </div>
+                                ${humidor.notes ? `
+                                    <div class="humidor-card-notes">
+                                        <p>${escapeHtml(humidor.notes)}</p>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        </div>
+    `;
+}
+
+// Humidor Detail View (for single humidor with pagination)
+async function showHumidorDetail(humidorId) {
+    console.log('showHumidorDetail called with ID:', humidorId);
+    console.log('Available humidors:', humidors);
+    
+    const humidor = humidors.find(h => h.id === humidorId);
+    if (!humidor) {
+        console.log('Humidor not found!');
+        showToast('Humidor not found', 'error');
+        navigateToHub();
+        return;
+    }
+    
+    console.log('Found humidor:', humidor);
+    
+    const welcomeSection = document.getElementById('welcomeSection');
+    const mainContentSection = document.getElementById('mainContentSection');
+    const humidorsContainer = document.getElementById('humidorsContainer');
+    const paginationContainer = document.getElementById('paginationContainer');
+    
+    welcomeSection.style.display = 'none';
+    mainContentSection.style.display = 'block';
+    
+    // Show pagination on detail view
+    if (paginationContainer) {
+        paginationContainer.style.display = 'flex';
+    }
+    
+    // Load cigars for this specific humidor with pagination
+    try {
+        console.log('Loading cigars for humidor:', humidorId);
+        const response = await makeAuthenticatedRequest(
+            `/api/v1/cigars?humidor_id=${humidorId}&page=${currentCigarPage}&page_size=${cigarPageSize}`
+        );
+        
+        if (response.ok) {
+            const responseData = await response.json();
+            cigars = responseData.cigars || [];
+            totalCigars = responseData.total || 0;
+            totalCigarPages = responseData.total_pages || 1;
+            
+            console.log('Loaded cigars:', cigars.length);
+            
+            // Render back button and humidor header
+            const backButtonHtml = humidors.length > 1 ? `
+                <div class="humidor-detail-nav">
+                    <button class="btn-back" onclick="navigateToHub()">
+                        <i class="mdi mdi-arrow-left"></i> Back to Humidors
+                    </button>
+                </div>
+            ` : '';
+            
+            // Render the humidor section
+            humidorsContainer.innerHTML = `
+                ${backButtonHtml}
+                ${renderSingleHumidorSection(humidor, cigars)}
+            `;
+            
+            // Update pagination controls
+            updatePaginationControls();
+            
+            // Update favorite icons for all displayed cigars
+            updateAllFavoriteIcons();
+        } else {
+            throw new Error('Failed to load humidor details');
+        }
+    } catch (error) {
+        console.error('Error loading humidor detail:', error);
+        showToast('Failed to load humidor details', 'error');
+        navigateToHub();
+    }
+}
+
+function renderSingleHumidorSection(humidor, humidorCigars) {
+    const totalQuantity = humidorCigars.reduce((sum, cigar) => sum + (cigar.quantity || 0), 0);
+    
+    return `
+        <div class="humidor-section" data-humidor-id="${humidor.id}">
+            <div class="humidor-header">
+                <div class="humidor-info-card">
+                    <div class="humidor-title-section">
+                        <i class="mdi mdi-home-variant"></i>
+                        <div>
+                            <h2 class="humidor-name">${escapeHtml(humidor.name)}</h2>
+                            ${humidor.location ? `<p class="humidor-location">${escapeHtml(humidor.location)}</p>` : ''}
+                        </div>
+                    </div>
+                    <div class="humidor-actions">
+                        <button class="btn-icon" onclick="editHumidor('${humidor.id}')" title="Edit Humidor">
+                            <i class="mdi mdi-pencil"></i>
+                        </button>
+                        <button class="btn-icon" onclick="deleteHumidor('${humidor.id}')" title="Delete Humidor">
+                            <i class="mdi mdi-delete"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="humidor-stats">
+                    <div class="stat-card">
+                        <i class="mdi mdi-cigar stat-icon"></i>
+                        <div>
+                            <div class="stat-value">${totalQuantity}</div>
+                            <div class="stat-label">Total Cigars</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <i class="mdi mdi-format-list-bulleted stat-icon"></i>
+                        <div>
+                            <div class="stat-value">${humidorCigars.length}</div>
+                            <div class="stat-label">Cigar Types</div>
+                        </div>
+                    </div>
+                </div>
+                ${humidor.notes ? `
+                    <div class="humidor-notes-card">
+                        <i class="mdi mdi-note-text"></i>
+                        <p>${escapeHtml(humidor.notes)}</p>
+                    </div>
+                ` : ''}
+            </div>
+            ${humidorCigars.length > 0 ? `
+                <div class="cigars-grid">
+                    ${humidorCigars.map(cigar => renderCigarCard(cigar)).join('')}
+                </div>
+            ` : `
+                <div class="empty-state">
+                    <i class="mdi mdi-cigar-off"></i>
+                    <p>No cigars in this humidor yet</p>
+                    <button class="btn-primary" onclick="openCigarModal(${humidor.id})">
+                        <i class="mdi mdi-plus"></i> Add First Cigar
+                    </button>
+                </div>
+            `}
+        </div>
+    `;
+}
+
+// Wrapper function for cigar card rendering
+function renderCigarCard(cigar) {
+    return createCigarCard(cigar);
 }
 
 // Search and Filter Functions

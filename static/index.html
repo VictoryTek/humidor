@@ -219,6 +219,38 @@
                         <div class="humidors-container" id="humidorsContainer">
                             <!-- Humidor sections will be dynamically generated here -->
                         </div>
+
+                        <!-- Pagination Controls -->
+                        <div class="pagination-container" id="paginationContainer" style="display: none;">
+                            <div class="pagination-info">
+                                <span id="paginationInfo">Showing 1-50 of 100 cigars</span>
+                            </div>
+                            <div class="pagination-controls">
+                                <button class="pagination-btn" id="firstPageBtn" title="First page">
+                                    <span class="mdi mdi-page-first"></span>
+                                </button>
+                                <button class="pagination-btn" id="prevPageBtn" title="Previous page">
+                                    <span class="mdi mdi-chevron-left"></span>
+                                </button>
+                                <div class="pagination-pages" id="paginationPages">
+                                    <!-- Page numbers will be generated here -->
+                                </div>
+                                <button class="pagination-btn" id="nextPageBtn" title="Next page">
+                                    <span class="mdi mdi-chevron-right"></span>
+                                </button>
+                                <button class="pagination-btn" id="lastPageBtn" title="Last page">
+                                    <span class="mdi mdi-page-last"></span>
+                                </button>
+                            </div>
+                            <div class="pagination-size">
+                                <label for="pageSizeSelect">Items per page:</label>
+                                <select id="pageSizeSelect" class="page-size-select">
+                                    <option value="25">25</option>
+                                    <option value="50" selected>50</option>
+                                    <option value="100">100</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
                 </div>
 

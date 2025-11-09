@@ -1,564 +1,692 @@
-# Code Review Progress Tracker
+# HUMIDOR PROJECT - COMPREHENSIVE CODE REVIEW
+Principal-Level Security, Architecture & Production Readiness Assessment
 
-## Critical Issues
+## EXECUTIVE SUMMARY
 
-### ✅ Critical Issue #1: SQL Injection via JSON Concatenation
-**Status**: COMPLETED  
-**Priority**: Critical  
-**Files Modified**: `src/services/backup.rs`
+### Critical Findings Requiring Immediate Action:
+1. String interpolation in SQL (backup.rs:296-302) - User-controlled JSON concatenated directly into queries, bypassing parameterization
+2. Runtime panic potential - 25+ .unwrap() and .expect() calls that will crash the service rather than return errors
+3. Unvalidated secrets - JWT signing key checked only when first used, not at application startup
+4. Unstructured error logging - Over 100 instances of eprintln!/println! bypassing the configured tracing system
 
-**Changes Made**:
-- Replaced JSON concatenation with parameterized queries
-- Used PostgreSQL's native `jsonb_build_object()` function
-- Eliminated all string interpolation in SQL queries
-
----
-
-### ✅ Critical Issue #2: Replace All Panic-Inducing Error Handling
-**Status**: COMPLETED  
-**Priority**: Critical  
-**Files Modified**: 5 files, 23 instances
-
-**Changes Made**:
-- `src/handlers/cigars.rs`: 7 `.unwrap()` calls → proper error handling
-- `src/handlers/humidors.rs`: 5 `.unwrap()` calls → proper error handling
-- `src/handlers/backups.rs`: 5 `.unwrap()` calls → proper error handling
-- `src/handlers/wish_list.rs`: 3 `.unwrap()` calls → proper error handling
-- `src/handlers/favorites.rs`: 3 `.unwrap()` calls → proper error handling
+### Production Blockers:
+- Authentication endpoints lack rate limiting (enables credential stuffing attacks)
+- Password reset tokens accumulate indefinitely in database
+- No security headers (HSTS, CSP, X-Frame-Options)
+- CORS configuration accepts credentials without proper validation
+- Mobile viewport exists but responsive breakpoints have coverage gaps
 
 ---
 
-### ✅ Critical Issue #3: Enforce Startup Configuration Validation
-**Status**: COMPLETED  
-**Priority**: Critical  
-**Files Modified**: `src/main.rs`
+## PRIORITY-ORDERED REMEDIATION ROADMAP
 
-**Changes Made**:
-- Added `validate_database_connection()` - Tests DB with SELECT 1 query
-- Added `validate_smtp_config()` - Validates SMTP environment variables
-- Added `validate_jwt_secret()` - Validates JWT secret length (minimum 32 chars)
-- Added `validate_environment()` - Orchestrates all validation checks
-- Application now fails fast at startup with clear error messages if configuration is invalid
+### 🔴 CRITICAL - Block Production Deployment
+1. Eliminate SQL Concatenation in Data Import
+2. Replace All Panic-Inducing Error Handling
+3. Enforce Startup Configuration Validation
+4. Convert All Console Output to Structured Logging
+5. Add HTTP Security Headers Middleware
+6. Implement Authentication Rate Limiting
 
----
+### 🟠 HIGH - Address Before Scale
+7. Decompose 986-line main.rs into route modules
+8. Add automated password reset token expiration
+9. Strengthen CORS origin validation logic
+10. Apply global request payload limits
+11. Build integration test coverage
+12. Establish CI/CD pipeline with linting
 
-### ✅ Critical Issue #4: Convert All Console Output to Structured Logging
-**Status**: COMPLETED  
-**Priority**: Critical  
-**Files Modified**: 17 files, 100+ instances
-
-**Pattern Applied**: `eprintln!("error: {}", e)` → `tracing::error!(error = %e, "message")`
-
-**Files Modified**:
-- `src/main.rs`: 2 instances
-- `src/middleware/auth.rs`: 2 instances
-- `src/services/email.rs`: 1 instance
-- `src/services/backup.rs`: 1 instance
-- `src/services/mod.rs`: 9 instances
-- `src/handlers/auth.rs`: 29 instances
-- `src/handlers/favorites.rs`: 9 instances
-- `src/handlers/humidors.rs`: 13 instances
-- `src/handlers/wish_list.rs`: 13 instances
-- `src/handlers/cigars.rs`: 10 instances
-- `src/handlers/backups.rs`: 10 instances
-- `src/handlers/brands.rs`: 8 instances
-- `src/handlers/origins.rs`: 8 instances
-- `src/handlers/ring_gauges.rs`: 8 instances
-- `src/handlers/strengths.rs`: 8 instances
-- `src/handlers/sizes.rs`: 8 instances
+### 🟡 MEDIUM - Quality & Maintainability
+13. ✅ Add rustfmt configuration with CI enforcement
+14. Bundle and minify frontend assets
+15. ✅ Optimize database query patterns (COMPLETED)
+16. Enable Clippy pedantic lints
+17. Enhance health check endpoint
+18. Add observability layer (metrics, distributed tracing)
 
 ---
 
-### ✅ Critical Issue #5: Add HTTP Security Headers Middleware
-**Status**: COMPLETED  
-**Priority**: Critical  
-**Files Modified**: `src/main.rs`
+## DETAILED FILE-LEVEL ANALYSIS
 
-**Security Headers Implemented**:
-- `Strict-Transport-Security`: max-age=31536000; includeSubDomains; preload
-- `X-Content-Type-Options`: nosniff
-- `X-Frame-Options`: DENY
-- `X-XSS-Protection`: 1; mode=block
-- `Content-Security-Policy`: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'
-- `Referrer-Policy`: no-referrer-when-downgrade
-- `Permissions-Policy`: geolocation=(), microphone=(), camera=()
+### 1. backup.rs
 
-**Implementation**:
-- Applied via chained `.map()` calls with `warp::reply::with_header()`
-- Headers applied to all HTTP responses
+**Critical Issue: SQL Injection via JSON Concatenation**
+- **Location**: Lines 296-302
+- **Severity**: 🔴 CRITICAL
 
----
-
-### ✅ Critical Issue #6: Implement Authentication Rate Limiting
-**Status**: COMPLETED  
-**Priority**: Critical  
-**Files Created**: `src/middleware/rate_limiter.rs`  
-**Files Modified**: `src/middleware/mod.rs`, `src/main.rs`, `src/handlers/auth.rs`
-
-**Implementation Details**:
-- **Algorithm**: Sliding window with automatic cleanup
-- **Configuration**: 5 attempts per 15 minutes (configurable)
-- **Storage**: Thread-safe `Arc<RwLock<HashMap<IpAddr, Vec<SystemTime>>>>`
-- **Response**: Returns `429 Too Many Requests` when limit exceeded
-- **Behavior**:
-  - Records failed attempts on invalid password or non-existent user
-  - Clears rate limit records on successful login
-  - Background cleanup task runs every 5 minutes
-  - Enhanced structured logging for all rate limit events
-
-**Features**:
-- IP-based tracking
-- Automatic expiry of old attempts
-- Unit tests included
-- Production-ready with proper error handling
-
----
-
-## High Priority Issues
-
-### 🔲 High Priority #1: Add Input Validation to All Handlers
-**Status**: NOT STARTED  
-**Priority**: High
-
-**Requirements**:
-- Validate all user input before processing
-- Check field lengths, formats, and allowed characters
-- Return clear validation error messages
-
----
-
-### 🔲 High Priority #2: Implement Proper CORS Configuration
-**Status**: PARTIALLY COMPLETE  
-**Priority**: High
-
-**Current State**: Basic CORS is configured in `src/main.rs`
-
-**Improvements Needed**:
-- Make allowed origins configurable via environment variables
-- Restrict origins in production (currently allows all with `allow_any_origin()`)
-- Add proper preflight caching
-
----
-
-### 🔲 High Priority #3: Add Database Connection Pooling Timeout
-**Status**: NOT STARTED  
-**Priority**: High
-
-**Requirements**:
-- Configure connection pool timeouts
-- Handle pool exhaustion gracefully
-- Add monitoring for pool health
-
----
-
-### ✅ High Priority #4: Implement Request Size Limits (Issue #10)
-**Status**: COMPLETED  
-**Priority**: High  
-**Files Modified**: `src/routes/helpers.rs`, `src/routes/auth.rs`, `src/routes/users.rs`, `src/routes/cigars.rs`, `src/routes/organizers.rs`, `src/routes/humidors.rs`, `src/routes/favorites.rs`
-
-**Implementation Details**:
-- **JSON Request Limit**: 1MB for all JSON API endpoints (reasonable for typical API payloads)
-- **File Upload Limit**: 100MB for multipart file uploads (already configured in backups.rs)
-- **Helper Function**: Created `json_body()` helper in `routes/helpers.rs` that wraps `warp::body::content_length_limit(1024 * 1024)` and `warp::body::json()`
-- **Global Application**: Updated all 7 route modules to use the new `json_body()` helper instead of raw `warp::body::json()`
-
-**Security Benefits**:
-- Prevents memory exhaustion attacks via oversized request bodies
-- Protects against denial-of-service (DoS) attacks
-- Server automatically rejects requests exceeding limits with HTTP 413 (Payload Too Large)
-- No custom error handling needed - Warp handles rejection automatically
-
-**Affected Routes** (40+ endpoints):
-- Authentication: setup, login, forgot password, reset password
-- User management: profile updates, password changes
-- Cigars: create, update, scrape operations
-- Organizers: brands, origins, sizes, strengths, ring gauges (create/update operations)
-- Humidors: create and update operations
-- Favorites & Wish List: add operations and notes updates
-
----
-
-### 🔲 High Priority #5: Add Database Transaction Support
-**Status**: NOT STARTED  
-**Priority**: High
-
-**Requirements**:
-- Wrap multi-step database operations in transactions
-- Ensure data consistency
-- Proper rollback on errors
-
----
-
-### 🔲 High Priority #6: Implement Comprehensive Error Types
-**Status**: PARTIALLY COMPLETE  
-**Priority**: High
-
-**Current State**: Basic `AppError` exists in `src/errors.rs`
-
-**Improvements Needed**:
-- Add more specific error types
-- Include error context
-- Better error recovery strategies
-
----
-
-### ✅ High Priority #7: Build Integration Test Coverage (Issue #11)
-**Status**: COMPLETED  
-**Priority**: High  
-**Files Created**: `src/lib.rs`, `tests/security_tests.rs`, `tests/integration_tests.rs`, `tests/README.md`  
-**Files Modified**: `Cargo.toml`
-
-**Test Coverage Implemented**:
-
-**Security Tests** (`security_tests.rs` - 13 tests):
-- Rate limiter functionality (4 tests)
-  - Limits login attempts after threshold
-  - Clears attempts on successful login
-  - Expires old attempts automatically
-  - Isolates different IPs independently
-- Request size limits validation
-- Password security (never stored plaintext, bcrypt format)
-- JWT token expiration validation
-- Database connection pooling
-- Email validation logic
-- CORS origin validation rules
-- UUID format for user IDs
-- Timestamp generation on entity creation
-
-**Integration Tests** (`integration_tests.rs` - 12 tests):
-- Humidor CRUD operations
-- User isolation (humidors belong to correct users)
-- Cigar quantity tracking
-- Cigar-humidor relationships
-- Favorite persistence
-- Wish list with notes functionality
-- Unique constraint enforcement
-- Cascade delete behavior
-- Admin user flags
-- Concurrent database operations
-
-**Existing Test Suites** (maintained):
-- Authentication tests (`auth_tests.rs`)
-- Cigar tests (`cigar_tests.rs`)
-- Favorites tests (`favorites_tests.rs`)
-- Wish list tests (`wish_list_tests.rs`)
-- Quantity tests (`quantity_tests.rs`)
-
-**Infrastructure Improvements**:
-1. **Library Support**: Created `src/lib.rs` to expose modules for testing
-2. **Dual Target**: Configured `Cargo.toml` for both binary and library compilation
-3. **Test Utilities**: Common test helpers in `tests/common/mod.rs`
-4. **Documentation**: Comprehensive `tests/README.md` with usage examples
-
-**Test Features**:
-- Serial execution with `#[serial]` to prevent database conflicts
-- Automatic database cleanup with `setup_test_db()`
-- Unique test data generation (UUID-based usernames)
-- Async test support with `#[tokio::test]`
-- Integration with existing PostgreSQL database
-
-**Running Tests**:
-```bash
-# All tests
-cargo test
-
-# Specific test suite
-cargo test --test security_tests
-cargo test --test integration_tests
-
-# With output
-cargo test -- --nocapture
+**Current Vulnerable Implementation**:
+```rust
+let query = format!(
+    "INSERT INTO {} SELECT * FROM json_populate_record(NULL::{}, '{}'::json)",
+    table, table, json_str.replace("'", "''")
+);
+match db.execute(&query, &[]).await {
 ```
 
-**Total Test Count**: 25+ integration tests covering critical security features, database operations, and business logic
+**Vulnerability Analysis**:
+- Relying solely on single-quote doubling for escaping
+- Backslashes, dollar signs, and other SQL metacharacters remain unescaped
+- Attacker-controlled JSON field values can break out of string context
+
+**Proof of Concept Attack**:
+```json
+{
+  "username": "admin'); DROP TABLE users CASCADE; --"
+}
+```
+
+**Secure Replacement**:
+```rust
+async fn import_row(
+    db: &Client,
+    table: &str,
+    row: &serde_json::Value,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // Use parameterized query with PostgreSQL type coercion
+    let query = format!(
+        "INSERT INTO {} SELECT * FROM json_populate_record(NULL::{}, $1::json)",
+        table, table
+    );
+    
+    // Convert to JSON string - PostgreSQL driver handles escaping
+    let json_param = serde_json::to_string(row)?;
+    
+    db.execute(&query, &[&json_param])
+        .await
+        .map_err(|e| {
+            tracing::error!(
+                table = %table,
+                error = %e,
+                "Row import failed"
+            );
+            e
+        })?;
+    
+    Ok(())
+}
+```
+
+**Required Dependency Addition**:
+```toml
+# Cargo.toml - Enable JSON type support
+tokio-postgres = { 
+    version = "0.7", 
+    features = ["with-uuid-1", "with-chrono-0_4", "with-serde_json-1"] 
+}
+```
 
 ---
 
-### ✅ High Priority #8: Establish CI/CD Pipeline with Linting (Issue #12)
-**Status**: COMPLETED  
-**Priority**: High  
-**Files Created**: `.github/workflows/ci.yml`, `.github/workflows/deploy.yml`, `.github/workflows/scheduled.yml`, `.github/workflows/pr-checks.yml`, `.github/labeler.yml`, `.typos.toml`, `.github/workflows/README.md`
+### 2. auth.rs
 
-**CI/CD Infrastructure Implemented**:
+**Critical Issue: JWT Secret Validation Deferred to Runtime**
+- **Location**: Lines 56-59
+- **Severity**: 🔴 CRITICAL
+- **Problem**: Application accepts requests before discovering missing configuration
 
-**Main CI Pipeline** (`ci.yml`):
-- **Triggers**: Push to main/develop/review, pull requests
-- **Jobs**:
-  - `lint`: Rustfmt formatting, Clippy linting (zero warnings policy)
-  - `security`: cargo-audit for vulnerability scanning
-  - `test`: Integration tests with PostgreSQL service container
-  - `docker`: Docker build validation with multi-stage builds
-  - `coverage`: Code coverage with tarpaulin (generates lcov reports)
-  - `dependencies`: Check for outdated and unused dependencies
-- **Features**: Cargo caching (registry, index, target), parallel job execution
-- **Enforcement**: All jobs required to pass for green build status
+**Current Code**:
+```rust
+fn jwt_secret() -> String {
+    if let Ok(content) = fs::read_to_string("/run/secrets/jwt_secret") {
+        return content.trim().to_string();
+    }
+    env::var("JWT_SECRET").expect("JWT_SECRET must be set...")
+}
+```
 
-**Deployment Pipeline** (`deploy.yml`):
-- **Triggers**: Push to main, version tags (v*.*.*), manual workflow dispatch
-- **Jobs**:
-  - `build-and-push`: Build Docker images, push to GitHub Container Registry (GHCR)
-  - `security-scan`: Trivy vulnerability scanning with SARIF upload to GitHub Security
-  - `deploy`: Deploy to staging/production environments with approval gates
-- **Features**: 
-  - SBOM (Software Bill of Materials) generation
-  - Multi-platform image support (linux/amd64, linux/arm64)
-  - Tag management (latest, version tags, branch-specific)
-  - Environment-specific deployments with protection rules
-- **Security**: Image scanning for HIGH/CRITICAL vulnerabilities
+**Improved Approach - Fail Fast at Startup**:
+```rust
+// Add to main.rs before server starts
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    initialize_logging();
+    
+    // Validate all secrets before proceeding
+    validate_required_secrets()?;
+    
+    let pool = setup_database().await?;
+    // ... rest of initialization
+}
 
-**Scheduled Maintenance** (`scheduled.yml`):
-- **Schedule**: Mondays at 9:00 AM UTC (weekly)
-- **Jobs**:
-  - `dependency-updates`: Check cargo-outdated, create GitHub issues **only for major version updates** (e.g., 1.x → 2.x)
-  - `security-audit`: Run cargo-audit, create issues for vulnerabilities (CRITICAL priority)
-  - `docker-updates`: Check Rust base image updates
-  - `health-summary`: Aggregate maintenance status
-- **Issue Creation Policy**: Only creates issues for major updates requiring manual intervention; minor/patch updates are logged but skipped
-- **Automation**: Uses GitHub Script API to create automated issues with labels
+fn validate_required_secrets() -> Result<(), Box<dyn std::error::Error>> {
+    let secret = read_secret("jwt_secret", "JWT_SECRET")
+        .ok_or_else(|| anyhow::anyhow!(
+            "JWT_SECRET not found in /run/secrets or environment. \
+             Generate with: openssl rand -base64 32"
+        ))?;
+    
+    if secret.len() < 32 {
+        anyhow::bail!("JWT_SECRET must be minimum 32 characters for cryptographic security");
+    }
+    
+    tracing::info!("Authentication secrets validated");
+    Ok(())
+}
+```
 
-**PR Validation** (`pr-checks.yml`):
-- **Triggers**: Pull request events (opened, synchronize, reopened, edited)
-- **Jobs**:
-  - `validate`: PR title format (semantic commits), file size checks (<5MB), TODO/FIXME detection
-  - `size-check`: Binary size analysis with cargo-bloat, detect size regressions
-  - `breaking-changes`: API compatibility checking with cargo-semver-checks
-  - `spell-check`: Typos spell checking with project dictionary
-  - `auto-label`: Automatic PR labeling based on changed files
-- **Features**: 
-  - Comments on PRs with validation results
-  - Large file warnings (>5MB)
-  - Binary bloat analysis (top 10 largest functions)
+**High Risk: Unsafe Unwrap After Conditional Check**
+- **Location**: Lines 706, 779
+- **Severity**: 🔴 CRITICAL
+- **Vulnerability**: TOCTOU (Time-of-Check-Time-of-Use) race condition
 
-**Supporting Configuration**:
-1. **PR Auto-Labeling** (`.github/labeler.yml`):
-   - 10 categories: CI/CD, dependencies, documentation, security, database, frontend, tests, handlers, routes, migrations
-   - Automatic label application based on file paths
+**Current Pattern**:
+```rust
+if user_result.is_none() {
+    return early_response;
+}
+let user_row = user_result.unwrap(); // ⚠️ Can still panic
+```
 
-2. **Spell Checker** (`.typos.toml`):
-   - Project dictionary: humidor, cigars, warp, tokio, postgres, etc.
-   - Exclusions: target/, Cargo.lock, minified files, UUIDs, hex strings
+**Safe Alternative**:
+```rust
+let user_row = match user_result {
+    Some(row) => row,
+    None => {
+        tracing::info!(
+            email = %request.email,
+            "Password reset attempt for unregistered email"
+        );
+        return Ok(warp::reply::json(&json!({
+            "message": "If that email exists, a reset link was sent"
+        })));
+    }
+};
+```
 
-3. **Workflow Documentation** (`.github/workflows/README.md`):
-   - Comprehensive 300+ line guide
-   - Local testing instructions
-   - Secrets configuration (GHCR_TOKEN, deployment credentials)
-   - Troubleshooting guide
-   - Best practices and performance metrics
+**Medium Risk: Optional Chaining Without Safety**
+- **Location**: Lines 846-848
+- **Severity**: 🟠 HIGH
 
-**Quality Gates Enforced**:
-- ✅ Rustfmt formatting compliance
-- ✅ Clippy linting with zero warnings
-- ✅ Security vulnerability scanning (cargo-audit, Trivy)
-- ✅ Integration test suite passing
-- ✅ Docker build success
-- ✅ Code coverage tracking
-- ✅ Dependency freshness monitoring
-- ✅ Binary size tracking
-- ✅ API compatibility checking
+**Current Code**:
+```rust
+let is_configured = smtp_host.is_some() 
+    && !smtp_host.as_ref().unwrap().is_empty()
+```
 
-**Automation Features**:
-- Automatic issue creation for **major version** dependency updates only
-- Automatic issue creation for security vulnerabilities
-- PR auto-labeling based on changed files
-- Code coverage reporting
-- Binary size regression detection
-- Spell checking with project-specific dictionary
+**Elegant Pattern-Matching Solution**:
+```rust
+let is_configured = matches!(
+    (&smtp_host, &smtp_user, &smtp_password),
+    (Some(h), Some(u), Some(p)) if !h.is_empty() && !u.is_empty() && !p.is_empty()
+);
+```
 
-**Next Steps**:
-1. Push changes to GitHub to activate workflows
-2. Monitor Actions tab for first few runs
-3. Configure required secrets (GHCR_TOKEN for deployment)
-4. **Optional**: Set up branch protection rules after 1-2 weeks of stable builds
-4. Configure environment protection rules for production deployments
-5. Monitor first workflow runs and adjust as needed
+**Missing: Password Reset Token Cleanup**
+- **Severity**: 🟠 HIGH
+- **Problem**: Tokens remain in database indefinitely, creating memory leak and extended attack window
 
----
+**Solution - Background Cleanup Task**:
+```rust
+// In main.rs after pool initialization
+tokio::spawn(password_reset_cleanup_task(db_pool.clone()));
 
-## Medium Priority Issues
+async fn password_reset_cleanup_task(pool: DbPool) {
+    let mut cleanup_interval = tokio::time::interval(Duration::from_secs(3600));
+    
+    loop {
+        cleanup_interval.tick().await;
+        
+        if let Ok(db) = pool.get().await {
+            let expiry_threshold = Utc::now() - chrono::Duration::minutes(30);
+            
+            match db.execute(
+                "DELETE FROM password_reset_tokens WHERE created_at < $1",
+                &[&expiry_threshold]
+            ).await {
+                Ok(count) => tracing::info!(removed = count, "Expired tokens cleaned"),
+                Err(e) => tracing::error!(error = %e, "Token cleanup failed"),
+            }
+        }
+    }
+}
+```
 
-### 🔲 Medium Priority #1: Add API Documentation
-**Status**: NOT STARTED  
-**Priority**: Medium
+**Improvement: Add Timeout to Blocking Operations**
+- **Location**: Lines 19-27
+- **Severity**: 🟡 MEDIUM
+- **Enhancement for bcrypt DOS Prevention**:
 
-**Requirements**:
-- Document all API endpoints
-- Add request/response examples
-- Include authentication requirements
-
----
-
-### 🔲 Medium Priority #2: Implement Audit Logging
-**Status**: NOT STARTED  
-**Priority**: Medium
-
-**Requirements**:
-- Log all data modifications
-- Track who made changes and when
-- Queryable audit trail
-
----
-
-### 🔲 Medium Priority #3: Add Health Check Endpoint Details
-**Status**: PARTIALLY COMPLETE  
-**Priority**: Medium
-
-**Current State**: Basic `/health` endpoint exists
-
-**Improvements Needed**:
-- Check database connectivity
-- Check external service status
-- Return detailed health metrics
-
----
-
-### 🔲 Medium Priority #4: Implement Pagination
-**Status**: NOT STARTED  
-**Priority**: Medium
-
-**Requirements**:
-- Add pagination to list endpoints
-- Configurable page size
-- Include total count in responses
-
----
-
-### 🔲 Medium Priority #5: Add Caching Layer
-**Status**: NOT STARTED  
-**Priority**: Medium
-
-**Requirements**:
-- Cache frequently accessed data
-- Implement cache invalidation strategy
-- Consider Redis for distributed caching
+```rust
+async fn hash_password(password: String) -> Result<String, bcrypt::BcryptError> {
+    let hash_future = tokio::task::spawn_blocking(move || {
+        hash(&password, DEFAULT_COST)
+    });
+    
+    tokio::time::timeout(Duration::from_secs(5), hash_future)
+        .await
+        .map_err(|_| bcrypt::BcryptError::InvalidCost("Hash operation timeout".into()))?
+        .map_err(|e| {
+            tracing::error!("Background task failure: {}", e);
+            bcrypt::BcryptError::InvalidCost("Task execution error".into())
+        })?
+}
+```
 
 ---
 
-## Progress Summary
+### 3. main.rs
 
-**Critical Issues**: 9/9 ✅ (100% Complete)  
-**High Priority Issues**: 3/7 ⏸️ (43% Complete)  
-**Medium Priority Issues**: 0/5 ⏸️ (0% Complete)
+**Architectural Issue: Monolithic Route Definitions**
+- **Location**: Lines 1-986
+- **Severity**: 🟠 HIGH
+- **Problem**: Single 986-line file with massive route duplication, poor maintainability
 
-**Overall Progress**: 12/21 (57% Complete)
+**Recommended Structure**:
+```
+src/
+├── main.rs                    (< 150 lines)
+├── config.rs                  (configuration validation)
+├── routes/
+│   ├── mod.rs
+│   ├── cigars.rs
+│   ├── auth.rs
+│   ├── organizers.rs
+│   ├── humidors.rs
+│   └── backups.rs
+├── filters/
+│   ├── mod.rs
+│   ├── database.rs
+│   └── authentication.rs
+└── middleware/
+    ├── mod.rs
+    ├── rate_limit.rs
+    └── security_headers.rs
+```
 
----
+**Refactored main.rs Example**:
+```rust
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let config = Config::load_and_validate()?;
+    
+    tracing_subscriber::registry()
+        .with(EnvFilter::from_default_env())
+        .with(tracing_subscriber::fmt::layer().json())
+        .init();
+    
+    let pool = initialize_database(&config).await?;
+    validate_required_secrets()?;
+    
+    let api_routes = routes::build_api_routes(pool.clone());
+    let page_routes = routes::build_page_routes();
+    
+    let app = warp::any()
+        .and(page_routes.or(api_routes))
+        .with(middleware::security_headers())
+        .with(middleware::request_logging())
+        .with(middleware::cors(&config))
+        .recover(errors::handle_rejection);
+    
+    tracing::info!(port = config.port, "Server initialized");
+    warp::serve(app).run(([0, 0, 0, 0], config.port)).await;
+    Ok(())
+}
+```
 
-## Build Status
+**Missing: HTTP Security Headers**
+- **Severity**: 🔴 CRITICAL
 
-**Last Build**: ✅ Success  
-**Warnings**: 0  
-**Errors**: 0  
-**Build Time**: ~6-8 seconds
+**Add Middleware Function**:
+```rust
+// src/middleware/security_headers.rs
+pub fn apply() -> impl Reply {
+    warp::reply::with::headers(vec![
+        ("X-Content-Type-Options", "nosniff"),
+        ("X-Frame-Options", "DENY"),
+        ("X-XSS-Protection", "1; mode=block"),
+        ("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload"),
+        ("Referrer-Policy", "strict-origin-when-cross-origin"),
+        ("Permissions-Policy", "geolocation=(), microphone=(), camera=()"),
+        ("Content-Security-Policy", 
+         "default-src 'self'; \
+          script-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; \
+          style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; \
+          font-src 'self' https://fonts.gstatic.com; \
+          img-src 'self' data:; \
+          connect-src 'self'"),
+    ])
+}
+```
 
----
-
-### ✅ Critical Issue #7: Decompose 986-line main.rs into route modules
-**Status**: COMPLETED  
-**Priority**: Critical  
-**Files Created**: `src/routes/mod.rs`, `src/routes/auth.rs`, `src/routes/users.rs`, `src/routes/cigars.rs`, `src/routes/organizers.rs`, `src/routes/humidors.rs`, `src/routes/favorites.rs`, `src/routes/backups.rs`  
-**Files Modified**: `src/main.rs`
-
-**Results**:
-- **Line Reduction**: 1045 lines → 508 lines (51.4% reduction)
-- **Route Organization**: 7 logical route modules created
-- **Modular Structure**: Each module handles related endpoints
-
-**Route Modules**:
-- `auth.rs`: Setup, login, password reset (with rate limiting)
-- `users.rs`: User profile management
-- `cigars.rs`: Cigar CRUD operations, scraping
-- `organizers.rs`: Brands, origins, sizes, strengths, ring gauges
-- `humidors.rs`: Humidor management
-- `favorites.rs`: Favorites and wish list
-- `backups.rs`: Backup/restore operations
-
-**Benefits**:
-- Improved code organization and maintainability
-- Easier to locate and modify specific routes
-- Reduced cognitive load when working with routing
-- Each module is self-contained with clear responsibilities
-
----
-
-### ✅ Critical Issue #8: Add automated password reset token expiration
-**Status**: COMPLETED  
-**Priority**: Critical  
-**Files Modified**: `src/main.rs`
+**Missing: Rate Limiting on Authentication**
+- **Severity**: 🔴 CRITICAL
 
 **Implementation**:
-- **Token Expiration**: Already implemented - tokens expire after 30 minutes
-- **Validation**: Existing code in `reset_password` handler checks token age and rejects expired tokens
-- **Automated Cleanup**: Added background task that runs every hour to remove expired tokens from database
+```toml
+# Cargo.toml
+governor = "0.6"
+dashmap = "5.5"
+```
 
-**Background Task Details**:
-- Runs every 60 minutes
-- Deletes tokens older than 30 minutes using SQL query
-- Logs cleanup activity (info level for deletions, debug for no-ops)
-- Handles database connection errors gracefully
-- Non-blocking - runs in separate tokio task
+```rust
+// src/middleware/rate_limit.rs
+use governor::{Quota, RateLimiter, clock::DefaultClock};
+use std::net::IpAddr;
+use std::sync::Arc;
+use dashmap::DashMap;
 
-**Security Benefits**:
-- Prevents token accumulation in database
-- Reduces attack surface by removing old tokens
-- Maintains clean database state
-- Follows security best practice of time-limited reset tokens
+pub struct DistributedRateLimiter {
+    limiters: Arc<DashMap<IpAddr, RateLimiter<IpAddr, DashMap<IpAddr, governor::InMemoryState>, DefaultClock>>>,
+    quota: Quota,
+}
 
----
+impl DistributedRateLimiter {
+    pub fn new(requests_per_minute: u32) -> Self {
+        Self {
+            limiters: Arc::new(DashMap::new()),
+            quota: Quota::per_minute(std::num::NonZeroU32::new(requests_per_minute).unwrap()),
+        }
+    }
+    
+    pub fn check(&self, ip: IpAddr) -> Result<(), RateLimitExceeded> {
+        let limiter = self.limiters
+            .entry(ip)
+            .or_insert_with(|| RateLimiter::direct(self.quota));
+        
+        limiter.check().map_err(|_| RateLimitExceeded)
+    }
+}
 
-### ✅ Critical Issue #9: Strengthen CORS origin validation logic
-**Status**: COMPLETED  
-**Priority**: Critical  
-**Files Modified**: `src/main.rs`
+// Apply to sensitive routes
+let rate_limiter = Arc::new(DistributedRateLimiter::new(10)); // 10 req/min
 
-**Implementation Details**:
-- **URL Format Validation**: Rejects origins without `http://` or `https://` protocol
-- **Path/Query/Fragment Detection**: Blocks origins containing paths, queries, or fragments
-- **Wildcard Warning**: Logs warning when `*` is used, recommending explicit origins for production
-- **Empty Origin List Detection**: Logs error if no valid origins remain after validation
-- **Detailed Error Logging**: All rejected origins logged with specific reasons
-
-**Validation Rules**:
-- **Accepts**: Valid URLs like `http://localhost:9898`, `https://example.com`, `https://app.example.com:8443`
-- **Rejects**: 
-  - Missing protocol: `example.com`
-  - With path: `http://example.com/api`
-  - With query: `http://example.com?query=1`
-  - With fragment: `http://example.com#section`
-- **Warns**: `*` (wildcard - security risk in production)
-
-**Security Benefits**:
-- Prevents misconfigured CORS allowing unintended origins
-- Detects and warns about overly permissive configurations
-- Provides clear error messages for invalid configurations
-- Helps developers avoid common CORS security mistakes
-- Supports security auditing through comprehensive logging
-
----
-
-## Next Steps
-
-1. Continue with remaining High Priority issues:
-   - **High Priority #1**: Add input validation to all handlers
-   - **High Priority #2**: Improve CORS configuration for production (partially complete)
-   - **High Priority #3**: Add database connection pooling timeouts
-   - **High Priority #5**: Add database transaction support
-   - **High Priority #6**: Implement comprehensive error types (partially complete)
-2. Move to Medium Priority issues after High Priority completion
-3. Focus on API documentation and audit logging
+let login_route = warp::path!("api" / "v1" / "auth" / "login")
+    .and(warp::addr::remote())
+    .and_then(move |addr: Option<SocketAddr>| {
+        let limiter = rate_limiter.clone();
+        async move {
+            let ip = addr.map(|a| a.ip()).unwrap_or(IpAddr::from([0, 0, 0, 0]));
+            limiter.check(ip)?;
+            Ok::<_, Rejection>(())
+        }
+    })
+    .and(warp::post())
+    .and(warp::body::json())
+    .and_then(handlers::login_user);
+```
 
 ---
 
-## Notes
+### 4. Frontend Mobile Responsiveness Issues
 
-- **All 9 critical security issues completed** ✅
-- **2 of 7 high priority issues completed** (Request size limits, Integration test coverage)
-- **25+ integration tests** covering security, database operations, and business logic
-- Application now has proper startup validation
-- Comprehensive structured logging in place
-- Rate limiting prevents brute force attacks (5 attempts/15 min)
-- Security headers protect against common web vulnerabilities (7 headers)
-- CORS validation prevents misconfiguration
-- Request size limits prevent DoS attacks (1MB JSON, 100MB files)
-- Zero panic-inducing code remains in production handlers
-- Code is well-modularized with 7 separate route modules
-- Test suite includes security tests, integration tests, and feature-specific tests
+**CSS Breakpoint Gaps**
+- **Location**: styles.css lines 2495-2670
+- **Severity**: 🟡 MEDIUM
+
+**Issues Found**:
+1. Fixed sidebar width (280px) not hidden on tablets (768px-1024px range)
+2. No touch-target sizing enforcement (minimum 44x44px)
+3. Font sizes don't scale below 768px breakpoint
+4. Fixed max-widths on cards break layout on small screens
+
+**Recommended Fixes**:
+```css
+/* Enhanced mobile-first approach */
+:root {
+    --sidebar-width: 280px;
+    --touch-target-min: 44px;
+    --mobile-padding: 1rem;
+}
+
+/* Base: Mobile first (320px+) */
+body {
+    font-size: 16px; /* Prevent iOS zoom on input focus */
+}
+
+.btn, .nav-item {
+    min-height: var(--touch-target-min);
+    min-width: var(--touch-target-min);
+    padding: 0.75rem 1rem;
+}
+
+/* Tablet landscape (1024px) */
+@media (max-width: 1024px) {
+    .sidebar {
+        position: fixed;
+        transform: translateX(-100%);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 1000;
+    }
+    
+    .sidebar.mobile-open {
+        transform: translateX(0);
+        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.3);
+    }
+}
+
+/* Tablet portrait (768px) */
+@media (max-width: 768px) {
+    :root {
+        --mobile-padding: 0.75rem;
+    }
+    
+    .page-header h1 {
+        font-size: 1.75rem; /* Scale down from 2.5rem */
+    }
+    
+    .card {
+        max-width: 100%; /* Remove fixed widths */
+        margin: 0 var(--mobile-padding);
+    }
+}
+
+/* Mobile (480px) */
+@media (max-width: 480px) {
+    .grid {
+        grid-template-columns: 1fr; /* Force single column */
+    }
+    
+    .form-row {
+        flex-direction: column;
+    }
+    
+    .modal-content {
+        width: calc(100vw - 2rem);
+        max-height: calc(100vh - 4rem);
+        overflow-y: auto;
+    }
+}
+
+/* Small mobile (360px) */
+@media (max-width: 360px) {
+    body {
+        font-size: 14px;
+    }
+    
+    .page-header h1 {
+        font-size: 1.5rem;
+    }
+}
+```
+
+**Additional Accessibility Issues**:
+1. Missing aria-label on icon-only buttons
+2. No skip-to-main-content link
+3. Color contrast issues in dark theme (needs WCAG AA verification)
+
+---
+
+### 5. Docker & Deployment
+
+**Dockerfile Optimization Opportunities**
+- **Location**: Dockerfile lines 1-63
+- **Severity**: 🟡 MEDIUM
+
+**Current Issues**:
+- Dependency layer caching effective but verbose
+- No explicit version pinning for Debian packages
+- Large final image size potential
+
+**Optimized Dockerfile**:
+```dockerfile
+# syntax=docker/dockerfile:1
+ARG RUST_VERSION=1.82
+FROM rust:${RUST_VERSION}-slim AS builder
+
+WORKDIR /build
+
+# Install build dependencies with explicit versions
+RUN --mount=type=cache,target=/var/cache/apt \
+    apt-get update && apt-get install -y \
+    pkg-config=1.8.* \
+    libssl-dev=3.0.* \
+    && rm -rf /var/lib/apt/lists/*
+
+# Dependency caching layer
+COPY Cargo.toml Cargo.lock ./
+RUN mkdir src && echo "fn main() {}" > src/main.rs \
+    && cargo build --release \
+    && rm -rf src
+
+# Build application
+COPY src ./src
+COPY static ./static
+COPY migrations ./migrations
+
+RUN cargo build --release --locked \
+    && strip --strip-all target/release/humidor
+
+# Minimal runtime image
+FROM gcr.io/distroless/cc-debian12:nonroot
+
+COPY --from=builder --chown=nonroot:nonroot \
+    /build/target/release/humidor /app/humidor
+COPY --from=builder --chown=nonroot:nonroot \
+    /build/static /app/static
+
+WORKDIR /app
+USER nonroot:nonroot
+
+EXPOSE 9898
+
+HEALTHCHECK --interval=30s --timeout=3s \
+    CMD ["/app/humidor", "health"] || exit 1
+
+ENTRYPOINT ["/app/humidor"]
+```
+
+---
+
+### 6. Missing: Testing Infrastructure
+
+**Current State**: No tests found in repository
+
+**Recommended Test Structure**:
+```
+tests/
+├── integration/
+│   ├── auth_tests.rs
+│   ├── cigar_crud_tests.rs
+│   └── backup_restore_tests.rs
+├── fixtures/
+│   ├── test_data.sql
+│   └── sample_backup.zip
+└── helpers/
+    ├── test_database.rs
+    └── test_server.rs
+```
+
+**Example Integration Test**:
+```rust
+// tests/integration/auth_tests.rs
+#[tokio::test]
+async fn test_login_rate_limiting() {
+    let test_server = setup_test_server().await;
+    
+    // Attempt 11 rapid login requests
+    let mut tasks = vec![];
+    for _ in 0..11 {
+        let client = test_server.client();
+        tasks.push(tokio::spawn(async move {
+            client.post("/api/v1/auth/login")
+                .json(&json!({"username": "test", "password": "wrong"}))
+                .send()
+                .await
+        }));
+    }
+    
+    let results = futures::future::join_all(tasks).await;
+    let rate_limited = results.iter()
+        .filter(|r| r.as_ref().unwrap().status() == 429)
+        .count();
+    
+    assert!(rate_limited >= 1, "Rate limiting should trigger");
+}
+```
+
+---
+
+## CONFIGURATION FILES TO ADD
+
+### rustfmt.toml
+```toml
+edition = "2021"
+max_width = 100
+tab_spaces = 4
+newline_style = "Unix"
+use_small_heuristics = "Max"
+imports_granularity = "Crate"
+group_imports = "StdExternalCrate"
+```
+
+### clippy.toml
+```toml
+cognitive-complexity-threshold = 30
+```
+
+### config.toml
+```toml
+[build]
+rustflags = ["-D", "warnings"]
+
+[target.x86_64-unknown-linux-gnu]
+linker = "clang"
+rustflags = ["-C", "link-arg=-fuse-ld=lld"]
+```
+
+### .github/workflows/ci.yml
+```yaml
+name: CI
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo fmt --check
+      - run: cargo clippy -- -D warnings
+      - run: cargo test
+      
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo install cargo-audit
+      - run: cargo audit
+```
+
+---
+
+## IMPLEMENTATION CHECKLIST
+
+### Before Merging to Production:
+- [ ] Remove all SQL string concatenation in backup restore
+- [ ] Replace every .unwrap() and .expect() with proper error handling
+- [ ] Validate JWT secret at application startup
+- [ ] Convert all eprintln!/println! to tracing macros
+- [ ] Add security headers middleware
+- [ ] Implement rate limiting on auth endpoints
+- [ ] Add password reset token cleanup task
+- [ ] Split main.rs into modular route files
+- [ ] Write integration tests for critical paths
+- [ ] Set up CI pipeline with automated checks
+- [ ] Test mobile responsiveness on real devices
+- [ ] Document all environment variables in README
+- [ ] Create deployment runbook with rollback procedures
+
+---
+
+**Review Completed**: This assessment covers security, architecture, performance, maintainability, and operational readiness across backend Rust code, frontend assets, Docker configuration, and deployment infrastructure.

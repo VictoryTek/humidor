@@ -12,6 +12,9 @@ use crate::{
 pub struct CigarResponse {
     pub cigars: Vec<Cigar>,
     pub total: i64,
+    pub page: i64,
+    pub page_size: i64,
+    pub total_pages: i64,
 }
 
 pub async fn get_cigars(
@@ -22,6 +25,8 @@ pub async fn get_cigars(
     use crate::errors::AppError;
     use tokio_postgres::types::ToSql;
 
+    let start_time = std::time::Instant::now();
+
     // Acquire a connection from the pool
     let db = pool.get().await.map_err(|e| {
         warp::reject::custom(AppError::DatabaseError(format!(
@@ -30,8 +35,24 @@ pub async fn get_cigars(
         )))
     })?;
 
+    // Parse pagination parameters
+    let page = params
+        .get("page")
+        .and_then(|p| p.parse::<i64>().ok())
+        .unwrap_or(1)
+        .max(1); // Ensure page is at least 1
+
+    let page_size = params
+        .get("page_size")
+        .and_then(|ps| ps.parse::<i64>().ok())
+        .unwrap_or(50)
+        .clamp(1, 100); // Allow 1-100 items per page
+
+    let offset = (page - 1) * page_size;
+
     // Build query with parameterized conditions to prevent SQL injection
     let base_query = "SELECT id, humidor_id, brand_id, name, size_id, strength_id, origin_id, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge_id, length, image_url, retail_link, is_active, created_at, updated_at FROM cigars";
+    let count_query = "SELECT COUNT(*) FROM cigars";
     let mut conditions = Vec::new();
     let mut param_values: Vec<Box<dyn ToSql + Sync + Send>> = Vec::new();
     let mut param_counter = 1;
@@ -78,29 +99,57 @@ pub async fn get_cigars(
         if let Ok(ring_gauge_uuid) = Uuid::parse_str(ring_gauge_id_str) {
             conditions.push(format!("ring_gauge_id = ${}", param_counter));
             param_values.push(Box::new(ring_gauge_uuid));
-            // param_counter would be incremented here if we had more parameters
+            param_counter += 1;
         }
     }
 
-    // Build the final query with WHERE clause if there are conditions
-    let query = if conditions.is_empty() {
-        format!(
-            "{} ORDER BY is_active DESC, created_at DESC LIMIT 50",
-            base_query
-        )
+    // Build WHERE clause
+    let where_clause = if conditions.is_empty() {
+        String::new()
     } else {
-        format!(
-            "{} WHERE {} ORDER BY is_active DESC, created_at DESC LIMIT 50",
-            base_query,
-            conditions.join(" AND ")
-        )
+        format!(" WHERE {}", conditions.join(" AND "))
     };
+
+    // Get total count with same filters
+    let total_count_query = format!("{}{}", count_query, where_clause);
 
     // Convert boxed parameters to references for query execution
     let param_refs: Vec<&(dyn ToSql + Sync)> = param_values
         .iter()
         .map(|b| &**b as &(dyn ToSql + Sync))
         .collect();
+
+    // Execute count query
+    let total = match db.query_one(&total_count_query, &param_refs[..]).await {
+        Ok(row) => row.get::<_, i64>(0),
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to get total count");
+            return Err(warp::reject::custom(AppError::DatabaseError(
+                "Failed to count cigars".to_string(),
+            )));
+        }
+    };
+
+    let total_pages = (total as f64 / page_size as f64).ceil() as i64;
+
+    // Add pagination parameters to the param list
+    param_values.push(Box::new(page_size));
+    param_values.push(Box::new(offset));
+
+    // Rebuild param_refs with new values
+    let param_refs: Vec<&(dyn ToSql + Sync)> = param_values
+        .iter()
+        .map(|b| &**b as &(dyn ToSql + Sync))
+        .collect();
+
+    // Build the final query with pagination
+    let query = format!(
+        "{}{} ORDER BY is_active DESC, created_at DESC LIMIT ${} OFFSET ${}",
+        base_query,
+        where_clause,
+        param_counter,
+        param_counter + 1
+    );
 
     match db.query(&query, &param_refs[..]).await {
         Ok(rows) => {
@@ -132,13 +181,35 @@ pub async fn get_cigars(
                 cigars.push(cigar);
             }
 
-            let total = cigars.len() as i64;
-            let response = CigarResponse { cigars, total };
+            let elapsed = start_time.elapsed();
+            if elapsed.as_millis() > 100 {
+                tracing::warn!(
+                    duration_ms = elapsed.as_millis(),
+                    total_results = total,
+                    page = page,
+                    "Slow query detected in get_cigars"
+                );
+            } else {
+                tracing::debug!(
+                    duration_ms = elapsed.as_millis(),
+                    total_results = total,
+                    page = page,
+                    "Query completed"
+                );
+            }
+
+            let response = CigarResponse {
+                cigars,
+                total,
+                page,
+                page_size,
+                total_pages,
+            };
 
             Ok(warp::reply::json(&response))
         }
         Err(e) => {
-            tracing::error!(error = %e, "Database error");
+            tracing::error!(error = %e, "Database error fetching cigars");
             Ok(warp::reply::json(
                 &json!({"error": "Failed to fetch cigars"}),
             ))
