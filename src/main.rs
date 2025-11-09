@@ -623,11 +623,11 @@ async fn serve_reset_password() -> Result<impl Reply, warp::Rejection> {
 async fn health_check(pool: DbPool) -> Result<impl Reply, warp::Rejection> {
     use chrono::Utc;
     use std::time::Duration;
-    
+
     let version = env!("CARGO_PKG_VERSION");
     let uptime = STARTUP_TIME.elapsed();
     let timestamp = Utc::now();
-    
+
     // Measure database response time
     let db_check_start = Instant::now();
     let db_result = tokio::time::timeout(Duration::from_secs(5), async {
@@ -649,9 +649,9 @@ async fn health_check(pool: DbPool) -> Result<impl Reply, warp::Rejection> {
         }
     })
     .await;
-    
+
     let db_response_time_ms = db_check_start.elapsed().as_millis() as u64;
-    
+
     // Get pool statistics
     let pool_status = pool.status();
     let pool_stats = serde_json::json!({
@@ -659,14 +659,22 @@ async fn health_check(pool: DbPool) -> Result<impl Reply, warp::Rejection> {
         "available": pool_status.available,
         "max_size": pool_status.max_size,
     });
-    
+
     // Determine overall health status
     let (status, http_status_code, db_status) = match db_result {
         Ok(Ok(())) => ("healthy", warp::http::StatusCode::OK, "connected"),
-        Ok(Err(_)) => ("unhealthy", warp::http::StatusCode::SERVICE_UNAVAILABLE, "query_failed"),
-        Err(_) => ("unhealthy", warp::http::StatusCode::SERVICE_UNAVAILABLE, "timeout"),
+        Ok(Err(_)) => (
+            "unhealthy",
+            warp::http::StatusCode::SERVICE_UNAVAILABLE,
+            "query_failed",
+        ),
+        Err(_) => (
+            "unhealthy",
+            warp::http::StatusCode::SERVICE_UNAVAILABLE,
+            "timeout",
+        ),
     };
-    
+
     let response = serde_json::json!({
         "status": status,
         "version": version,
@@ -681,7 +689,7 @@ async fn health_check(pool: DbPool) -> Result<impl Reply, warp::Rejection> {
             }
         }
     });
-    
+
     Ok(warp::reply::with_status(
         warp::reply::json(&response),
         http_status_code,
