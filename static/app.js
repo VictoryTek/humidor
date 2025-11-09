@@ -3524,6 +3524,8 @@ async function loadFavorites() {
 
 function createFavoriteCard(cigar) {
     const brandName = getBrandName(cigar.brand_id);
+    const humidor = humidors.find(h => h.id === cigar.humidor_id);
+    const humidorName = humidor ? humidor.name : 'Unknown Humidor';
     
     const imageHtml = cigar.image_url 
         ? `<img src="${cigar.image_url}" alt="${cigar.name}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
@@ -3561,6 +3563,10 @@ function createFavoriteCard(cigar) {
             <div class="cigar-card-content">
                 <div class="cigar-card-brand">${brandName}</div>
                 <h3 class="cigar-card-name">${cigar.name}</h3>
+                <div class="cigar-card-humidor">
+                    <i class="mdi mdi-home-variant"></i>
+                    <span>${escapeHtml(humidorName)}</span>
+                </div>
             </div>
         </div>
     `;
