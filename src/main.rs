@@ -11,13 +11,18 @@ mod validation;
 use anyhow::{anyhow, bail};
 use deadpool_postgres::{Config, ManagerConfig, Pool, RecyclingMethod, Runtime};
 use middleware::{handle_rejection, RateLimiter};
+use once_cell::sync::Lazy;
 use refinery::embed_migrations;
 use std::env;
 use std::fs;
+use std::time::Instant;
 use tokio_postgres::NoTls;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 use warp::log;
 use warp::{Filter, Reply};
+
+// Track application startup time for uptime calculation
+static STARTUP_TIME: Lazy<Instant> = Lazy::new(Instant::now);
 
 // Embed migrations from the migrations directory
 embed_migrations!("migrations");
@@ -391,12 +396,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .or(backup_routes);
 
     // Health check endpoint (no auth required)
-    let health = warp::path("health").and(warp::get()).map(|| {
-        warp::reply::json(&serde_json::json!({
-            "status": "ok",
-            "service": "humidor"
-        }))
-    });
+    let health = warp::path("health")
+        .and(warp::get())
+        .and(routes::helpers::with_db(db_pool.clone()))
+        .and_then(health_check);
 
     // Root route
     let root = warp::path::end().and(warp::get()).and_then(serve_index);
@@ -614,4 +617,73 @@ async fn serve_reset_password() -> Result<impl Reply, warp::Rejection> {
         )
         .into_response()),
     }
+}
+
+/// Enhanced health check endpoint with database connectivity verification
+async fn health_check(pool: DbPool) -> Result<impl Reply, warp::Rejection> {
+    use chrono::Utc;
+    use std::time::Duration;
+    
+    let version = env!("CARGO_PKG_VERSION");
+    let uptime = STARTUP_TIME.elapsed();
+    let timestamp = Utc::now();
+    
+    // Measure database response time
+    let db_check_start = Instant::now();
+    let db_result = tokio::time::timeout(Duration::from_secs(5), async {
+        match pool.get().await {
+            Ok(client) => {
+                // Ping database with a simple query
+                match client.query_one("SELECT 1 as health_check", &[]).await {
+                    Ok(_) => Ok(()),
+                    Err(e) => {
+                        tracing::error!(error = %e, "Database query failed during health check");
+                        Err(())
+                    }
+                }
+            }
+            Err(e) => {
+                tracing::error!(error = %e, "Failed to get database connection from pool");
+                Err(())
+            }
+        }
+    })
+    .await;
+    
+    let db_response_time_ms = db_check_start.elapsed().as_millis() as u64;
+    
+    // Get pool statistics
+    let pool_status = pool.status();
+    let pool_stats = serde_json::json!({
+        "size": pool_status.size,
+        "available": pool_status.available,
+        "max_size": pool_status.max_size,
+    });
+    
+    // Determine overall health status
+    let (status, http_status_code, db_status) = match db_result {
+        Ok(Ok(())) => ("healthy", warp::http::StatusCode::OK, "connected"),
+        Ok(Err(_)) => ("unhealthy", warp::http::StatusCode::SERVICE_UNAVAILABLE, "query_failed"),
+        Err(_) => ("unhealthy", warp::http::StatusCode::SERVICE_UNAVAILABLE, "timeout"),
+    };
+    
+    let response = serde_json::json!({
+        "status": status,
+        "version": version,
+        "service": "humidor",
+        "timestamp": timestamp.to_rfc3339(),
+        "uptime_seconds": uptime.as_secs(),
+        "checks": {
+            "database": {
+                "status": db_status,
+                "response_time_ms": db_response_time_ms,
+                "connection_pool": pool_stats
+            }
+        }
+    });
+    
+    Ok(warp::reply::with_status(
+        warp::reply::json(&response),
+        http_status_code,
+    ))
 }

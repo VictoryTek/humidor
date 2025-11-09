@@ -1,4 +1,4 @@
-mod helpers;
+pub mod helpers;
 
 pub mod auth;
 pub mod backups;
