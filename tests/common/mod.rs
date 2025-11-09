@@ -194,8 +194,8 @@ pub async fn create_test_cigar(
 
     let row = client
         .query_one(
-            "INSERT INTO cigars (id, name, quantity, humidor_id, is_active, created_at, updated_at) 
-             VALUES ($1, $2, $3, $4, true, NOW(), NOW()) 
+            "INSERT INTO cigars (id, name, quantity, humidor_id, is_active, created_at, updated_at, retail_link) 
+             VALUES ($1, $2, $3, $4, true, NOW(), NOW(), NULL) 
              RETURNING id",
             &[&Uuid::new_v4(), &name, &quantity, &humidor_id],
         )
