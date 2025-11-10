@@ -11,6 +11,7 @@ mod validation;
 use anyhow::{anyhow, bail};
 use deadpool_postgres::{Config, ManagerConfig, Pool, RecyclingMethod, Runtime};
 use middleware::{handle_rejection, RateLimiter};
+use metrics_exporter_prometheus::PrometheusBuilder;
 use once_cell::sync::Lazy;
 use refinery::embed_migrations;
 use std::env;
@@ -213,6 +214,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Starting Humidor application"
     );
 
+    // Initialize Prometheus metrics exporter
+    let metrics_handle = PrometheusBuilder::new()
+        .install_recorder()
+        .expect("Failed to install Prometheus recorder");
+
+    tracing::info!("Metrics collection initialized with Prometheus exporter");
+
     // Build DATABASE_URL from secrets or environment
     let database_url = if let Ok(template) = env::var("DATABASE_URL_TEMPLATE") {
         // Using Docker secrets - read username and password from secret files
@@ -360,17 +368,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Password reset token cleanup task initialized"
     );
 
-    // Request logging middleware with structured logging
+    // Request logging middleware with structured logging and metrics
     fn log_requests() -> log::Log<impl Fn(log::Info) + Copy> {
         warp::log::custom(|info| {
+            let path = info.path();
+            let method = info.method().as_str();
+            let status = info.status().as_u16();
+            let duration = info.elapsed();
+
             tracing::info!(
-                method = %info.method(),
-                path = %info.path(),
-                status = %info.status().as_u16(),
-                duration_ms = %info.elapsed().as_millis(),
+                method = %method,
+                path = %path,
+                status = %status,
+                duration_ms = %duration.as_millis(),
                 remote_addr = ?info.remote_addr(),
                 "request completed"
             );
+
+            // Record metrics for this request
+            middleware::record_response_metrics(path, method, status, duration);
         })
     }
 
@@ -400,6 +416,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and(warp::get())
         .and(routes::helpers::with_db(db_pool.clone()))
         .and_then(health_check);
+
+    // Metrics endpoint (no auth required) - Prometheus scraping
+    let metrics_route = warp::path("metrics").and(warp::get()).map(move || {
+        let metrics = metrics_handle.render();
+        warp::reply::with_header(metrics, "Content-Type", "text/plain; version=0.0.4")
+    });
 
     // Root route
     let root = warp::path::end().and(warp::get()).and_then(serve_index);
@@ -482,6 +504,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .allow_credentials(true); // Required for cookie-based auth
 
     let routes = health
+        .or(metrics_route)
         .or(root)
         .or(setup)
         .or(login)
@@ -659,6 +682,13 @@ async fn health_check(pool: DbPool) -> Result<impl Reply, warp::Rejection> {
         "available": pool_status.available,
         "max_size": pool_status.max_size,
     });
+
+    // Record database pool metrics
+    middleware::metrics::record_db_pool_metrics(
+        pool_status.size,
+        pool_status.available,
+        pool_status.max_size,
+    );
 
     // Determine overall health status
     let (status, http_status_code, db_status) = match db_result {
