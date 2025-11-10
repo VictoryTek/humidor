@@ -10,8 +10,8 @@ mod validation;
 
 use anyhow::{anyhow, bail};
 use deadpool_postgres::{Config, ManagerConfig, Pool, RecyclingMethod, Runtime};
-use middleware::{handle_rejection, RateLimiter};
 use metrics_exporter_prometheus::PrometheusBuilder;
+use middleware::{handle_rejection, RateLimiter};
 use once_cell::sync::Lazy;
 use refinery::embed_migrations;
 use std::env;
