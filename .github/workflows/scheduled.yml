@@ -39,6 +39,18 @@ jobs:
             const fs = require('fs');
             const outdated = JSON.parse(fs.readFileSync('outdated.json', 'utf8'));
             
+            // Packages with known deferred updates (see DEPENDENCY_UPDATES_PLAN.md)
+            const deferredPackages = [
+              'warp',           // Phase 4: Requires hyper 1.x migration
+              'hyper',          // Phase 4: Major rewrite, blocked by warp
+              'http',           // Phase 4: Part of HTTP stack migration
+              'http-body',      // Phase 4: Part of HTTP stack migration
+              'h2',             // Phase 4: Part of HTTP stack migration
+              'headers',        // Phase 4: Part of HTTP stack migration
+              'headers-core',   // Phase 4: Part of HTTP stack migration
+              'hyper-tls',      // Phase 4: Part of HTTP stack migration
+            ];
+            
             // Helper function to check if update is a major version change
             function isMajorUpdate(current, latest) {
               const currentMajor = parseInt(current.split('.')[0]);
@@ -46,20 +58,26 @@ jobs:
               return latestMajor > currentMajor;
             }
             
-            // Filter for only major version updates
+            // Filter for major version updates, excluding deferred packages
             const majorUpdates = outdated.dependencies.filter(dep => 
-              isMajorUpdate(dep.project, dep.latest)
+              isMajorUpdate(dep.project, dep.latest) && 
+              !deferredPackages.includes(dep.name)
             );
             
-            // Only create issue if there are major updates
+            // Only create issue if there are actionable major updates
             if (majorUpdates.length === 0) {
-              console.log('No major version updates found. Skipping issue creation.');
-              console.log(`Total outdated: ${outdated.dependencies.length}, but all are minor/patch updates.`);
+              console.log('No actionable major version updates found.');
+              const totalMajor = outdated.dependencies.filter(dep => 
+                isMajorUpdate(dep.project, dep.latest)
+              ).length;
+              const deferredCount = totalMajor - majorUpdates.length;
+              console.log(`Total outdated: ${outdated.dependencies.length}`);
+              console.log(`Major updates deferred: ${deferredCount} (see DEPENDENCY_UPDATES_PLAN.md)`);
               return;
             }
             
             let body = '## Major Dependency Updates Available\n\n';
-            body += `Found ${majorUpdates.length} major version updates that require attention:\n\n`;
+            body += `Found ${majorUpdates.length} actionable major version updates:\n\n`;
             body += '| Package | Current | Latest | Kind |\n';
             body += '|---------|---------|--------|------|\n';
             
@@ -67,9 +85,19 @@ jobs:
               body += `| ${dep.name} | ${dep.project} | ${dep.latest} | ${dep.kind} |\n`;
             }
             
-            if (outdated.dependencies.length > majorUpdates.length) {
-              const minorCount = outdated.dependencies.length - majorUpdates.length;
-              body += `\n\n_Note: ${minorCount} minor/patch updates are also available but not shown here. Run \`cargo outdated\` locally to see all updates._\n`;
+            // Note about deferred updates
+            const deferredCount = outdated.dependencies.filter(dep => 
+              isMajorUpdate(dep.project, dep.latest) && 
+              deferredPackages.includes(dep.name)
+            ).length;
+            
+            if (deferredCount > 0) {
+              body += `\n\n_Note: ${deferredCount} major updates are intentionally deferred (HTTP stack migration). See [DEPENDENCY_UPDATES_PLAN.md](../blob/main/docs/DEPENDENCY_UPDATES_PLAN.md) for details._\n`;
+            }
+            
+            if (outdated.dependencies.length > majorUpdates.length + deferredCount) {
+              const minorCount = outdated.dependencies.length - majorUpdates.length - deferredCount;
+              body += `\n\n_${minorCount} minor/patch updates are also available. Run \`cargo outdated\` locally to see all updates._\n`;
             }
             
             body += '\n\n**Action Required:**\n';

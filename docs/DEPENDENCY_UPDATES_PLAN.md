@@ -56,14 +56,24 @@ The majority of updates are related to the HTTP stack migration from 0.2.x to 1.
 - [x] Identify breaking changes
 - [x] Create migration plan
 - [x] Set up tracking issue
+- [x] Configure CI to ignore deferred dependencies
 
-### Phase 2: Low-Risk Updates (Next Sprint)
-1. Update `sync_wrapper` (0.1.2 → 1.0.2)
-2. Update `thiserror` (1.0.69 → 2.0.17)
-3. Run full test suite
-4. Deploy to staging
+**Actions Taken:**
+- Added inline comments in `Cargo.toml` explaining version constraints
+- Updated scheduled workflow to filter out HTTP stack packages from outdated alerts
+- Documented deferred packages: warp, hyper, http, http-body, h2, headers, hyper-tls
 
-**Effort**: 8-12 hours
+### Phase 2: Low-Risk Updates (Next Sprint) ✅ COMPLETE
+1. ✅ Update `sync_wrapper` (0.1.2 → 1.0.2) - **COMPLETED 2025-11-10**
+   - Updated via `reqwest` 0.11 → 0.12
+   - All tests passing
+2. ✅ Update `thiserror` (1.0.69 → 2.0.17) - **COMPLETED 2025-11-10**
+   - No code changes required (not using derive macros)
+   - All tests passing
+3. ✅ Run full test suite - **PASSED**
+4. ⏳ Deploy to staging - **Pending commit**
+
+**Effort**: 8-12 hours (Actual: ~30 minutes)
 
 ### Phase 3: Medium-Risk Updates (Following Sprint)
 1. Update `jsonwebtoken` (9.3.1 → 10.2.0)
@@ -152,6 +162,19 @@ Continue weekly checks for:
 - End-of-life announcements
 - Critical patches
 - Community migration experiences
+
+### CI Configuration
+
+The scheduled maintenance workflow (`scheduled.yml`) is configured to:
+- ✅ Only alert on **actionable** major version updates
+- ✅ Filter out known deferred packages (HTTP stack migration)
+- ✅ Provide context about intentional version locks
+- ✅ Link to this plan for detailed migration strategy
+
+**Deferred Packages** (automatically filtered from alerts):
+- `warp`, `hyper`, `http`, `http-body`, `h2`, `headers`, `headers-core`, `hyper-tls`
+
+These packages are part of the Phase 4 HTTP stack migration and will generate false-positive "outdated" warnings until we complete that migration.
 
 ## References
 

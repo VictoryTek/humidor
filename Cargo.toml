@@ -13,6 +13,8 @@ path = "src/lib.rs"
 
 [dependencies]
 tokio = { version = "1.40", features = ["full"] }
+# Web framework - Staying on 0.3.x until 0.4 stabilizes (requires hyper 1.x migration)
+# See docs/DEPENDENCY_UPDATES_PLAN.md Phase 4 for upgrade plan
 warp = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -26,14 +28,16 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3.20", features = ["env-filter", "json"] }
 dotenvy = "0.15"
 bcrypt = "0.15"
+# JWT library - Staying on 9.x until Phase 3 migration (breaking changes in 10.x)
 jsonwebtoken = "9.2"
 base64 = "0.22"
 regex = "1.10"
-thiserror = "1.0"
-reqwest = { version = "0.11", features = ["json"] }
+thiserror = "2.0"
+reqwest = { version = "0.12", features = ["json"] }
 scraper = "0.24"
 lettre = { version = "0.11", features = ["tokio1-native-tls", "builder", "smtp-transport"] }
 rand = "0.8"
+# Archive library - Staying on 0.6.x until Phase 3 migration (major API changes in 6.0)
 zip = { version = "0.6", default-features = false, features = ["deflate"] }
 futures = "0.3"
 bytes = "1.0"
