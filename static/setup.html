@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Humidor Setup - First Time Setup</title>
     <link rel="stylesheet" href="/static/styles.css">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>📦</text></svg>">
+    <link rel="icon" type="image/png" href="static/logo.png">
+    <link rel="shortcut icon" type="image/png" href="static/logo.png">
+    <link rel="apple-touch-icon" href="static/logo.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
@@ -92,36 +94,38 @@
                             <span class="feature-icon">🔒</span>
                             <span>Secure and private</span>
                         </div>
+                        
+                        <!-- Restore from Backup Button -->
+                        <div class="feature" style="cursor: pointer; margin-top: 1rem; padding-top: 2rem; border-top: 1px solid var(--border-color);" id="showRestoreBtn">
+                            <span class="feature-icon">📁</span>
+                            <span>Already have a backup? Click to restore</span>
+                        </div>
                     </div>
                     
-                    <!-- Restore from Backup Section -->
-                    <div class="restore-section">
-                        <div class="divider">
-                            <span>OR</span>
-                        </div>
-                        <h3 style="margin-top: 2rem; margin-bottom: 1rem; font-size: 1.1rem;">Restore from Backup</h3>
-                        <p style="margin-bottom: 1rem; color: var(--text-secondary);">
-                            Already have a backup? Upload it to restore your complete collection, including all users, humidors, and cigars.
+                    <!-- Restore Form (hidden by default, positioned after welcome-features) -->
+                    <div id="restoreForm" style="display: none; margin: 1rem auto 0; padding: 1rem; background: var(--background-secondary); border-radius: 8px; max-width: 400px;">
+                        <p style="margin-bottom: 1rem; color: var(--text-secondary); font-size: 0.9rem;">
+                            Upload your backup file to restore your complete collection.
                         </p>
                         <div class="backup-upload-section">
-                            <input type="file" id="restoreBackupFile" accept=".zip" style="display: none;">
-                            <button class="btn btn-secondary" id="selectBackupBtn" style="width: 100%; margin-bottom: 0.5rem;">
-                                📁 Select Backup File
-                            </button>
-                            <div id="backupFileName" style="display: none; padding: 0.75rem; background: var(--background-tertiary); border-radius: 8px; margin-bottom: 0.5rem; text-align: center; color: var(--text-secondary);">
-                                <span id="selectedFileName"></span>
-                            </div>
-                            <button class="btn btn-primary" id="restoreBackupBtn" style="width: 100%; display: none;">
-                                ⬆️ Restore from Backup
-                            </button>
-                            <div id="restoreLoading" style="display: none; text-align: center; padding: 1rem;">
-                                <div class="spinner" style="margin: 0 auto 1rem;"></div>
-                                <p style="color: var(--text-secondary);">Restoring backup...</p>
+                                <input type="file" id="restoreBackupFile" accept=".zip" style="display: none;">
+                                <button class="btn btn-secondary" id="selectBackupBtn" style="width: 100%; margin-bottom: 0.5rem;">
+                                    📁 Select Backup File
+                                </button>
+                                <div id="backupFileName" style="display: none; padding: 0.5rem; background: var(--background-tertiary); border-radius: 6px; margin-bottom: 0.5rem; text-align: center; color: var(--text-secondary); font-size: 0.9rem;">
+                                    <span id="selectedFileName"></span>
+                                </div>
+                                <button class="btn btn-primary" id="restoreBackupBtn" style="width: 100%; display: none;">
+                                    ⬆️ Restore from Backup
+                                </button>
+                                <div id="restoreLoading" style="display: none; text-align: center; padding: 1rem;">
+                                    <div class="spinner" style="margin: 0 auto 0.5rem; width: 30px; height: 30px;"></div>
+                                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Restoring backup...</p>
+                                </div>
                             </div>
                         </div>
-                    </div>
                     
-                    <p class="already-setup" style="margin-top: 2rem;">
+                    <p class="already-setup" style="margin-top: 2rem; text-align: center;">
                         Already have an account? 
                         <a href="/" class="setup-link">Go to login</a>
                     </p>
@@ -290,18 +294,18 @@
                     </div>
                 </div>
             </div>
-        </div>
-
-        <!-- Navigation -->
-        <div class="setup-navigation">
-            <button class="btn btn-secondary" id="prevBtn" disabled>
-                ← Previous
-            </button>
-            <button class="btn btn-primary" id="nextBtn">
-                Next →
-            </button>
-        </div>
-    </div>
+            
+            <!-- Navigation -->
+            <div class="setup-navigation">
+                <button class="btn btn-secondary" id="prevBtn" disabled>
+                    ← Previous
+                </button>
+                <button class="btn btn-primary" id="nextBtn">
+                    Next →
+                </button>
+            </div>
+        </div> <!-- close setup-content -->
+    </div> <!-- close setup-container -->
 
     <!-- Toast Container -->
     <div id="toastContainer" class="toast-container"></div>

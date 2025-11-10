@@ -66,6 +66,22 @@ document.addEventListener('DOMContentLoaded', function() {
     elements.password.addEventListener('input', validatePasswords);
     elements.confirmPassword.addEventListener('input', validatePasswords);
     
+    // Show/hide restore form
+    const showRestoreBtn = document.getElementById('showRestoreBtn');
+    const restoreForm = document.getElementById('restoreForm');
+    
+    if (showRestoreBtn && restoreForm) {
+        showRestoreBtn.addEventListener('click', () => {
+            if (restoreForm.style.display === 'none' || restoreForm.style.display === '') {
+                restoreForm.style.display = 'block';
+                showRestoreBtn.style.opacity = '0.6';
+            } else {
+                restoreForm.style.display = 'none';
+                showRestoreBtn.style.opacity = '1';
+            }
+        });
+    }
+    
     // Restore from backup listeners
     const selectBackupBtn = document.getElementById('selectBackupBtn');
     const restoreBackupFile = document.getElementById('restoreBackupFile');

@@ -155,16 +155,28 @@ jobs:
       - name: Check for newer Rust version
         id: rust-check
         run: |
-          CURRENT_RUST=$(grep -oP 'FROM rust:\K[0-9.]+' Dockerfile | head -1)
-          LATEST_RUST=$(curl -s https://static.rust-lang.org/dist/channel-rust-stable.toml | grep -oP 'version = "\K[0-9.]+')
+          # Extract Rust version from Dockerfile (e.g., "1.90" from "rust:1.90-slim")
+          CURRENT_RUST=$(grep -m 1 'FROM rust:' Dockerfile | sed -n 's/.*FROM rust:\([0-9.]*\).*/\1/p')
+          
+          # Get latest stable Rust version from official channel
+          LATEST_RUST=$(curl -s https://static.rust-lang.org/dist/channel-rust-stable.toml | grep -m 1 'version = ' | cut -d'"' -f2 | cut -d' ' -f1)
+          
+          echo "Current Rust version: $CURRENT_RUST"
+          echo "Latest Rust version: $LATEST_RUST"
           
           echo "current=$CURRENT_RUST" >> $GITHUB_OUTPUT
           echo "latest=$LATEST_RUST" >> $GITHUB_OUTPUT
           
-          if [ "$CURRENT_RUST" != "$LATEST_RUST" ]; then
+          # Compare versions (strip patch version for comparison if needed)
+          CURRENT_MAJOR_MINOR=$(echo "$CURRENT_RUST" | cut -d. -f1,2)
+          LATEST_MAJOR_MINOR=$(echo "$LATEST_RUST" | cut -d. -f1,2)
+          
+          if [ "$CURRENT_MAJOR_MINOR" != "$LATEST_MAJOR_MINOR" ]; then
             echo "update_available=true" >> $GITHUB_OUTPUT
+            echo "Update available: $CURRENT_MAJOR_MINOR -> $LATEST_MAJOR_MINOR"
           else
             echo "update_available=false" >> $GITHUB_OUTPUT
+            echo "Already on latest major.minor version"
           fi
 
       - name: Create issue if Rust update available

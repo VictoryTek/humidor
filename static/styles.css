@@ -2838,9 +2838,10 @@ body {
 }
 
 .setup-container {
+    width: 100%;
     max-width: 800px;
     margin: 0 auto;
-    padding: 2rem;
+    padding: 2rem 1rem;
     display: flex;
     flex-direction: column;
 }
@@ -2942,18 +2943,20 @@ body {
     background: var(--card-background);
     border-radius: 12px;
     padding: 2rem;
-    margin-bottom: 2rem;
     box-shadow: 0 8px 32px var(--shadow-color);
     border: 1px solid rgba(212, 175, 55, 0.2);
     min-height: auto;
+    position: relative;
 }
 
 .setup-step {
     display: none;
+    position: relative;
 }
 
 .setup-step.active {
     display: block;
+    position: relative;
 }
 
 .step-content h2 {
@@ -3219,12 +3222,15 @@ body {
     line-height: 1.5;
 }
 
-/* Navigation */
+/* Navigation - inside the card at bottom */
 .setup-navigation {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0 1rem;
+    gap: 1rem;
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid rgba(212, 175, 55, 0.1);
 }
 
 .setup-navigation .btn {
