@@ -303,13 +303,13 @@ async fn test_concurrent_quantity_updates() {
     let updates: Vec<_> = (0..5)
         .map(|i| {
             let pool = pool.clone();
-            let cigar_id = cigar_id;
+            let id = cigar_id;
             async move {
                 let client = pool.get().await.unwrap();
                 let result = client
                     .execute(
                         "UPDATE cigars SET quantity = quantity - 1 WHERE id = $1",
-                        &[&cigar_id],
+                        &[&id],
                     )
                     .await;
 
