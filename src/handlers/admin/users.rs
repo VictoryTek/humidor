@@ -61,7 +61,10 @@ pub async fn list_users(
         LIMIT $1 OFFSET $2
     ";
 
-    match db.query(query, &[&(per_page as i64), &(offset as i64)]).await {
+    match db
+        .query(query, &[&(per_page as i64), &(offset as i64)])
+        .await
+    {
         Ok(rows) => {
             let users: Vec<UserResponse> = rows
                 .iter()
@@ -137,9 +140,7 @@ pub async fn get_user(
 
             Ok(warp::reply::json(&user))
         }
-        Ok(None) => Err(warp::reject::custom(AppError::NotFound(
-            "User".to_string(),
-        ))),
+        Ok(None) => Err(warp::reject::custom(AppError::NotFound("User".to_string()))),
         Err(e) => {
             tracing::error!(error = %e, user_id = %user_id, "Database error fetching user");
             Err(warp::reject::custom(AppError::DatabaseError(
@@ -318,7 +319,10 @@ pub async fn update_user(
     }
 
     if let Some(is_active) = request.is_active {
-        updates.push((format!("is_active = ${}", param_index), is_active.to_string()));
+        updates.push((
+            format!("is_active = ${}", param_index),
+            is_active.to_string(),
+        ));
         param_index += 1;
     }
 
@@ -347,7 +351,7 @@ pub async fn update_user(
 
     // Build params dynamically based on what we're updating
     let mut query_params: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> = Vec::new();
-    
+
     if let Some(ref username) = request.username {
         query_params.push(username);
     }
@@ -430,9 +434,7 @@ pub async fn delete_user(
                 warp::reject::custom(AppError::NotFound("User".to_string()))
             } else {
                 tracing::error!(error = %e, "Failed to fetch user");
-                warp::reject::custom(AppError::DatabaseError(
-                    "Failed to fetch user".to_string(),
-                ))
+                warp::reject::custom(AppError::DatabaseError("Failed to fetch user".to_string()))
             }
         })?;
 
@@ -441,10 +443,7 @@ pub async fn delete_user(
     // If deleting an admin, check if it's the last one
     if is_admin {
         let admin_count_check = db
-            .query_one(
-                "SELECT COUNT(*) FROM users WHERE is_admin = true",
-                &[],
-            )
+            .query_one("SELECT COUNT(*) FROM users WHERE is_admin = true", &[])
             .await
             .map_err(|e| {
                 tracing::error!(error = %e, "Failed to check admin count");
@@ -462,12 +461,13 @@ pub async fn delete_user(
     }
 
     // Delete user (cascade will handle related data)
-    match db.execute("DELETE FROM users WHERE id = $1", &[&user_id]).await {
+    match db
+        .execute("DELETE FROM users WHERE id = $1", &[&user_id])
+        .await
+    {
         Ok(deleted) => {
             if deleted == 0 {
-                return Err(warp::reject::custom(AppError::NotFound(
-                    "User".to_string(),
-                )));
+                return Err(warp::reject::custom(AppError::NotFound("User".to_string())));
             }
 
             tracing::info!(
@@ -521,9 +521,7 @@ pub async fn toggle_active(
     {
         Ok(updated) => {
             if updated == 0 {
-                return Err(warp::reject::custom(AppError::NotFound(
-                    "User".to_string(),
-                )));
+                return Err(warp::reject::custom(AppError::NotFound("User".to_string())));
             }
 
             tracing::info!(
@@ -582,9 +580,7 @@ pub async fn change_user_password(
     {
         Ok(updated) => {
             if updated == 0 {
-                return Err(warp::reject::custom(AppError::NotFound(
-                    "User".to_string(),
-                )));
+                return Err(warp::reject::custom(AppError::NotFound("User".to_string())));
             }
 
             tracing::info!(

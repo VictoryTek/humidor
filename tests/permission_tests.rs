@@ -193,7 +193,10 @@ async fn test_inactive_admin_retains_admin_flag() {
     let is_admin: bool = row.get(0);
     let is_active: bool = row.get(1);
 
-    assert!(is_admin, "Deactivated admin should still have is_admin flag");
+    assert!(
+        is_admin,
+        "Deactivated admin should still have is_admin flag"
+    );
     assert!(
         !is_active,
         "Deactivated admin should have is_active set to false"

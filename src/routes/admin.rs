@@ -22,12 +22,8 @@ pub fn create_admin_routes(
         .and(with_db(db_pool.clone()))
         .and_then(
             |auth, query: std::collections::HashMap<String, String>, pool| async move {
-                let page = query
-                    .get("page")
-                    .and_then(|p| p.parse::<i32>().ok());
-                let per_page = query
-                    .get("per_page")
-                    .and_then(|pp| pp.parse::<i32>().ok());
+                let page = query.get("page").and_then(|p| p.parse::<i32>().ok());
+                let per_page = query.get("per_page").and_then(|pp| pp.parse::<i32>().ok());
 
                 admin::list_users(auth, page, per_page, pool).await
             },

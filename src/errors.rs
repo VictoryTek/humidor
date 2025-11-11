@@ -111,10 +111,9 @@ impl AppError {
                 StatusCode::BAD_REQUEST,
                 ErrorResponse::new("BAD_REQUEST", msg),
             ),
-            AppError::Forbidden(msg) => (
-                StatusCode::FORBIDDEN,
-                ErrorResponse::new("FORBIDDEN", msg),
-            ),
+            AppError::Forbidden(msg) => {
+                (StatusCode::FORBIDDEN, ErrorResponse::new("FORBIDDEN", msg))
+            }
         }
     }
 }

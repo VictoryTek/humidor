@@ -31,10 +31,7 @@ impl AuthContext {
 
     /// Check if the current user is an admin
     pub fn is_admin(&self) -> bool {
-        self.user
-            .as_ref()
-            .map(|u| u.is_admin)
-            .unwrap_or(false)
+        self.user.as_ref().map(|u| u.is_admin).unwrap_or(false)
     }
 
     /// Get a reference to the user data if available
