@@ -1,15 +1,14 @@
 /// Security Isolation Tests
-/// 
+///
 /// These tests verify that users cannot access or modify other users' data.
 /// Critical for preventing unauthorized data access and maintaining user privacy.
-/// 
+///
 /// Tests cover:
 /// - Cross-user humidor access (GET, UPDATE, DELETE)
 /// - Cross-user cigar access (GET, CREATE, UPDATE, DELETE)
 /// - Cross-user favorites access
 /// - Cross-user wish list access
 /// - Proper error responses (403 Forbidden)
-
 mod common;
 
 use common::{create_test_cigar, create_test_humidor, create_test_user, setup_test_db};
@@ -68,7 +67,10 @@ async fn test_user_cannot_get_other_users_humidor() {
         .expect("Query failed");
 
     let retrieved_id: Uuid = result.get(0);
-    assert_eq!(retrieved_id, humidor_a_id, "User A should access their own humidor");
+    assert_eq!(
+        retrieved_id, humidor_a_id,
+        "User A should access their own humidor"
+    );
 }
 
 #[tokio::test]
@@ -109,10 +111,7 @@ async fn test_user_cannot_update_other_users_humidor() {
 
     // Verify name was not changed
     let result = client
-        .query_one(
-            "SELECT name FROM humidors WHERE id = $1",
-            &[&humidor_a_id],
-        )
+        .query_one("SELECT name FROM humidors WHERE id = $1", &[&humidor_a_id])
         .await
         .expect("Query failed");
 
@@ -221,7 +220,10 @@ async fn test_user_cannot_get_other_users_cigars() {
         .expect("Query failed");
 
     let retrieved_id: Uuid = result.get(0);
-    assert_eq!(retrieved_id, cigar_a_id, "User A should access their own cigar");
+    assert_eq!(
+        retrieved_id, cigar_a_id,
+        "User A should access their own cigar"
+    );
 }
 
 #[tokio::test]
@@ -331,7 +333,10 @@ async fn test_user_cannot_update_other_users_cigar() {
         .expect("Query failed");
 
     let has_access: bool = ownership_check.get(0);
-    assert!(has_access, "User A should have access to update their own cigar");
+    assert!(
+        has_access,
+        "User A should have access to update their own cigar"
+    );
 }
 
 #[tokio::test]
@@ -488,10 +493,7 @@ async fn test_user_cannot_view_other_users_favorites() {
 
     // User B tries to view User A's favorites
     let result = client
-        .query(
-            "SELECT id FROM favorites WHERE user_id = $1",
-            &[&user_b_id],
-        )
+        .query("SELECT id FROM favorites WHERE user_id = $1", &[&user_b_id])
         .await
         .expect("Query failed");
 
@@ -499,10 +501,7 @@ async fn test_user_cannot_view_other_users_favorites() {
 
     // Verify User A can see their own favorites
     let result = client
-        .query(
-            "SELECT id FROM favorites WHERE user_id = $1",
-            &[&user_a_id],
-        )
+        .query("SELECT id FROM favorites WHERE user_id = $1", &[&user_a_id])
         .await
         .expect("Query failed");
 
@@ -617,10 +616,7 @@ async fn test_user_cannot_remove_other_users_favorite() {
 
     // Verify favorite still exists
     let result = client
-        .query_opt(
-            "SELECT id FROM favorites WHERE id = $1",
-            &[&favorite_id],
-        )
+        .query_opt("SELECT id FROM favorites WHERE id = $1", &[&favorite_id])
         .await
         .expect("Query failed");
 
@@ -666,10 +662,7 @@ async fn test_user_cannot_view_other_users_wish_list() {
 
     // User B tries to view User A's wish list
     let result = client
-        .query(
-            "SELECT id FROM wish_list WHERE user_id = $1",
-            &[&user_b_id],
-        )
+        .query("SELECT id FROM wish_list WHERE user_id = $1", &[&user_b_id])
         .await
         .expect("Query failed");
 
@@ -677,14 +670,15 @@ async fn test_user_cannot_view_other_users_wish_list() {
 
     // Verify User A can see their own wish list
     let result = client
-        .query(
-            "SELECT id FROM wish_list WHERE user_id = $1",
-            &[&user_a_id],
-        )
+        .query("SELECT id FROM wish_list WHERE user_id = $1", &[&user_a_id])
         .await
         .expect("Query failed");
 
-    assert_eq!(result.len(), 1, "User A should see their own wish list item");
+    assert_eq!(
+        result.len(),
+        1,
+        "User A should see their own wish list item"
+    );
 }
 
 #[tokio::test]
@@ -715,12 +709,7 @@ async fn test_user_cannot_modify_other_users_wish_list() {
         .execute(
             "INSERT INTO wish_list (id, user_id, cigar_id, notes, created_at) 
              VALUES ($1, $2, $3, $4, NOW())",
-            &[
-                &Uuid::new_v4(),
-                &user_a_id,
-                &cigar_a_id,
-                &"Original notes",
-            ],
+            &[&Uuid::new_v4(), &user_a_id, &cigar_a_id, &"Original notes"],
         )
         .await
         .expect("Failed to create wish list item");
@@ -843,7 +832,7 @@ async fn test_complete_user_isolation() {
         .expect("Failed to create cigar");
 
     let client = ctx.pool.get().await.expect("Failed to get client");
-    
+
     // Add to favorites
     client
         .execute(
@@ -883,19 +872,13 @@ async fn test_complete_user_isolation() {
     assert_eq!(cigars.len(), 0, "User B should have no cigars");
 
     let favorites = client
-        .query(
-            "SELECT id FROM favorites WHERE user_id = $1",
-            &[&user_b_id],
-        )
+        .query("SELECT id FROM favorites WHERE user_id = $1", &[&user_b_id])
         .await
         .expect("Query failed");
     assert_eq!(favorites.len(), 0, "User B should have no favorites");
 
     let wish_list = client
-        .query(
-            "SELECT id FROM wish_list WHERE user_id = $1",
-            &[&user_b_id],
-        )
+        .query("SELECT id FROM wish_list WHERE user_id = $1", &[&user_b_id])
         .await
         .expect("Query failed");
     assert_eq!(wish_list.len(), 0, "User B should have no wish list items");
@@ -919,19 +902,13 @@ async fn test_complete_user_isolation() {
     assert_eq!(cigars.len(), 1, "User A should have 1 cigar");
 
     let favorites = client
-        .query(
-            "SELECT id FROM favorites WHERE user_id = $1",
-            &[&user_a_id],
-        )
+        .query("SELECT id FROM favorites WHERE user_id = $1", &[&user_a_id])
         .await
         .expect("Query failed");
     assert_eq!(favorites.len(), 1, "User A should have 1 favorite");
 
     let wish_list = client
-        .query(
-            "SELECT id FROM wish_list WHERE user_id = $1",
-            &[&user_a_id],
-        )
+        .query("SELECT id FROM wish_list WHERE user_id = $1", &[&user_a_id])
         .await
         .expect("Query failed");
     assert_eq!(wish_list.len(), 1, "User A should have 1 wish list item");
