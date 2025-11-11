@@ -295,20 +295,33 @@ async fn test_concurrent_quantity_updates() {
         .await
         .unwrap();
 
+    // Ensure the cigar is committed before starting concurrent updates
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
     // Use join_all to ensure all operations complete before checking
     let pool = ctx.pool.clone();
     let updates: Vec<_> = (0..5)
-        .map(|_| {
+        .map(|i| {
             let pool = pool.clone();
+            let cigar_id = cigar_id;
             async move {
                 let client = pool.get().await.unwrap();
-                client
+                let result = client
                     .execute(
                         "UPDATE cigars SET quantity = quantity - 1 WHERE id = $1",
                         &[&cigar_id],
                     )
-                    .await
-                    .unwrap();
+                    .await;
+
+                // Provide better error message if update fails
+                if let Err(e) = result {
+                    panic!("Update {} failed: {:?}", i, e);
+                }
+
+                let rows_affected = result.unwrap();
+                if rows_affected == 0 {
+                    panic!("Update {} affected 0 rows - cigar not found", i);
+                }
             }
         })
         .collect();
