@@ -130,12 +130,15 @@ pub async fn add_favorite(
     let id = Uuid::new_v4();
     let now = Utc::now();
 
-    // First, get the cigar data to create a snapshot
+    // CRITICAL: Verify the cigar belongs to the user (through its humidor)
+    // First, get the cigar data AND verify ownership via humidor
     let cigar = db
         .query_opt(
-            "SELECT name, brand_id, size_id, strength_id, origin_id, ring_gauge_id, image_url
-         FROM cigars WHERE id = $1",
-            &[&request.cigar_id],
+            "SELECT c.name, c.brand_id, c.size_id, c.strength_id, c.origin_id, c.ring_gauge_id, c.image_url
+             FROM cigars c
+             INNER JOIN humidors h ON c.humidor_id = h.id
+             WHERE c.id = $1 AND h.user_id = $2",
+            &[&request.cigar_id, &auth.user_id],
         )
         .await
         .map_err(|e| {
@@ -152,9 +155,12 @@ pub async fn add_favorite(
         None => {
             tracing::warn!(
                 cigar_id = %request.cigar_id,
-                "Attempted to favorite non-existent cigar"
+                user_id = %auth.user_id,
+                "Attempted to favorite non-existent or unauthorized cigar"
             );
-            return Err(warp::reject::reject());
+            return Err(warp::reject::custom(AppError::Forbidden(
+                "You do not have access to this cigar".to_string(),
+            )));
         }
     };
 

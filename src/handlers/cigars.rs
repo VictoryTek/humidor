@@ -17,9 +17,72 @@ pub struct CigarResponse {
     pub total_pages: i64,
 }
 
+/// Helper function to verify that a humidor belongs to the authenticated user
+async fn verify_humidor_ownership(
+    db: &deadpool_postgres::Object,
+    humidor_id: Option<Uuid>,
+    user_id: Uuid,
+) -> Result<(), AppError> {
+    if let Some(hid) = humidor_id {
+        let check_query = "SELECT EXISTS(SELECT 1 FROM humidors WHERE id = $1 AND user_id = $2)";
+        match db.query_one(check_query, &[&hid, &user_id]).await {
+            Ok(row) => {
+                let exists: bool = row.get(0);
+                if !exists {
+                    return Err(AppError::Forbidden(
+                        "You do not have access to this humidor".to_string(),
+                    ));
+                }
+                Ok(())
+            }
+            Err(e) => {
+                tracing::error!(error = %e, "Failed to verify humidor ownership");
+                Err(AppError::DatabaseError(
+                    "Failed to verify humidor access".to_string(),
+                ))
+            }
+        }
+    } else {
+        // No humidor specified is okay for some operations (e.g., listing all cigars across humidors)
+        Ok(())
+    }
+}
+
+/// Helper function to verify that a cigar belongs to the authenticated user (through its humidor)
+async fn verify_cigar_ownership(
+    db: &deadpool_postgres::Object,
+    cigar_id: Uuid,
+    user_id: Uuid,
+) -> Result<(), AppError> {
+    let check_query = "
+        SELECT EXISTS(
+            SELECT 1 FROM cigars c
+            INNER JOIN humidors h ON c.humidor_id = h.id
+            WHERE c.id = $1 AND h.user_id = $2
+        )
+    ";
+    match db.query_one(check_query, &[&cigar_id, &user_id]).await {
+        Ok(row) => {
+            let exists: bool = row.get(0);
+            if !exists {
+                return Err(AppError::Forbidden(
+                    "You do not have access to this cigar".to_string(),
+                ));
+            }
+            Ok(())
+        }
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to verify cigar ownership");
+            Err(AppError::DatabaseError(
+                "Failed to verify cigar access".to_string(),
+            ))
+        }
+    }
+}
+
 pub async fn get_cigars(
     params: std::collections::HashMap<String, String>,
-    _auth: AuthContext,
+    auth: AuthContext,
     pool: DbPool,
 ) -> Result<impl Reply, Rejection> {
     use crate::errors::AppError;
@@ -50,17 +113,26 @@ pub async fn get_cigars(
 
     let offset = (page - 1) * page_size;
 
-    // Build query with parameterized conditions to prevent SQL injection
-    let base_query = "SELECT id, humidor_id, brand_id, name, size_id, strength_id, origin_id, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge_id, length, image_url, retail_link, is_active, created_at, updated_at FROM cigars";
-    let count_query = "SELECT COUNT(*) FROM cigars";
+    // Build query with JOIN to filter by user-owned humidors
+    let base_query = "SELECT c.id, c.humidor_id, c.brand_id, c.name, c.size_id, c.strength_id, c.origin_id, c.wrapper, c.binder, c.filler, c.price, c.purchase_date, c.notes, c.quantity, c.ring_gauge_id, c.length, c.image_url, c.retail_link, c.is_active, c.created_at, c.updated_at FROM cigars c INNER JOIN humidors h ON c.humidor_id = h.id";
+    let count_query = "SELECT COUNT(*) FROM cigars c INNER JOIN humidors h ON c.humidor_id = h.id";
     let mut conditions = Vec::new();
     let mut param_values: Vec<Box<dyn ToSql + Sync + Send>> = Vec::new();
     let mut param_counter = 1;
 
+    // CRITICAL: Always filter by user_id to ensure data isolation
+    conditions.push(format!("h.user_id = ${}", param_counter));
+    param_values.push(Box::new(auth.user_id));
+    param_counter += 1;
+
     // Check for humidor_id filter
     if let Some(humidor_id_str) = params.get("humidor_id") {
         if let Ok(humidor_uuid) = Uuid::parse_str(humidor_id_str) {
-            conditions.push(format!("humidor_id = ${}", param_counter));
+            // Verify the humidor belongs to the user (extra safety check)
+            if let Err(e) = verify_humidor_ownership(&db, Some(humidor_uuid), auth.user_id).await {
+                return Err(warp::reject::custom(e));
+            }
+            conditions.push(format!("c.humidor_id = ${}", param_counter));
             param_values.push(Box::new(humidor_uuid));
             param_counter += 1;
         }
@@ -69,35 +141,35 @@ pub async fn get_cigars(
     // Check for organizer filters (brand, size, origin, strength, ring_gauge)
     if let Some(brand_id_str) = params.get("brand_id") {
         if let Ok(brand_uuid) = Uuid::parse_str(brand_id_str) {
-            conditions.push(format!("brand_id = ${}", param_counter));
+            conditions.push(format!("c.brand_id = ${}", param_counter));
             param_values.push(Box::new(brand_uuid));
             param_counter += 1;
         }
     }
     if let Some(size_id_str) = params.get("size_id") {
         if let Ok(size_uuid) = Uuid::parse_str(size_id_str) {
-            conditions.push(format!("size_id = ${}", param_counter));
+            conditions.push(format!("c.size_id = ${}", param_counter));
             param_values.push(Box::new(size_uuid));
             param_counter += 1;
         }
     }
     if let Some(origin_id_str) = params.get("origin_id") {
         if let Ok(origin_uuid) = Uuid::parse_str(origin_id_str) {
-            conditions.push(format!("origin_id = ${}", param_counter));
+            conditions.push(format!("c.origin_id = ${}", param_counter));
             param_values.push(Box::new(origin_uuid));
             param_counter += 1;
         }
     }
     if let Some(strength_id_str) = params.get("strength_id") {
         if let Ok(strength_uuid) = Uuid::parse_str(strength_id_str) {
-            conditions.push(format!("strength_id = ${}", param_counter));
+            conditions.push(format!("c.strength_id = ${}", param_counter));
             param_values.push(Box::new(strength_uuid));
             param_counter += 1;
         }
     }
     if let Some(ring_gauge_id_str) = params.get("ring_gauge_id") {
         if let Ok(ring_gauge_uuid) = Uuid::parse_str(ring_gauge_id_str) {
-            conditions.push(format!("ring_gauge_id = ${}", param_counter));
+            conditions.push(format!("c.ring_gauge_id = ${}", param_counter));
             param_values.push(Box::new(ring_gauge_uuid));
             param_counter += 1;
         }
@@ -219,7 +291,7 @@ pub async fn get_cigars(
 
 pub async fn create_cigar(
     create_cigar: CreateCigar,
-    _auth: AuthContext,
+    auth: AuthContext,
     pool: DbPool,
 ) -> Result<impl Reply, Rejection> {
     // Validate input
@@ -231,6 +303,11 @@ pub async fn create_cigar(
             "Database connection failed".to_string(),
         ))
     })?;
+
+    // CRITICAL: Verify the humidor belongs to the authenticated user
+    verify_humidor_ownership(&db, create_cigar.humidor_id, auth.user_id)
+        .await
+        .map_err(warp::reject::custom)?;
 
     let id = Uuid::new_v4();
     let now = Utc::now();
@@ -276,17 +353,18 @@ pub async fn create_cigar(
     }
 }
 
-pub async fn get_cigar(
-    id: Uuid,
-    _auth: AuthContext,
-    pool: DbPool,
-) -> Result<impl Reply, Rejection> {
+pub async fn get_cigar(id: Uuid, auth: AuthContext, pool: DbPool) -> Result<impl Reply, Rejection> {
     let db = pool.get().await.map_err(|e| {
         tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError(
             "Database connection failed".to_string(),
         ))
     })?;
+
+    // CRITICAL: Verify the cigar belongs to the user (through its humidor)
+    verify_cigar_ownership(&db, id, auth.user_id)
+        .await
+        .map_err(warp::reject::custom)?;
 
     match db.query_one(
         "SELECT id, humidor_id, brand_id, name, size_id, strength_id, origin_id, wrapper, binder, filler, price, purchase_date, notes, quantity, ring_gauge_id, length, image_url, retail_link, is_active, created_at, updated_at FROM cigars WHERE id = $1",
@@ -328,7 +406,7 @@ pub async fn get_cigar(
 pub async fn update_cigar(
     id: Uuid,
     update_cigar: UpdateCigar,
-    _auth: AuthContext,
+    auth: AuthContext,
     pool: DbPool,
 ) -> Result<impl Reply, Rejection> {
     // Validate input
@@ -340,6 +418,18 @@ pub async fn update_cigar(
             "Database connection failed".to_string(),
         ))
     })?;
+
+    // CRITICAL: Verify the cigar belongs to the user (through its humidor)
+    verify_cigar_ownership(&db, id, auth.user_id)
+        .await
+        .map_err(warp::reject::custom)?;
+
+    // If updating humidor_id, verify the new humidor also belongs to the user
+    if let Some(new_humidor_id) = update_cigar.humidor_id {
+        verify_humidor_ownership(&db, Some(new_humidor_id), auth.user_id)
+            .await
+            .map_err(warp::reject::custom)?;
+    }
 
     let now = Utc::now();
 
@@ -409,7 +499,7 @@ pub async fn update_cigar(
 
 pub async fn delete_cigar(
     id: Uuid,
-    _auth: AuthContext,
+    auth: AuthContext,
     pool: DbPool,
 ) -> Result<impl Reply, Rejection> {
     let db = pool.get().await.map_err(|e| {
@@ -418,6 +508,11 @@ pub async fn delete_cigar(
             "Database connection failed".to_string(),
         ))
     })?;
+
+    // CRITICAL: Verify the cigar belongs to the user (through its humidor)
+    verify_cigar_ownership(&db, id, auth.user_id)
+        .await
+        .map_err(warp::reject::custom)?;
 
     // Hard delete: actually remove the cigar from the database
     // Note: favorites will keep snapshot data due to ON DELETE SET NULL on cigar_id
