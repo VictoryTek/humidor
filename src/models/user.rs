@@ -73,6 +73,44 @@ pub struct SetupRequest {
     pub humidor: CreateHumidorRequest,
 }
 
+// Admin user management models
+#[derive(Debug, Deserialize)]
+pub struct AdminCreateUserRequest {
+    pub username: String,
+    pub email: String,
+    pub full_name: String,
+    pub password: String,
+    pub is_admin: bool,
+    pub is_active: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AdminUpdateUserRequest {
+    pub username: Option<String>,
+    pub email: Option<String>,
+    pub full_name: Option<String>,
+    pub is_admin: Option<bool>,
+    pub is_active: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AdminChangePasswordRequest {
+    pub new_password: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AdminToggleActiveRequest {
+    pub is_active: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub struct UserListResponse {
+    pub users: Vec<UserResponse>,
+    pub total: i64,
+    pub page: i32,
+    pub per_page: i32,
+}
+
 impl From<User> for UserResponse {
     fn from(user: User) -> Self {
         UserResponse {

@@ -9,7 +9,7 @@ pub enum AppError {
     DatabaseError(String),
     ValidationError(String),
     Unauthorized,
-    Forbidden,
+    Forbidden(String),
     NotFound(String),
     Conflict(String),
     BadRequest(String),
@@ -22,7 +22,7 @@ impl fmt::Display for AppError {
             AppError::DatabaseError(msg) => write!(f, "Database error: {}", msg),
             AppError::ValidationError(msg) => write!(f, "Validation error: {}", msg),
             AppError::Unauthorized => write!(f, "Unauthorized"),
-            AppError::Forbidden => write!(f, "Forbidden"),
+            AppError::Forbidden(msg) => write!(f, "Forbidden: {}", msg),
             AppError::NotFound(msg) => write!(f, "Not found: {}", msg),
             AppError::Conflict(msg) => write!(f, "Conflict: {}", msg),
             AppError::BadRequest(msg) => write!(f, "Bad request: {}", msg),
@@ -111,9 +111,9 @@ impl AppError {
                 StatusCode::BAD_REQUEST,
                 ErrorResponse::new("BAD_REQUEST", msg),
             ),
-            AppError::Forbidden => (
+            AppError::Forbidden(msg) => (
                 StatusCode::FORBIDDEN,
-                ErrorResponse::new("FORBIDDEN", "Access denied"),
+                ErrorResponse::new("FORBIDDEN", msg),
             ),
         }
     }

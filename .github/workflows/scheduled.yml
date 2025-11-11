@@ -7,115 +7,18 @@ on:
   workflow_dispatch:
 
 jobs:
-  # Check for dependency updates
-  dependency-updates:
-    name: Check Dependency Updates
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+  # Dependency updates check - DISABLED during active development
+  # Will re-enable during maintenance phase (RC/post-release)
+  # See docs/DEPENDENCY_UPDATES_PLAN.md for migration strategy
+  # dependency-updates:
+  #   name: Check Dependency Updates
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #     [... rest disabled ...]
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install cargo-outdated
-        run: cargo install cargo-outdated
-
-      - name: Check for outdated dependencies
-        id: outdated
-        run: |
-          cargo outdated --format json > outdated.json
-          cat outdated.json
-          
-          # Count outdated dependencies
-          OUTDATED_COUNT=$(jq '.dependencies | length' outdated.json)
-          echo "outdated_count=$OUTDATED_COUNT" >> $GITHUB_OUTPUT
-
-      - name: Create issue if dependencies are outdated
-        if: steps.outdated.outputs.outdated_count > 0
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const outdated = JSON.parse(fs.readFileSync('outdated.json', 'utf8'));
-            
-            // Packages with known deferred updates (see DEPENDENCY_UPDATES_PLAN.md)
-            const deferredPackages = [
-              'warp',           // Phase 4: Requires hyper 1.x migration
-              'hyper',          // Phase 4: Major rewrite, blocked by warp
-              'http',           // Phase 4: Part of HTTP stack migration
-              'http-body',      // Phase 4: Part of HTTP stack migration
-              'h2',             // Phase 4: Part of HTTP stack migration
-              'headers',        // Phase 4: Part of HTTP stack migration
-              'headers-core',   // Phase 4: Part of HTTP stack migration
-              'hyper-tls',      // Phase 4: Part of HTTP stack migration
-            ];
-            
-            // Helper function to check if update is a major version change
-            function isMajorUpdate(current, latest) {
-              const currentMajor = parseInt(current.split('.')[0]);
-              const latestMajor = parseInt(latest.split('.')[0]);
-              return latestMajor > currentMajor;
-            }
-            
-            // Filter for major version updates, excluding deferred packages
-            const majorUpdates = outdated.dependencies.filter(dep => 
-              isMajorUpdate(dep.project, dep.latest) && 
-              !deferredPackages.includes(dep.name)
-            );
-            
-            // Only create issue if there are actionable major updates
-            if (majorUpdates.length === 0) {
-              console.log('No actionable major version updates found.');
-              const totalMajor = outdated.dependencies.filter(dep => 
-                isMajorUpdate(dep.project, dep.latest)
-              ).length;
-              const deferredCount = totalMajor - majorUpdates.length;
-              console.log(`Total outdated: ${outdated.dependencies.length}`);
-              console.log(`Major updates deferred: ${deferredCount} (see DEPENDENCY_UPDATES_PLAN.md)`);
-              return;
-            }
-            
-            let body = '## Major Dependency Updates Available\n\n';
-            body += `Found ${majorUpdates.length} actionable major version updates:\n\n`;
-            body += '| Package | Current | Latest | Kind |\n';
-            body += '|---------|---------|--------|------|\n';
-            
-            for (const dep of majorUpdates) {
-              body += `| ${dep.name} | ${dep.project} | ${dep.latest} | ${dep.kind} |\n`;
-            }
-            
-            // Note about deferred updates
-            const deferredCount = outdated.dependencies.filter(dep => 
-              isMajorUpdate(dep.project, dep.latest) && 
-              deferredPackages.includes(dep.name)
-            ).length;
-            
-            if (deferredCount > 0) {
-              body += `\n\n_Note: ${deferredCount} major updates are intentionally deferred (HTTP stack migration). See [DEPENDENCY_UPDATES_PLAN.md](../blob/main/docs/DEPENDENCY_UPDATES_PLAN.md) for details._\n`;
-            }
-            
-            if (outdated.dependencies.length > majorUpdates.length + deferredCount) {
-              const minorCount = outdated.dependencies.length - majorUpdates.length - deferredCount;
-              body += `\n\n_${minorCount} minor/patch updates are also available. Run \`cargo outdated\` locally to see all updates._\n`;
-            }
-            
-            body += '\n\n**Action Required:**\n';
-            body += '1. Review breaking changes in the changelog for each package\n';
-            body += '2. Update `Cargo.toml` with new version requirements\n';
-            body += '3. Run `cargo update` and fix any compilation errors\n';
-            body += '4. Run full test suite to verify compatibility\n';
-            body += '5. Consider minor/patch updates with `cargo update`\n';
-            
-            github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: `🔼 Major Dependency Updates Available - ${new Date().toISOString().split('T')[0]}`,
-              body: body,
-              labels: ['dependencies', 'maintenance', 'breaking-change']
-            });
-
-  # Weekly security audit
+  # Weekly security audit - ACTIVE (critical for security)
   security-audit:
     name: Security Audit
     runs-on: ubuntu-latest
@@ -237,12 +140,14 @@ jobs:
   health-summary:
     name: Project Health Summary
     runs-on: ubuntu-latest
-    needs: [dependency-updates, security-audit, docker-updates]
+    needs: [security-audit, docker-updates]
     if: always()
     steps:
       - name: Project health summary
         run: |
           echo "## Project Health Check Complete"
-          echo "Dependency Updates: ${{ needs.dependency-updates.result }}"
           echo "Security Audit: ${{ needs.security-audit.result }}"
           echo "Docker Updates: ${{ needs.docker-updates.result }}"
+          echo ""
+          echo "Note: Dependency update checks disabled during active development"
+          echo "Will re-enable during maintenance phase (see DEPENDENCY_UPDATES_PLAN.md)"

@@ -395,6 +395,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create all API routes using route modules
     let auth_routes = routes::create_auth_routes(db_pool.clone(), rate_limiter.clone()).boxed();
+    let admin_routes = routes::create_admin_routes(db_pool.clone()).boxed();
     let user_routes = routes::create_user_routes(db_pool.clone()).boxed();
     let cigar_routes = routes::create_cigar_routes(db_pool.clone()).boxed();
     let organizer_routes = routes::create_organizer_routes(db_pool.clone()).boxed();
@@ -404,6 +405,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Combine all API routes
     let api = auth_routes
+        .or(admin_routes)
         .or(user_routes)
         .or(cigar_routes)
         .or(organizer_routes)

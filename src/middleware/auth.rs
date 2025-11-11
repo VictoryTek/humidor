@@ -28,6 +28,20 @@ impl AuthContext {
         self.user = Some(user);
         self
     }
+
+    /// Check if the current user is an admin
+    pub fn is_admin(&self) -> bool {
+        self.user
+            .as_ref()
+            .map(|u| u.is_admin)
+            .unwrap_or(false)
+    }
+
+    /// Get a reference to the user data if available
+    #[allow(dead_code)]
+    pub fn get_user(&self) -> Result<&UserResponse, AppError> {
+        self.user.as_ref().ok_or(AppError::Unauthorized)
+    }
 }
 
 // Extract token from Authorization header or cookie
@@ -142,6 +156,27 @@ pub fn with_optional_auth(
                 Err(_) => None,
             },
             Err(_) => None,
+        }
+    })
+}
+
+// Combined middleware for admin routes: auth + user data + admin check
+// Use this for endpoints that require admin privileges
+pub fn with_admin(
+    pool: DbPool,
+) -> impl Filter<Extract = (AuthContext,), Error = Rejection> + Clone {
+    with_current_user(pool).and_then(|auth_ctx: AuthContext| async move {
+        if auth_ctx.is_admin() {
+            Ok(auth_ctx)
+        } else {
+            tracing::warn!(
+                user_id = %auth_ctx.user_id,
+                username = %auth_ctx.username,
+                "Non-admin user attempted to access admin endpoint"
+            );
+            Err(reject::custom(AppError::Forbidden(
+                "Admin privileges required".to_string(),
+            )))
         }
     })
 }

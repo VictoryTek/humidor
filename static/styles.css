@@ -2001,7 +2001,8 @@ body {
     padding: 2rem;
 }
 
-.modal.show {
+.modal.show,
+.modal.active {
     display: flex !important;
 }
 
@@ -4575,5 +4576,534 @@ body {
     
     .humidor-card-stats .stat-value {
         font-size: 1.5rem;
+    }
+}
+
+/* ========================================
+   User Management Styles
+   ======================================== */
+
+/* User Management Section */
+.user-management-section {
+    margin-bottom: 2rem;
+}
+
+.user-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.user-controls .search-box {
+    position: relative;
+    flex: 0 1 300px;
+}
+
+.user-controls .search-icon {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-secondary);
+    font-size: 1.25rem;
+    pointer-events: none;
+}
+
+.user-controls .search-input {
+    width: 100%;
+    padding: 0.75rem 1rem 0.75rem 3rem;
+    background: var(--surface-secondary);
+    border: 1px solid rgba(212, 175, 55, 0.2);
+    border-radius: 0.5rem;
+    color: var(--text-primary);
+    font-size: 0.938rem;
+    transition: all 0.3s ease;
+}
+
+.user-controls .search-input:focus {
+    outline: none;
+    border-color: var(--accent-gold);
+    box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.1);
+}
+
+.user-controls .search-input::placeholder {
+    color: var(--text-secondary);
+}
+
+.users-table-container {
+    overflow-x: auto;
+    border-radius: 8px;
+    border: 1px solid rgba(212, 175, 55, 0.2);
+    margin-top: 1rem;
+}
+
+/* User Badge Styles */
+.user-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 1rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.admin-badge {
+    background: linear-gradient(135deg, #ff6b6b, #ee5a6f);
+    color: white;
+    box-shadow: 0 2px 8px rgba(255, 107, 107, 0.3);
+}
+
+.user-badge-regular {
+    background: rgba(212, 175, 55, 0.15);
+    color: var(--accent-gold);
+    border: 1px solid rgba(212, 175, 55, 0.3);
+}
+
+/* Status Badge Styles */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 1rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.status-active {
+    background: rgba(76, 175, 80, 0.15);
+    color: #4caf50;
+    border: 1px solid rgba(76, 175, 80, 0.3);
+}
+
+.status-inactive {
+    background: rgba(158, 158, 158, 0.15);
+    color: #9e9e9e;
+    border: 1px solid rgba(158, 158, 158, 0.3);
+}
+
+/* User Table Styles */
+.users-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--surface-secondary);
+    margin-top: 1rem;
+}
+
+.users-table thead {
+    background: rgba(212, 175, 55, 0.15);
+}
+
+.users-table th {
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-primary);
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid rgba(212, 175, 55, 0.3);
+}
+
+.users-table th.actions-column {
+    text-align: left;
+    width: 420px;
+    min-width: 420px;
+}
+
+.users-table tbody tr {
+    border-bottom: 1px solid rgba(212, 175, 55, 0.1);
+    transition: background 0.2s ease;
+}
+
+.users-table tbody tr:hover {
+    background: rgba(212, 175, 55, 0.05);
+}
+
+.users-table td {
+    padding: 1rem;
+    color: var(--text-primary);
+    vertical-align: middle;
+}
+
+.users-table td.loading-row,
+.users-table td.empty-row {
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 2rem;
+    font-style: italic;
+}
+
+#usersTableBody tr {
+    transition: background-color 0.2s ease;
+}
+
+#usersTableBody tr:hover {
+    background: rgba(212, 175, 55, 0.05);
+}
+
+#usersTableBody td {
+    vertical-align: middle;
+}
+
+.user-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.user-email {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+.user-created-date {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+/* User Action Buttons */
+.user-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.user-actions .btn-sm {
+    padding: 0.5rem 1rem;
+    font-size: 0.813rem;
+    border-radius: 0.375rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    border: none;
+    font-weight: 500;
+}
+
+.btn-edit {
+    background: linear-gradient(135deg, var(--accent-gold), var(--accent-copper));
+    color: var(--primary-dark);
+    border: none;
+}
+
+.btn-edit:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(212, 175, 55, 0.4);
+}
+
+.btn-toggle {
+    background: rgba(158, 158, 158, 0.2);
+    color: var(--text-primary);
+    border: 1px solid rgba(158, 158, 158, 0.3);
+}
+
+.btn-toggle:hover {
+    background: rgba(158, 158, 158, 0.3);
+}
+
+.btn-reset-password {
+    background: rgba(33, 150, 243, 0.2);
+    color: #2196f3;
+    border: 1px solid rgba(33, 150, 243, 0.3);
+}
+
+.btn-reset-password:hover {
+    background: rgba(33, 150, 243, 0.3);
+}
+
+/* Old styles - keeping for compatibility but will be overridden */
+#usersTableBody tr {
+    transition: background-color 0.2s ease;
+}
+
+#usersTableBody tr:hover {
+    background: rgba(212, 175, 55, 0.05);
+}
+
+#usersTableBody td {
+    vertical-align: middle;
+}
+
+.user-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.user-email {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+.user-created-date {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+/* User Action Buttons */
+.user-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+}
+
+.user-actions .btn-sm {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
+    border-radius: 0.375rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.btn-edit {
+    background: linear-gradient(135deg, var(--accent-gold), var(--accent-copper));
+    color: var(--primary-dark);
+    border: none;
+}
+
+.btn-edit:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(212, 175, 55, 0.4);
+}
+
+.btn-toggle {
+    background: rgba(158, 158, 158, 0.2);
+    color: var(--text-primary);
+    border: 1px solid rgba(158, 158, 158, 0.3);
+}
+
+.btn-toggle:hover {
+    background: rgba(158, 158, 158, 0.3);
+}
+
+.btn-reset-password {
+    background: rgba(33, 150, 243, 0.2);
+    color: #2196f3;
+    border: 1px solid rgba(33, 150, 243, 0.3);
+}
+
+.btn-reset-password:hover {
+    background: rgba(33, 150, 243, 0.3);
+}
+
+/* Checkbox Group Enhancements */
+.checkbox-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.checkbox-text strong {
+    color: var(--text-primary);
+}
+
+.checkbox-text small {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+/* User Form Styles */
+#userForm {
+    padding: 0 2rem 2rem;
+}
+
+#userForm .form-group {
+    margin-bottom: 1.25rem;
+}
+
+#userForm .form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: var(--accent-gold);
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+#userForm .form-group input[type="text"],
+#userForm .form-group input[type="email"],
+#userForm .form-group input[type="password"] {
+    width: 100%;
+    padding: 0.875rem 1rem;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(212, 175, 55, 0.2);
+    border-radius: 0.5rem;
+    font-size: 0.95rem;
+    color: var(--text-primary);
+    transition: all 0.3s ease;
+    font-family: 'Inter', sans-serif;
+}
+
+#userForm .form-group input:focus {
+    outline: none;
+    background: rgba(0, 0, 0, 0.4);
+    border-color: var(--accent-gold);
+    box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15);
+}
+
+#userForm .form-group.checkbox-group {
+    margin: 1rem 0;
+    padding: 1rem;
+    background: rgba(212, 175, 55, 0.05);
+    border: 1px solid rgba(212, 175, 55, 0.15);
+    border-radius: 0.5rem;
+}
+
+#userForm .checkbox-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    cursor: pointer;
+    margin: 0;
+}
+
+#userForm .checkbox-label input[type="checkbox"] {
+    margin-top: 0.25rem;
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+#userForm .form-help {
+    display: block;
+    margin-top: 0.375rem;
+    color: var(--text-secondary);
+    font-size: 0.8125rem;
+    font-style: italic;
+}
+
+#userPasswordModal form {
+    padding: 0 2rem 2rem;
+}
+
+#userPasswordModal .form-group,
+#deleteUserConfirmModal .modal-body {
+    margin-bottom: 1rem;
+}
+
+#deleteUserConfirmModal .modal-body {
+    padding: 0 2rem 2rem;
+}
+
+#userPasswordModal .form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: var(--accent-gold);
+    font-size: 0.875rem;
+}
+
+#userPasswordModal input[type="password"] {
+    width: 100%;
+    padding: 0.875rem 1rem;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(212, 175, 55, 0.2);
+    border-radius: 0.5rem;
+    font-size: 0.95rem;
+    color: var(--text-primary);
+}
+
+#userPasswordModal input[type="password"]:focus {
+    outline: none;
+    background: rgba(0, 0, 0, 0.4);
+    border-color: var(--accent-gold);
+    box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15);
+}
+
+/* Form Help Text */
+.form-help {
+    display: block;
+    margin-top: 0.25rem;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+/* Confirm Modal Warning Styles */
+.confirm-modal-content .modal-body ul {
+    color: var(--text-primary);
+    padding-left: 1.5rem;
+}
+
+.confirm-modal-content .modal-body ul li {
+    margin: 0.5rem 0;
+}
+
+.delete-username {
+    padding: 1rem;
+    background: rgba(255, 107, 107, 0.1);
+    border-left: 3px solid #ff6b6b;
+    margin: 1rem 0;
+}
+
+/* Empty State */
+.empty-users-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-secondary);
+}
+
+.empty-users-state i {
+    font-size: 4rem;
+    color: rgba(212, 175, 55, 0.3);
+    margin-bottom: 1rem;
+}
+
+.empty-users-state p {
+    font-size: 1.125rem;
+    margin: 0.5rem 0;
+}
+
+/* Responsive User Management */
+@media (max-width: 768px) {
+    .user-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .user-controls .search-box {
+        flex: 1 1 auto;
+    }
+    
+    .user-actions {
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+    
+    .user-actions .btn-sm {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .users-table {
+        font-size: 0.875rem;
+    }
+    
+    .users-table th,
+    .users-table td {
+        padding: 0.75rem 0.5rem;
+    }
+    
+    .users-table th.actions-column {
+        width: auto;
+    }
+    
+    .checkbox-label {
+        font-size: 0.9rem;
     }
 }

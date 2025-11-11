@@ -1906,7 +1906,18 @@ function navigateToPage(page) {
         case 'settings':
             document.getElementById('settingsSection').style.display = 'block';
             initializeBackupHandlers();
+            initializeUserManagementHandlers();
             loadBackups();
+            // Show/hide user management section based on admin status
+            const userMgmtSection = document.getElementById('userManagementSection');
+            if (userMgmtSection) {
+                if (isCurrentUserAdmin()) {
+                    userMgmtSection.style.display = 'block';
+                    loadUsers();
+                } else {
+                    userMgmtSection.style.display = 'none';
+                }
+            }
             break;
     }
 
@@ -3784,6 +3795,410 @@ async function deleteWishListCigar(cigarId, event) {
 }
 
 // ============================================
+// USER MANAGEMENT FUNCTIONS
+// ============================================
+
+let users = [];
+let usersCurrentPage = 1;
+let usersTotalPages = 1;
+let editingUserId = null;
+let deleteUserId = null;
+let passwordResetUserId = null;
+
+// Check if current user is admin
+function isCurrentUserAdmin() {
+    const user = JSON.parse(localStorage.getItem('humidor_user') || '{}');
+    return user.is_admin === true;
+}
+
+// Load users with pagination
+async function loadUsers(page = 1, search = '') {
+    console.log('[loadUsers] Starting, page:', page, 'search:', search);
+    
+    if (!isCurrentUserAdmin()) {
+        console.log('[loadUsers] Not admin, skipping user load');
+        return;
+    }
+    
+    console.log('[loadUsers] User is admin, loading users...');
+
+    try {
+        let url = `/api/v1/admin/users?page=${page}&per_page=10`;
+        if (search) {
+            url += `&search=${encodeURIComponent(search)}`;
+        }
+        
+        console.log('[loadUsers] Fetching from:', url);
+
+        const response = await makeAuthenticatedRequest(url);
+        
+        console.log('[loadUsers] Response:', response);
+        
+        if (response && response.ok) {
+            const data = await response.json();
+            console.log('[loadUsers] Data received:', data);
+            users = data.users || [];
+            usersCurrentPage = page;
+            usersTotalPages = Math.ceil((data.total || users.length) / 10);
+            console.log('[loadUsers] Rendering', users.length, 'users');
+            renderUsersTable();
+            renderUsersPagination();
+        } else {
+            console.error('[loadUsers] Failed response:', response);
+            showToast('Failed to load users', 'error');
+        }
+    } catch (error) {
+        console.error('[loadUsers] Error loading users:', error);
+        showToast('Error loading users', 'error');
+    }
+}
+
+// Render users table
+function renderUsersTable() {
+    const tbody = document.getElementById('usersTableBody');
+    
+    if (!tbody) return; // Not on settings page
+    
+    if (users.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" class="empty-users-state">
+                    <i class="mdi mdi-account-off"></i>
+                    <p>No users found</p>
+                    <p style="font-size: 0.875rem;">Create a new user to get started.</p>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    const currentUser = JSON.parse(localStorage.getItem('humidor_user') || '{}');
+    
+    tbody.innerHTML = users.map(user => {
+        const isCurrentUser = user.id === currentUser.id;
+        const createdDate = new Date(user.created_at).toLocaleDateString();
+        
+        return `
+            <tr>
+                <td>
+                    <div class="user-info">
+                        <strong>${escapeHtml(user.username)}</strong>
+                        ${isCurrentUser ? '<small style="color: var(--accent-gold);">(You)</small>' : ''}
+                    </div>
+                </td>
+                <td>
+                    <span class="user-email">${escapeHtml(user.email)}</span>
+                </td>
+                <td>${escapeHtml(user.full_name)}</td>
+                <td>
+                    ${user.is_admin ? 
+                        '<span class="user-badge admin-badge"><i class="mdi mdi-shield-crown"></i> Admin</span>' : 
+                        '<span class="user-badge user-badge-regular"><i class="mdi mdi-account"></i> User</span>'}
+                </td>
+                <td>
+                    ${user.is_active ? 
+                        '<span class="status-badge status-active"><i class="mdi mdi-check-circle"></i> Active</span>' : 
+                        '<span class="status-badge status-inactive"><i class="mdi mdi-cancel"></i> Inactive</span>'}
+                </td>
+                <td>
+                    <span class="user-created-date">${createdDate}</span>
+                </td>
+                <td>
+                    <div class="user-actions">
+                        <button class="btn btn-sm btn-edit" onclick="editUser('${user.id}')" title="Edit User">
+                            <i class="mdi mdi-pencil"></i> Edit
+                        </button>
+                        <button class="btn btn-sm btn-reset-password" onclick="showPasswordResetDialog('${user.id}')" title="Reset Password">
+                            <i class="mdi mdi-lock-reset"></i> Password
+                        </button>
+                        <button class="btn btn-sm btn-toggle" onclick="toggleUserActive('${user.id}')" title="${user.is_active ? 'Deactivate' : 'Activate'}">
+                            <i class="mdi mdi-${user.is_active ? 'account-off' : 'account-check'}"></i> 
+                            ${user.is_active ? 'Disable' : 'Enable'}
+                        </button>
+                        ${!isCurrentUser ? `
+                            <button class="btn btn-sm btn-danger" onclick="showDeleteUserDialog('${user.id}')" title="Delete User">
+                                <i class="mdi mdi-delete"></i> Delete
+                            </button>
+                        ` : ''}
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// Render pagination
+function renderUsersPagination() {
+    const container = document.getElementById('usersPagination');
+    if (!container || usersTotalPages <= 1) {
+        if (container) container.innerHTML = '';
+        return;
+    }
+    
+    let html = '<div class="pagination">';
+    
+    // Previous button
+    if (usersCurrentPage > 1) {
+        html += `<button class="btn btn-secondary btn-sm" onclick="loadUsers(${usersCurrentPage - 1})">
+            <i class="mdi mdi-chevron-left"></i> Previous
+        </button>`;
+    }
+    
+    // Page numbers
+    html += `<span class="pagination-info">Page ${usersCurrentPage} of ${usersTotalPages}</span>`;
+    
+    // Next button
+    if (usersCurrentPage < usersTotalPages) {
+        html += `<button class="btn btn-secondary btn-sm" onclick="loadUsers(${usersCurrentPage + 1})">
+            Next <i class="mdi mdi-chevron-right"></i>
+        </button>`;
+    }
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+// Show create user modal
+function showCreateUserModal() {
+    console.log('[showCreateUserModal] Called');
+    editingUserId = null;
+    document.getElementById('userModalTitle').textContent = 'Create New User';
+    document.getElementById('saveUserBtnText').textContent = 'Create User';
+    document.getElementById('userForm').reset();
+    document.getElementById('passwordGroup').style.display = 'block';
+    document.getElementById('userPassword').required = true;
+    document.getElementById('userIsActive').checked = true;
+    document.getElementById('userModal').classList.add('active');
+    console.log('[showCreateUserModal] Modal should be visible');
+}
+
+// Edit user
+async function editUser(userId) {
+    console.log('[editUser] Called with userId:', userId);
+    try {
+        const response = await makeAuthenticatedRequest(`/api/v1/admin/users/${userId}`);
+        
+        if (response && response.ok) {
+            const user = await response.json();
+            editingUserId = userId;
+            
+            document.getElementById('userModalTitle').textContent = 'Edit User';
+            document.getElementById('saveUserBtnText').textContent = 'Save Changes';
+            document.getElementById('userUsername').value = user.username;
+            document.getElementById('userEmail').value = user.email;
+            document.getElementById('userFullName').value = user.full_name;
+            document.getElementById('userIsAdmin').checked = user.is_admin;
+            document.getElementById('userIsActive').checked = user.is_active;
+            
+            // Hide password field when editing
+            document.getElementById('passwordGroup').style.display = 'none';
+            document.getElementById('userPassword').required = false;
+            document.getElementById('userPassword').value = '';
+            
+            document.getElementById('userModal').classList.add('active');
+        } else {
+            showToast('Failed to load user details', 'error');
+        }
+    } catch (error) {
+        console.error('Error loading user:', error);
+        showToast('Error loading user', 'error');
+    }
+}
+
+// Handle user form submission
+async function handleUserFormSubmit(e) {
+    e.preventDefault();
+    
+    const formData = {
+        username: document.getElementById('userUsername').value.trim(),
+        email: document.getElementById('userEmail').value.trim(),
+        full_name: document.getElementById('userFullName').value.trim(),
+        is_admin: document.getElementById('userIsAdmin').checked,
+        is_active: document.getElementById('userIsActive').checked
+    };
+    
+    // Add password if creating or if provided when editing
+    const password = document.getElementById('userPassword').value;
+    if (!editingUserId || password) {
+        if (password.length < 8) {
+            showToast('Password must be at least 8 characters', 'error');
+            return;
+        }
+        formData.password = password;
+    }
+    
+    try {
+        let response;
+        if (editingUserId) {
+            // Update existing user
+            response = await makeAuthenticatedRequest(`/api/v1/admin/users/${editingUserId}`, {
+                method: 'PUT',
+                body: JSON.stringify(formData)
+            });
+        } else {
+            // Create new user
+            response = await makeAuthenticatedRequest('/api/v1/admin/users', {
+                method: 'POST',
+                body: JSON.stringify(formData)
+            });
+        }
+        
+        if (response && response.ok) {
+            showToast(editingUserId ? 'User updated successfully' : 'User created successfully', 'success');
+            closeUserModal();
+            loadUsers(usersCurrentPage);
+        } else {
+            const error = await response.json();
+            showToast(error.message || 'Failed to save user', 'error');
+        }
+    } catch (error) {
+        console.error('Error saving user:', error);
+        showToast('Error saving user', 'error');
+    }
+}
+
+// Toggle user active status
+async function toggleUserActive(userId) {
+    const user = users.find(u => u.id === userId);
+    if (!user) return;
+    
+    const newStatus = !user.is_active;
+    const action = newStatus ? 'activate' : 'deactivate';
+    
+    if (!confirm(`Are you sure you want to ${action} this user?`)) {
+        return;
+    }
+    
+    try {
+        const response = await makeAuthenticatedRequest(`/api/v1/admin/users/${userId}/active`, {
+            method: 'PATCH',
+            body: JSON.stringify({ is_active: newStatus })
+        });
+        
+        if (response && response.ok) {
+            alert(`User ${action}d successfully`, 'success');
+            loadUsers(usersCurrentPage);
+        } else {
+            alert(`Failed to ${action} user`, 'error');
+        }
+    } catch (error) {
+        console.error(`Error ${action}ing user:`, error);
+        alert(`Error ${action}ing user`, 'error');
+    }
+}
+
+// Show delete user confirmation dialog
+function showDeleteUserDialog(userId) {
+    const user = users.find(u => u.id === userId);
+    if (!user) return;
+    
+    deleteUserId = userId;
+    document.getElementById('deleteUsername').textContent = user.username;
+    document.getElementById('deleteUserEmail').textContent = user.email;
+    document.getElementById('deleteUserConfirmModal').classList.add('active');
+}
+
+// Confirm delete user
+async function confirmDeleteUser() {
+    if (!deleteUserId) return;
+    
+    try {
+        const response = await makeAuthenticatedRequest(`/api/v1/admin/users/${deleteUserId}`, {
+            method: 'DELETE'
+        });
+        
+        if (response && response.ok) {
+            showToast('User deleted successfully', 'success');
+            closeDeleteUserModal();
+            loadUsers(usersCurrentPage);
+        } else {
+            const error = await response.json();
+            showToast(error.message || 'Failed to delete user', 'error');
+        }
+    } catch (error) {
+        console.error('Error deleting user:', error);
+        showToast('Error deleting user', 'error');
+    }
+}
+
+// Show password reset dialog
+function showPasswordResetDialog(userId) {
+    console.log('[showPasswordResetDialog] Called with userId:', userId);
+    const user = users.find(u => u.id === userId);
+    console.log('[showPasswordResetDialog] Found user:', user);
+    if (!user) return;
+    
+    passwordResetUserId = userId;
+    document.getElementById('passwordResetUsername').textContent = user.username;
+    document.getElementById('userPasswordForm').reset();
+    document.getElementById('userPasswordModal').classList.add('active');
+    console.log('[showPasswordResetDialog] Modal should be visible');
+}
+
+// Handle password reset form submission
+async function handlePasswordResetSubmit(e) {
+    e.preventDefault();
+    
+    const newPassword = document.getElementById('newUserPassword').value;
+    const confirmPassword = document.getElementById('confirmUserPassword').value;
+    
+    if (newPassword !== confirmPassword) {
+        showToast('Passwords do not match', 'error');
+        return;
+    }
+    
+    if (newPassword.length < 8) {
+        showToast('Password must be at least 8 characters', 'error');
+        return;
+    }
+    
+    try {
+        const response = await makeAuthenticatedRequest(`/api/v1/admin/users/${passwordResetUserId}/password`, {
+            method: 'PATCH',
+            body: JSON.stringify({ new_password: newPassword })
+        });
+        
+        if (response && response.ok) {
+            showToast('Password reset successfully', 'success');
+            closePasswordResetModal();
+        } else {
+            const error = await response.json();
+            showToast(error.message || 'Failed to reset password', 'error');
+        }
+    } catch (error) {
+        console.error('Error resetting password:', error);
+        showToast('Error resetting password', 'error');
+    }
+}
+
+// Close user modal
+function closeUserModal() {
+    document.getElementById('userModal').classList.remove('active');
+    editingUserId = null;
+}
+
+// Close delete user modal
+function closeDeleteUserModal() {
+    document.getElementById('deleteUserConfirmModal').classList.remove('active');
+    deleteUserId = null;
+}
+
+// Close password reset modal
+function closePasswordResetModal() {
+    document.getElementById('userPasswordModal').classList.remove('active');
+    passwordResetUserId = null;
+}
+
+// User search with debounce
+let userSearchTimeout;
+function handleUserSearch(searchTerm) {
+    clearTimeout(userSearchTimeout);
+    userSearchTimeout = setTimeout(() => {
+        loadUsers(1, searchTerm);
+    }, 300);
+}
+
+// ============================================
 // BACKUP & RESTORE FUNCTIONS
 // ============================================
 
@@ -4054,6 +4469,77 @@ async function confirmDelete() {
     }
 }
 
+// Initialize user management event listeners
+function initializeUserManagementHandlers() {
+    // Create user button
+    const createUserBtn = document.getElementById('createUserBtn');
+    if (createUserBtn) {
+        createUserBtn.addEventListener('click', showCreateUserModal);
+    }
+    
+    // User search input
+    const userSearchInput = document.getElementById('userSearchInput');
+    if (userSearchInput) {
+        userSearchInput.addEventListener('input', (e) => {
+            handleUserSearch(e.target.value);
+        });
+    }
+    
+    // User form submission
+    const userForm = document.getElementById('userForm');
+    if (userForm) {
+        userForm.addEventListener('submit', handleUserFormSubmit);
+    }
+    
+    // User modal close handlers
+    const closeUserModal = document.getElementById('closeUserModal');
+    const cancelUserBtn = document.getElementById('cancelUserBtn');
+    
+    if (closeUserModal) closeUserModal.addEventListener('click', () => {
+        document.getElementById('userModal').classList.remove('active');
+        editingUserId = null;
+    });
+    
+    if (cancelUserBtn) cancelUserBtn.addEventListener('click', () => {
+        document.getElementById('userModal').classList.remove('active');
+        editingUserId = null;
+    });
+    
+    // Delete user dialog handlers
+    const closeDeleteUserModal = document.getElementById('closeDeleteUserModal');
+    const cancelDeleteUserBtn = document.getElementById('cancelDeleteUserBtn');
+    const confirmDeleteUserBtn = document.getElementById('confirmDeleteUserBtn');
+    
+    if (closeDeleteUserModal) closeDeleteUserModal.addEventListener('click', () => {
+        document.getElementById('deleteUserConfirmModal').classList.remove('active');
+        deleteUserId = null;
+    });
+    
+    if (cancelDeleteUserBtn) cancelDeleteUserBtn.addEventListener('click', () => {
+        document.getElementById('deleteUserConfirmModal').classList.remove('active');
+        deleteUserId = null;
+    });
+    
+    if (confirmDeleteUserBtn) confirmDeleteUserBtn.addEventListener('click', confirmDeleteUser);
+    
+    // Password reset dialog handlers
+    const closePasswordModal = document.getElementById('closeUserPasswordModal');
+    const cancelPasswordBtn = document.getElementById('cancelPasswordBtn');
+    const userPasswordForm = document.getElementById('userPasswordForm');
+    
+    if (closePasswordModal) closePasswordModal.addEventListener('click', () => {
+        document.getElementById('userPasswordModal').classList.remove('active');
+        passwordResetUserId = null;
+    });
+    
+    if (cancelPasswordBtn) cancelPasswordBtn.addEventListener('click', () => {
+        document.getElementById('userPasswordModal').classList.remove('active');
+        passwordResetUserId = null;
+    });
+    
+    if (userPasswordForm) userPasswordForm.addEventListener('submit', handlePasswordResetSubmit);
+}
+
 // Initialize backup event listeners
 function initializeBackupHandlers() {
     // Create backup button
@@ -4116,3 +4602,10 @@ window.editCigar = editCigar;
 window.deleteCigar = deleteCigar;
 window.toggleFavorite = toggleFavorite;
 window.removeFavorite = removeFavorite;
+// Export user management functions for global use
+window.showCreateUserModal = showCreateUserModal;
+window.editUser = editUser;
+window.toggleUserActive = toggleUserActive;
+window.showDeleteUserDialog = showDeleteUserDialog;
+window.showPasswordResetDialog = showPasswordResetDialog;
+window.loadUsers = loadUsers;
