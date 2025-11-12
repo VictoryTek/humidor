@@ -5,6 +5,7 @@ use crate::models::{
     SharedHumidorInfo, SharedHumidorsResponse, UpdateSharePermissionRequest, UserInfo,
 };
 use deadpool_postgres::Pool;
+use std::str::FromStr;
 use uuid::Uuid;
 use warp::{reject, reply, Rejection, Reply};
 
@@ -53,7 +54,7 @@ pub async fn get_user_permission_level(
     if let Some(row) = share_result {
         let permission_str: String = row.get(0);
         let permission =
-            PermissionLevel::from_str(&permission_str).map_err(|e| AppError::ValidationError(e))?;
+            PermissionLevel::from_str(&permission_str).map_err(AppError::ValidationError)?;
         return Ok(Some(permission));
     }
 
@@ -67,7 +68,7 @@ pub async fn can_view_humidor(
     humidor_id: &Uuid,
 ) -> Result<bool, AppError> {
     let permission = get_user_permission_level(pool, user_id, humidor_id).await?;
-    Ok(permission.map_or(false, |p| p.can_view()))
+    Ok(permission.is_some_and(|p| p.can_view()))
 }
 
 /// Helper function to check if user can edit a humidor (add/update cigars)
@@ -77,7 +78,7 @@ pub async fn can_edit_humidor(
     humidor_id: &Uuid,
 ) -> Result<bool, AppError> {
     let permission = get_user_permission_level(pool, user_id, humidor_id).await?;
-    Ok(permission.map_or(false, |p| p.can_edit()))
+    Ok(permission.is_some_and(|p| p.can_edit()))
 }
 
 /// Helper function to check if user can manage a humidor (delete cigars, manage shares)
@@ -87,7 +88,7 @@ pub async fn can_manage_humidor(
     humidor_id: &Uuid,
 ) -> Result<bool, AppError> {
     let permission = get_user_permission_level(pool, user_id, humidor_id).await?;
-    Ok(permission.map_or(false, |p| p.can_manage()))
+    Ok(permission.is_some_and(|p| p.can_manage()))
 }
 
 /// Helper function to check if user is the owner of a humidor

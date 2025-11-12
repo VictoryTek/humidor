@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 use uuid::Uuid;
 
 /// Permission level for shared humidor access
@@ -23,15 +24,6 @@ impl PermissionLevel {
         }
     }
 
-    pub fn from_str(s: &str) -> Result<Self, String> {
-        match s.to_lowercase().as_str() {
-            "view" => Ok(PermissionLevel::View),
-            "edit" => Ok(PermissionLevel::Edit),
-            "full" => Ok(PermissionLevel::Full),
-            _ => Err(format!("Invalid permission level: {}", s)),
-        }
-    }
-
     /// Check if this permission level allows viewing
     pub fn can_view(&self) -> bool {
         matches!(
@@ -48,6 +40,19 @@ impl PermissionLevel {
     /// Check if this permission level allows full management (including delete and sharing)
     pub fn can_manage(&self) -> bool {
         matches!(self, PermissionLevel::Full)
+    }
+}
+
+impl FromStr for PermissionLevel {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "view" => Ok(PermissionLevel::View),
+            "edit" => Ok(PermissionLevel::Edit),
+            "full" => Ok(PermissionLevel::Full),
+            _ => Err(format!("Invalid permission level: {}", s)),
+        }
     }
 }
 
