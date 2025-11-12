@@ -52,8 +52,8 @@ pub async fn get_user_permission_level(
 
     if let Some(row) = share_result {
         let permission_str: String = row.get(0);
-        let permission = PermissionLevel::from_str(&permission_str)
-            .map_err(|e| AppError::ValidationError(e))?;
+        let permission =
+            PermissionLevel::from_str(&permission_str).map_err(|e| AppError::ValidationError(e))?;
         return Ok(Some(permission));
     }
 
@@ -169,9 +169,7 @@ pub async fn share_humidor(
         .await
         .map_err(|e| {
             tracing::error!("Failed to check user existence: {}", e);
-            reject::custom(AppError::DatabaseError(
-                "Failed to verify user".to_string(),
-            ))
+            reject::custom(AppError::DatabaseError("Failed to verify user".to_string()))
         })?;
 
     if user_exists.is_none() {
@@ -369,7 +367,11 @@ pub async fn get_humidor_shares(
     auth: AuthContext,
     pool: Pool,
 ) -> Result<impl Reply, Rejection> {
-    tracing::debug!("User {} fetching shares for humidor {}", auth.user_id, humidor_id);
+    tracing::debug!(
+        "User {} fetching shares for humidor {}",
+        auth.user_id,
+        humidor_id
+    );
 
     // Verify user has access to the humidor (owner or has share)
     if !can_view_humidor(&pool, &auth.user_id, &humidor_id)
@@ -412,8 +414,8 @@ pub async fn get_humidor_shares(
         .iter()
         .map(|row| {
             let permission_str: String = row.get(2);
-            let permission = PermissionLevel::from_str(&permission_str)
-                .unwrap_or(PermissionLevel::View);
+            let permission =
+                PermissionLevel::from_str(&permission_str).unwrap_or(PermissionLevel::View);
 
             HumidorShareResponse {
                 id: row.get(0),
@@ -481,8 +483,8 @@ pub async fn get_shared_humidors(auth: AuthContext, pool: Pool) -> Result<impl R
         .iter()
         .map(|row| {
             let permission_str: String = row.get(3);
-            let permission = PermissionLevel::from_str(&permission_str)
-                .unwrap_or(PermissionLevel::View);
+            let permission =
+                PermissionLevel::from_str(&permission_str).unwrap_or(PermissionLevel::View);
 
             SharedHumidorInfo {
                 id: row.get(0),

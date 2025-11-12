@@ -21,7 +21,7 @@ pub async fn get_humidors(auth: AuthContext, pool: DbPool) -> Result<impl Reply,
     };
 
     let user_id = auth.user_id;
-    
+
     // Get humidors owned by user UNION with humidors shared with user
     let query = "
         SELECT DISTINCT h.id, h.user_id, h.name, h.description, h.capacity, h.target_humidity, h.location, h.created_at, h.updated_at,
@@ -83,7 +83,7 @@ pub async fn get_humidor(
     };
 
     let user_id = auth.user_id;
-    
+
     // Check if user can view this humidor (owner or has share access)
     match can_view_humidor(&pool, &user_id, &id).await {
         Ok(true) => {

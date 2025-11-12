@@ -110,7 +110,7 @@ async fn verify_cigar_ownership(
     match db.query_opt(humidor_query, &[&cigar_id]).await {
         Ok(Some(row)) => {
             let humidor_id: Uuid = row.get(0);
-            
+
             // Check if humidor is shared with appropriate permissions
             if require_edit {
                 if can_edit_humidor(pool, &user_id, &humidor_id).await? {
@@ -185,7 +185,9 @@ pub async fn get_cigars(
     if let Some(humidor_id_str) = params.get("humidor_id") {
         if let Ok(humidor_uuid) = Uuid::parse_str(humidor_id_str) {
             // Verify the humidor belongs to the user or is shared (view permission is enough)
-            if let Err(e) = verify_humidor_ownership(&pool, Some(humidor_uuid), auth.user_id, false).await {
+            if let Err(e) =
+                verify_humidor_ownership(&pool, Some(humidor_uuid), auth.user_id, false).await
+            {
                 return Err(warp::reject::custom(e));
             }
             conditions.push(format!("c.humidor_id = ${}", param_counter));
@@ -572,7 +574,7 @@ pub async fn delete_cigar(
             "Database connection failed".to_string(),
         ))
     })?;
-    
+
     let humidor_query = "SELECT humidor_id FROM cigars WHERE id = $1";
     let humidor_id: Uuid = match db_check.query_opt(humidor_query, &[&id]).await {
         Ok(Some(row)) => row.get(0),
@@ -588,7 +590,7 @@ pub async fn delete_cigar(
             ))))
         }
     };
-    
+
     // Check if user can manage (delete requires full permission)
     use crate::handlers::humidor_shares::can_manage_humidor;
     if !can_manage_humidor(&pool, &auth.user_id, &humidor_id)

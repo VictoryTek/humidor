@@ -4,8 +4,8 @@ pub mod backups;
 pub mod brands;
 pub mod cigars;
 pub mod favorites;
-pub mod humidors;
 pub mod humidor_shares;
+pub mod humidors;
 pub mod origins;
 pub mod ring_gauges;
 pub mod sizes;
@@ -36,8 +36,7 @@ pub use humidors::{
 };
 
 pub use humidor_shares::{
-    get_humidor_shares, get_shared_humidors, revoke_share, share_humidor,
-    update_share_permission,
+    get_humidor_shares, get_shared_humidors, revoke_share, share_humidor, update_share_permission,
 };
 
 pub use favorites::{add_favorite, get_favorites, is_favorite, remove_favorite};
