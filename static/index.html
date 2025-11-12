@@ -1272,33 +1272,40 @@
                 <h2>🤝 Share Humidor</h2>
                 <span class="close" id="shareHumidorClose">&times;</span>
             </div>
-            <div class="modal-body">
+            <div class="modal-body share-modal-body">
                 <div class="form-group">
                     <label for="shareHumidorName">Humidor:</label>
                     <input type="text" id="shareHumidorName" readonly>
                 </div>
 
-                <h3>Add User</h3>
-                <div class="form-group">
-                    <label for="shareUserSearch">Search for user (username or email):</label>
-                    <input type="text" id="shareUserSearch" placeholder="Type to search...">
-                    <div class="search-results" id="shareUserSearchResults"></div>
+                <div class="share-section">
+                    <h3 class="share-section-title">Add User</h3>
+                    <div class="form-group">
+                        <label for="shareUserSelect">Select User:</label>
+                        <select id="shareUserSelect">
+                            <option value="">-- Select a user to share with --</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="sharePermissionLevel">Permission Level:</label>
+                        <select id="sharePermissionLevel">
+                            <option value="view">View Only - Can see cigars but not modify</option>
+                            <option value="edit" selected>Edit - Can add/edit cigars and change quantities</option>
+                            <option value="full">Full Access - Can add, edit, delete cigars and manage shares</option>
+                        </select>
+                    </div>
+
+                    <button class="btn-primary" id="shareAddUserBtn">
+                        <i class="mdi mdi-account-plus"></i> Add User
+                    </button>
                 </div>
 
-                <div class="form-group">
-                    <label for="sharePermissionLevel">Permission Level:</label>
-                    <select id="sharePermissionLevel">
-                        <option value="view">View Only - Can see cigars but not modify</option>
-                        <option value="edit" selected>Edit - Can add/edit cigars and change quantities</option>
-                        <option value="full">Full Access - Can add, edit, delete cigars and manage shares</option>
-                    </select>
-                </div>
-
-                <button class="btn-primary" id="shareAddUserBtn">Add User</button>
-
-                <h3 style="margin-top: 2rem;">Currently Shared With</h3>
-                <div id="currentSharesList">
-                    <p class="text-muted">This humidor is not currently shared with anyone.</p>
+                <div class="share-section">
+                    <h3 class="share-section-title">Currently Shared With</h3>
+                    <div id="currentSharesList">
+                        <p class="text-muted">This humidor is not currently shared with anyone.</p>
+                    </div>
                 </div>
             </div>
         </div>
