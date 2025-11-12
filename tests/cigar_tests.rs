@@ -9,7 +9,15 @@ use uuid::Uuid;
 async fn test_create_cigar() {
     let ctx = setup_test_db().await;
 
-    let cigar_id = create_test_cigar(&ctx.pool, "Test Cigar", 5, None)
+    // Create a user and humidor first (required for Phase 3 data isolation)
+    let (user_id, _username) = create_test_user(&ctx.pool, "testuser", "password123", false)
+        .await
+        .expect("Failed to create user");
+    let humidor_id = create_test_humidor(&ctx.pool, user_id, "Test Humidor")
+        .await
+        .expect("Failed to create humidor");
+
+    let cigar_id = create_test_cigar(&ctx.pool, "Test Cigar", 5, Some(humidor_id))
         .await
         .expect("Failed to create cigar");
 
@@ -20,7 +28,7 @@ async fn test_create_cigar() {
     let client = ctx.pool.get().await.unwrap();
     let row = client
         .query_one(
-            "SELECT name, quantity, is_active FROM cigars WHERE id = $1",
+            "SELECT name, quantity, is_active, humidor_id FROM cigars WHERE id = $1",
             &[&cigar_id],
         )
         .await
@@ -29,10 +37,12 @@ async fn test_create_cigar() {
     let name: String = row.get(0);
     let quantity: i32 = row.get(1);
     let is_active: bool = row.get(2);
+    let db_humidor_id: Option<Uuid> = row.get(3);
 
     assert_eq!(name, "Test Cigar");
     assert_eq!(quantity, 5);
     assert!(is_active);
+    assert_eq!(db_humidor_id, Some(humidor_id));
 }
 
 #[tokio::test]
