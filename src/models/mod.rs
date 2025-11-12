@@ -1,6 +1,7 @@
 pub mod brand;
 pub mod cigar;
 pub mod humidor;
+pub mod humidor_share;
 pub mod origin;
 pub mod password_reset;
 pub mod ring_gauge;
@@ -11,6 +12,7 @@ pub mod user;
 pub use brand::*;
 pub use cigar::*;
 pub use humidor::*;
+pub use humidor_share::*;
 pub use origin::*;
 pub use password_reset::*;
 pub use ring_gauge::*;

@@ -5,6 +5,7 @@ pub mod brands;
 pub mod cigars;
 pub mod favorites;
 pub mod humidors;
+pub mod humidor_shares;
 pub mod origins;
 pub mod ring_gauges;
 pub mod sizes;
@@ -32,6 +33,11 @@ pub use ring_gauges::{create_ring_gauge, delete_ring_gauge, get_ring_gauges, upd
 
 pub use humidors::{
     create_humidor, delete_humidor, get_humidor, get_humidor_cigars, get_humidors, update_humidor,
+};
+
+pub use humidor_shares::{
+    get_humidor_shares, get_shared_humidors, revoke_share, share_humidor,
+    update_share_permission,
 };
 
 pub use favorites::{add_favorite, get_favorites, is_favorite, remove_favorite};

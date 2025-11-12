@@ -5,7 +5,12 @@ use uuid::Uuid;
 use warp::{Rejection, Reply};
 
 use crate::{
-    errors::AppError, middleware::auth::AuthContext, models::*, validation::Validate, DbPool,
+    errors::AppError,
+    handlers::humidor_shares::{can_edit_humidor, can_view_humidor},
+    middleware::auth::AuthContext,
+    models::*,
+    validation::Validate,
+    DbPool,
 };
 
 #[derive(Debug, Serialize)]
@@ -17,43 +22,67 @@ pub struct CigarResponse {
     pub total_pages: i64,
 }
 
-/// Helper function to verify that a humidor belongs to the authenticated user
+/// Helper function to verify that a humidor belongs to the authenticated user OR is shared with them with edit permissions
 async fn verify_humidor_ownership(
-    db: &deadpool_postgres::Object,
+    pool: &DbPool,
     humidor_id: Option<Uuid>,
     user_id: Uuid,
+    require_edit: bool,
 ) -> Result<(), AppError> {
     if let Some(hid) = humidor_id {
+        // First check if user owns the humidor
+        let db = pool.get().await.map_err(|e| {
+            tracing::error!(error = %e, "Failed to get database connection");
+            AppError::DatabaseError("Failed to connect to database".to_string())
+        })?;
+
         let check_query = "SELECT EXISTS(SELECT 1 FROM humidors WHERE id = $1 AND user_id = $2)";
         match db.query_one(check_query, &[&hid, &user_id]).await {
             Ok(row) => {
-                let exists: bool = row.get(0);
-                if !exists {
-                    return Err(AppError::Forbidden(
-                        "You do not have access to this humidor".to_string(),
-                    ));
+                let is_owner: bool = row.get(0);
+                if is_owner {
+                    return Ok(()); // Owner has full access
                 }
-                Ok(())
             }
             Err(e) => {
                 tracing::error!(error = %e, "Failed to verify humidor ownership");
-                Err(AppError::DatabaseError(
+                return Err(AppError::DatabaseError(
                     "Failed to verify humidor access".to_string(),
-                ))
+                ));
             }
         }
+
+        // Not owner, check if it's shared with appropriate permissions
+        if require_edit {
+            if can_edit_humidor(pool, &user_id, &hid).await? {
+                return Ok(());
+            }
+        } else if can_view_humidor(pool, &user_id, &hid).await? {
+            return Ok(());
+        }
+
+        Err(AppError::Forbidden(
+            "You do not have access to this humidor".to_string(),
+        ))
     } else {
         // No humidor specified is okay for some operations (e.g., listing all cigars across humidors)
         Ok(())
     }
 }
 
-/// Helper function to verify that a cigar belongs to the authenticated user (through its humidor)
+/// Helper function to verify that a cigar belongs to the authenticated user (through its humidor) OR is shared with them
 async fn verify_cigar_ownership(
-    db: &deadpool_postgres::Object,
+    pool: &DbPool,
     cigar_id: Uuid,
     user_id: Uuid,
+    require_edit: bool,
 ) -> Result<(), AppError> {
+    let db = pool.get().await.map_err(|e| {
+        tracing::error!(error = %e, "Failed to get database connection");
+        AppError::DatabaseError("Failed to connect to database".to_string())
+    })?;
+
+    // Check if user owns the cigar
     let check_query = "
         SELECT EXISTS(
             SELECT 1 FROM cigars c
@@ -63,21 +92,48 @@ async fn verify_cigar_ownership(
     ";
     match db.query_one(check_query, &[&cigar_id, &user_id]).await {
         Ok(row) => {
-            let exists: bool = row.get(0);
-            if !exists {
-                return Err(AppError::Forbidden(
-                    "You do not have access to this cigar".to_string(),
-                ));
+            let is_owner: bool = row.get(0);
+            if is_owner {
+                return Ok(()); // Owner has full access
             }
-            Ok(())
         }
         Err(e) => {
             tracing::error!(error = %e, "Failed to verify cigar ownership");
-            Err(AppError::DatabaseError(
+            return Err(AppError::DatabaseError(
                 "Failed to verify cigar access".to_string(),
-            ))
+            ));
         }
     }
+
+    // Not owner, get the humidor_id and check if it's shared
+    let humidor_query = "SELECT humidor_id FROM cigars WHERE id = $1";
+    match db.query_opt(humidor_query, &[&cigar_id]).await {
+        Ok(Some(row)) => {
+            let humidor_id: Uuid = row.get(0);
+            
+            // Check if humidor is shared with appropriate permissions
+            if require_edit {
+                if can_edit_humidor(pool, &user_id, &humidor_id).await? {
+                    return Ok(());
+                }
+            } else if can_view_humidor(pool, &user_id, &humidor_id).await? {
+                return Ok(());
+            }
+        }
+        Ok(None) => {
+            return Err(AppError::NotFound("Cigar not found".to_string()));
+        }
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to get cigar's humidor");
+            return Err(AppError::DatabaseError(
+                "Failed to verify cigar access".to_string(),
+            ));
+        }
+    }
+
+    Err(AppError::Forbidden(
+        "You do not have access to this cigar".to_string(),
+    ))
 }
 
 pub async fn get_cigars(
@@ -128,8 +184,8 @@ pub async fn get_cigars(
     // Check for humidor_id filter
     if let Some(humidor_id_str) = params.get("humidor_id") {
         if let Ok(humidor_uuid) = Uuid::parse_str(humidor_id_str) {
-            // Verify the humidor belongs to the user (extra safety check)
-            if let Err(e) = verify_humidor_ownership(&db, Some(humidor_uuid), auth.user_id).await {
+            // Verify the humidor belongs to the user or is shared (view permission is enough)
+            if let Err(e) = verify_humidor_ownership(&pool, Some(humidor_uuid), auth.user_id, false).await {
                 return Err(warp::reject::custom(e));
             }
             conditions.push(format!("c.humidor_id = ${}", param_counter));
@@ -304,8 +360,8 @@ pub async fn create_cigar(
         ))
     })?;
 
-    // CRITICAL: Verify the humidor belongs to the authenticated user
-    verify_humidor_ownership(&db, create_cigar.humidor_id, auth.user_id)
+    // CRITICAL: Verify the humidor belongs to the authenticated user or is shared with edit permission
+    verify_humidor_ownership(&pool, create_cigar.humidor_id, auth.user_id, true)
         .await
         .map_err(warp::reject::custom)?;
 
@@ -361,8 +417,8 @@ pub async fn get_cigar(id: Uuid, auth: AuthContext, pool: DbPool) -> Result<impl
         ))
     })?;
 
-    // CRITICAL: Verify the cigar belongs to the user (through its humidor)
-    verify_cigar_ownership(&db, id, auth.user_id)
+    // CRITICAL: Verify the cigar belongs to the user or is shared (view permission is enough)
+    verify_cigar_ownership(&pool, id, auth.user_id, false)
         .await
         .map_err(warp::reject::custom)?;
 
@@ -419,14 +475,14 @@ pub async fn update_cigar(
         ))
     })?;
 
-    // CRITICAL: Verify the cigar belongs to the user (through its humidor)
-    verify_cigar_ownership(&db, id, auth.user_id)
+    // CRITICAL: Verify the cigar belongs to the user or is shared with edit permission
+    verify_cigar_ownership(&pool, id, auth.user_id, true)
         .await
         .map_err(warp::reject::custom)?;
 
-    // If updating humidor_id, verify the new humidor also belongs to the user
+    // If updating humidor_id, verify the new humidor also belongs to the user or is shared with edit permission
     if let Some(new_humidor_id) = update_cigar.humidor_id {
-        verify_humidor_ownership(&db, Some(new_humidor_id), auth.user_id)
+        verify_humidor_ownership(&pool, Some(new_humidor_id), auth.user_id, true)
             .await
             .map_err(warp::reject::custom)?;
     }
@@ -509,10 +565,40 @@ pub async fn delete_cigar(
         ))
     })?;
 
-    // CRITICAL: Verify the cigar belongs to the user (through its humidor)
-    verify_cigar_ownership(&db, id, auth.user_id)
+    // CRITICAL: Verify the cigar belongs to the user or is shared with full permission (delete requires full)
+    // Check if user has manage permission (only owner or full shared access can delete)
+    let db_check = pool.get().await.map_err(|_e| {
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
+    })?;
+    
+    let humidor_query = "SELECT humidor_id FROM cigars WHERE id = $1";
+    let humidor_id: Uuid = match db_check.query_opt(humidor_query, &[&id]).await {
+        Ok(Some(row)) => row.get(0),
+        Ok(None) => {
+            return Err(warp::reject::custom(AppError::NotFound(
+                "Cigar not found".to_string(),
+            )))
+        }
+        Err(e) => {
+            return Err(warp::reject::custom(AppError::DatabaseError(format!(
+                "Failed to find cigar: {}",
+                e
+            ))))
+        }
+    };
+    
+    // Check if user can manage (delete requires full permission)
+    use crate::handlers::humidor_shares::can_manage_humidor;
+    if !can_manage_humidor(&pool, &auth.user_id, &humidor_id)
         .await
-        .map_err(warp::reject::custom)?;
+        .map_err(warp::reject::custom)?
+    {
+        return Err(warp::reject::custom(AppError::Forbidden(
+            "You do not have permission to delete cigars from this humidor".to_string(),
+        )));
+    }
 
     // Hard delete: actually remove the cigar from the database
     // Note: favorites will keep snapshot data due to ON DELETE SET NULL on cigar_id

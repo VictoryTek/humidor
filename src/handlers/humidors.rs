@@ -1,3 +1,4 @@
+use crate::handlers::humidor_shares::can_view_humidor;
 use crate::middleware::AuthContext;
 use crate::models::{CreateHumidorRequest, Humidor, UpdateHumidorRequest};
 use crate::validation::Validate;
@@ -20,11 +21,16 @@ pub async fn get_humidors(auth: AuthContext, pool: DbPool) -> Result<impl Reply,
     };
 
     let user_id = auth.user_id;
+    
+    // Get humidors owned by user UNION with humidors shared with user
     let query = "
-        SELECT id, user_id, name, description, capacity, target_humidity, location, created_at, updated_at
-        FROM humidors 
-        WHERE user_id = $1
-        ORDER BY created_at ASC
+        SELECT DISTINCT h.id, h.user_id, h.name, h.description, h.capacity, h.target_humidity, h.location, h.created_at, h.updated_at,
+               CASE WHEN h.user_id = $1 THEN true ELSE false END as is_owner,
+               COALESCE(hs.permission_level, 'full') as permission_level
+        FROM humidors h
+        LEFT JOIN humidor_shares hs ON h.id = hs.humidor_id AND hs.shared_with_user_id = $1
+        WHERE h.user_id = $1 OR hs.shared_with_user_id = $1
+        ORDER BY h.created_at ASC
     ";
 
     match db.query(query, &[&user_id]).await {
@@ -77,42 +83,69 @@ pub async fn get_humidor(
     };
 
     let user_id = auth.user_id;
-    let query = "
-        SELECT id, user_id, name, description, capacity, target_humidity, location, created_at, updated_at
-        FROM humidors 
-        WHERE id = $1 AND user_id = $2
-    ";
+    
+    // Check if user can view this humidor (owner or has share access)
+    match can_view_humidor(&pool, &user_id, &id).await {
+        Ok(true) => {
+            // User has access, fetch the humidor
+            let query = "
+                SELECT id, user_id, name, description, capacity, target_humidity, location, created_at, updated_at
+                FROM humidors 
+                WHERE id = $1
+            ";
 
-    match db.query_opt(query, &[&id, &user_id]).await {
-        Ok(Some(row)) => {
-            let humidor = Humidor {
-                id: row.get(0),
-                user_id: row.get(1),
-                name: row.get(2),
-                description: row.get(3),
-                capacity: row.get(4),
-                target_humidity: row.get(5),
-                location: row.get(6),
-                created_at: row.get(7),
-                updated_at: row.get(8),
-            };
+            match db.query_opt(query, &[&id]).await {
+                Ok(Some(row)) => {
+                    let humidor = Humidor {
+                        id: row.get(0),
+                        user_id: row.get(1),
+                        name: row.get(2),
+                        description: row.get(3),
+                        capacity: row.get(4),
+                        target_humidity: row.get(5),
+                        location: row.get(6),
+                        created_at: row.get(7),
+                        updated_at: row.get(8),
+                    };
 
-            Ok(reply::with_status(reply::json(&humidor), StatusCode::OK))
+                    Ok(reply::with_status(reply::json(&humidor), StatusCode::OK))
+                }
+                Ok(None) => {
+                    let error_response = json!({
+                        "error": "Humidor not found"
+                    });
+                    Ok(reply::with_status(
+                        reply::json(&error_response),
+                        StatusCode::NOT_FOUND,
+                    ))
+                }
+                Err(e) => {
+                    tracing::error!(error = %e, "Database error");
+                    let error_response = json!({
+                        "error": "Failed to fetch humidor",
+                        "details": e.to_string()
+                    });
+                    Ok(reply::with_status(
+                        reply::json(&error_response),
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                    ))
+                }
+            }
         }
-        Ok(None) => {
+        Ok(false) => {
+            // User does not have access
             let error_response = json!({
-                "error": "Humidor not found"
+                "error": "Forbidden: You do not have access to this humidor"
             });
             Ok(reply::with_status(
                 reply::json(&error_response),
-                StatusCode::NOT_FOUND,
+                StatusCode::FORBIDDEN,
             ))
         }
         Err(e) => {
-            tracing::error!(error = %e, "Database error");
+            tracing::error!(error = %e, "Failed to check humidor access");
             let error_response = json!({
-                "error": "Failed to fetch humidor",
-                "details": e.to_string()
+                "error": "Failed to check access"
             });
             Ok(reply::with_status(
                 reply::json(&error_response),

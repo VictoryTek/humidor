@@ -1265,6 +1265,45 @@
         </div>
     </div>
 
+    <!-- Share Humidor Modal -->
+    <div class="modal" id="shareHumidorModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🤝 Share Humidor</h2>
+                <span class="close" id="shareHumidorClose">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="shareHumidorName">Humidor:</label>
+                    <input type="text" id="shareHumidorName" readonly>
+                </div>
+
+                <h3>Add User</h3>
+                <div class="form-group">
+                    <label for="shareUserSearch">Search for user (username or email):</label>
+                    <input type="text" id="shareUserSearch" placeholder="Type to search...">
+                    <div class="search-results" id="shareUserSearchResults"></div>
+                </div>
+
+                <div class="form-group">
+                    <label for="sharePermissionLevel">Permission Level:</label>
+                    <select id="sharePermissionLevel">
+                        <option value="view">View Only - Can see cigars but not modify</option>
+                        <option value="edit" selected>Edit - Can add/edit cigars and change quantities</option>
+                        <option value="full">Full Access - Can add, edit, delete cigars and manage shares</option>
+                    </select>
+                </div>
+
+                <button class="btn-primary" id="shareAddUserBtn">Add User</button>
+
+                <h3 style="margin-top: 2rem;">Currently Shared With</h3>
+                <div id="currentSharesList">
+                    <p class="text-muted">This humidor is not currently shared with anyone.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Notifications -->
     <div class="toast-container" id="toastContainer"></div>
 

@@ -2072,6 +2072,9 @@ function showHumidorHub() {
                             <div class="humidor-card-image">
                                 ${imageHtml}
                                 <div class="humidor-card-actions" onclick="event.stopPropagation();">
+                                    <button class="btn-icon" onclick="openShareHumidorModal('${humidor.id}', '${escapeHtml(humidor.name).replace(/'/g, "\\'")}'))" title="Share Humidor">
+                                        <i class="mdi mdi-share-variant"></i>
+                                    </button>
                                     <button class="btn-icon" onclick="editHumidor('${humidor.id}')" title="Edit Humidor">
                                         <i class="mdi mdi-pencil"></i>
                                     </button>
@@ -4586,6 +4589,267 @@ function initializeBackupHandlers() {
     if (confirmDeleteBtn) confirmDeleteBtn.addEventListener('click', confirmDelete);
 }
 
+// ============================================
+// SHARE HUMIDOR FUNCTIONALITY
+// ============================================
+
+let currentShareHumidorId = null;
+let shareSearchTimeout = null;
+
+function openShareHumidorModal(humidorId, humidorName) {
+    currentShareHumidorId = humidorId;
+    const modal = document.getElementById('shareHumidorModal');
+    const nameInput = document.getElementById('shareHumidorName');
+    const searchInput = document.getElementById('shareUserSearch');
+    
+    nameInput.value = humidorName;
+    searchInput.value = '';
+    
+    // Load current shares
+    loadCurrentShares(humidorId);
+    
+    modal.style.display = 'flex';
+}
+
+function closeShareHumidorModal() {
+    const modal = document.getElementById('shareHumidorModal');
+    modal.style.display = 'none';
+    currentShareHumidorId = null;
+}
+
+async function loadCurrentShares(humidorId) {
+    try {
+        const response = await fetch(`/api/v1/humidors/${humidorId}/shares`, {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to load shares');
+        }
+        
+        const data = await response.json();
+        const sharesList = document.getElementById('currentSharesList');
+        
+        if (data.shares && data.shares.length > 0) {
+            sharesList.innerHTML = data.shares.map(share => `
+                <div class="share-item">
+                    <div class="share-item-info">
+                        <div class="share-item-name">${escapeHtml(share.shared_with_user.username)}</div>
+                        <div class="share-item-email">${escapeHtml(share.shared_with_user.email)}</div>
+                        ${share.shared_with_user.full_name ? `<div class="share-item-email">${escapeHtml(share.shared_with_user.full_name)}</div>` : ''}
+                        <span class="share-item-permission ${share.permission_level}">${share.permission_level.toUpperCase()}</span>
+                    </div>
+                    <div class="share-item-actions">
+                        <select onchange="updateSharePermission('${humidorId}', '${share.shared_with_user.id}', this.value)">
+                            <option value="view" ${share.permission_level === 'view' ? 'selected' : ''}>View</option>
+                            <option value="edit" ${share.permission_level === 'edit' ? 'selected' : ''}>Edit</option>
+                            <option value="full" ${share.permission_level === 'full' ? 'selected' : ''}>Full</option>
+                        </select>
+                        <button class="btn-danger btn-sm" onclick="revokeShare('${humidorId}', '${share.shared_with_user.id}')">Remove</button>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            sharesList.innerHTML = '<p class="text-muted">This humidor is not currently shared with anyone.</p>';
+        }
+    } catch (error) {
+        console.error('Error loading shares:', error);
+        alert('Failed to load shares. Please try again.');
+    }
+}
+
+async function searchUsers(query) {
+    if (!query || query.length < 2) {
+        document.getElementById('shareUserSearchResults').innerHTML = '';
+        document.getElementById('shareUserSearchResults').classList.remove('active');
+        return;
+    }
+    
+    try {
+        // Search through admin users endpoint (we'll need to create a simpler search endpoint later)
+        const response = await fetch(`/api/v1/admin/users?page=1&page_size=10`, {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to search users');
+        }
+        
+        const data = await response.json();
+        const searchResults = document.getElementById('shareUserSearchResults');
+        
+        // Filter results client-side
+        const filtered = data.users.filter(user => 
+            user.username.toLowerCase().includes(query.toLowerCase()) ||
+            user.email.toLowerCase().includes(query.toLowerCase()) ||
+            (user.full_name && user.full_name.toLowerCase().includes(query.toLowerCase()))
+        );
+        
+        if (filtered.length > 0) {
+            searchResults.innerHTML = filtered.map(user => `
+                <div class="search-result-item" onclick="selectUser('${user.id}', '${escapeHtml(user.username).replace(/'/g, "\\'")}')">
+                    <div class="username">${escapeHtml(user.username)}</div>
+                    <div class="email">${escapeHtml(user.email)}</div>
+                    ${user.full_name ? `<div class="full-name">${escapeHtml(user.full_name)}</div>` : ''}
+                </div>
+            `).join('');
+            searchResults.classList.add('active');
+        } else {
+            searchResults.innerHTML = '<div class="search-result-item">No users found</div>';
+            searchResults.classList.add('active');
+        }
+    } catch (error) {
+        console.error('Error searching users:', error);
+    }
+}
+
+let selectedUserId = null;
+let selectedUsername = null;
+
+function selectUser(userId, username) {
+    selectedUserId = userId;
+    selectedUsername = username;
+    document.getElementById('shareUserSearch').value = username;
+    document.getElementById('shareUserSearchResults').innerHTML = '';
+    document.getElementById('shareUserSearchResults').classList.remove('active');
+}
+
+async function shareHumidor() {
+    if (!selectedUserId) {
+        alert('Please select a user to share with');
+        return;
+    }
+    
+    const permissionLevel = document.getElementById('sharePermissionLevel').value;
+    
+    try {
+        const response = await fetch(`/api/v1/humidors/${currentShareHumidorId}/share`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({
+                user_id: selectedUserId,
+                permission_level: permissionLevel
+            })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to share humidor');
+        }
+        
+        alert(`Humidor shared with ${selectedUsername}!`);
+        
+        // Reset selection
+        selectedUserId = null;
+        selectedUsername = null;
+        document.getElementById('shareUserSearch').value = '';
+        
+        // Reload shares list
+        loadCurrentShares(currentShareHumidorId);
+    } catch (error) {
+        console.error('Error sharing humidor:', error);
+        alert(`Failed to share humidor: ${error.message}`);
+    }
+}
+
+async function updateSharePermission(humidorId, userId, newPermission) {
+    try {
+        const response = await fetch(`/api/v1/humidors/${humidorId}/share/${userId}`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({
+                permission_level: newPermission
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to update permission');
+        }
+        
+        alert('Permission updated successfully!');
+        loadCurrentShares(humidorId);
+    } catch (error) {
+        console.error('Error updating permission:', error);
+        alert('Failed to update permission. Please try again.');
+    }
+}
+
+async function revokeShare(humidorId, userId) {
+    if (!confirm('Are you sure you want to revoke access for this user?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/v1/humidors/${humidorId}/share/${userId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to revoke share');
+        }
+        
+        alert('Access revoked successfully!');
+        loadCurrentShares(humidorId);
+    } catch (error) {
+        console.error('Error revoking share:', error);
+        alert('Failed to revoke access. Please try again.');
+    }
+}
+
+// Setup share modal event listeners
+function setupShareModalListeners() {
+    const closeBtn = document.getElementById('shareHumidorClose');
+    const addUserBtn = document.getElementById('shareAddUserBtn');
+    const searchInput = document.getElementById('shareUserSearch');
+    
+    if (closeBtn) {
+        closeBtn.addEventListener('click', closeShareHumidorModal);
+    }
+    
+    if (addUserBtn) {
+        addUserBtn.addEventListener('click', shareHumidor);
+    }
+    
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            clearTimeout(shareSearchTimeout);
+            shareSearchTimeout = setTimeout(() => {
+                searchUsers(e.target.value);
+            }, 300);
+        });
+    }
+    
+    // Close modal when clicking outside
+    const modal = document.getElementById('shareHumidorModal');
+    if (modal) {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeShareHumidorModal();
+            }
+        });
+    }
+}
+
+// Call setup when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupShareModalListeners);
+} else {
+    setupShareModalListeners();
+}
+
 // Global functions for modal opening (called from HTML)
 function openBrandModal() { openOrganizerModal('brand'); }
 function openSizeModal() { openOrganizerModal('size'); }
@@ -4609,3 +4873,8 @@ window.toggleUserActive = toggleUserActive;
 window.showDeleteUserDialog = showDeleteUserDialog;
 window.showPasswordResetDialog = showPasswordResetDialog;
 window.loadUsers = loadUsers;
+// Export share management functions for global use
+window.openShareHumidorModal = openShareHumidorModal;
+window.updateSharePermission = updateSharePermission;
+window.revokeShare = revokeShare;
+window.selectUser = selectUser;
