@@ -487,6 +487,8 @@ pub async fn create_humidor_for_setup(
                 location: row.get("location"),
                 created_at: row.get("created_at"),
                 updated_at: row.get("updated_at"),
+                is_owner: Some(true), // User creating during setup is owner
+                permission_level: Some("full".to_string()),
             };
 
             Ok(warp::reply::json(&humidor).into_response())

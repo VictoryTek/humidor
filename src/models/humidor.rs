@@ -16,6 +16,10 @@ pub struct Humidor {
     pub location: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_owner: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub permission_level: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

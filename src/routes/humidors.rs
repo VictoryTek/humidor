@@ -10,6 +10,7 @@ pub fn create_humidor_routes(
     let get_humidors = warp::path("api")
         .and(warp::path("v1"))
         .and(warp::path("humidors"))
+        .and(warp::path::end())
         .and(warp::get())
         .and(with_current_user(db_pool.clone()))
         .and(with_db(db_pool.clone()))

@@ -164,11 +164,15 @@ function handleNextButtonClick(event) {
 
 function finishSetup() {
     console.log('finishSetup function called!');
-    console.log('Setup completed, redirecting to main app...');
+    console.log('Setup completed, redirecting to login...');
     
     try {
-        console.log('Redirecting to main app...');
-        window.location.href = '/';
+        // Clear any existing authentication data to ensure clean login
+        localStorage.removeItem('humidor_token');
+        localStorage.removeItem('humidor_user');
+        
+        console.log('Redirecting to login page...');
+        window.location.href = '/login.html';
         console.log('Redirect command executed');
     } catch (error) {
         console.error('Error during redirect:', error);
@@ -461,9 +465,8 @@ async function submitSetup() {
             console.log('Sample data not requested');
         }
         
-        // Store authentication data so user is logged in
-        localStorage.setItem('humidor_token', userData.token);
-        localStorage.setItem('humidor_user', JSON.stringify(userData.user));
+        // DO NOT auto-login - let user login manually for first time
+        // This ensures proper session initialization
         
         // Setup successful, move to completion step
         elements.setupLoading.classList.remove('active');

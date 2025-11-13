@@ -3,6 +3,7 @@ let humidors = [];
 let cigars = [];
 let wishListCigars = [];
 let currentHumidor = null;
+let currentHumidorPermission = 'full'; // 'view', 'edit', or 'full'
 let currentCigar = null;
 let isEditingHumidor = false;
 let isEditingCigar = false;
@@ -604,10 +605,23 @@ function createCigarCard(cigar) {
     // Out of stock badge centered on card
     const outOfStockBadge = isOutOfStock ? `<div class="out-of-stock-badge" style="position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: #e74c3c; color: white; padding: 4px 12px; border-radius: 4px; font-size: 0.875rem; font-weight: 600; z-index: 10; white-space: nowrap;">OUT OF STOCK</div>` : '';
     
-    const actionButtons = isOutOfStock 
-        ? `<button class="action-btn edit-btn" onclick="restockCigar('${cigar.id}')" title="Restock" style="background: #27ae60;">↻</button>`
-        : `<button class="action-btn edit-btn" onclick="editCigar('${cigar.id}')">✏️</button>
-           <button class="action-btn delete-btn" onclick="deleteCigar('${cigar.id}')">🗑️</button>`;
+    // Check permission level and conditionally render buttons
+    let actionButtons = '';
+    if (currentHumidorPermission === 'view') {
+        // View only - no action buttons
+        actionButtons = '';
+    } else if (currentHumidorPermission === 'edit') {
+        // Edit permission - can edit and restock but not delete
+        actionButtons = isOutOfStock 
+            ? `<button class="action-btn edit-btn" onclick="restockCigar('${cigar.id}')" title="Restock" style="background: #27ae60;">↻</button>`
+            : `<button class="action-btn edit-btn" onclick="editCigar('${cigar.id}')">✏️</button>`;
+    } else {
+        // Full permission (default for owners)
+        actionButtons = isOutOfStock 
+            ? `<button class="action-btn edit-btn" onclick="restockCigar('${cigar.id}')" title="Restock" style="background: #27ae60;">↻</button>`
+            : `<button class="action-btn edit-btn" onclick="editCigar('${cigar.id}')">✏️</button>
+               <button class="action-btn delete-btn" onclick="deleteCigar('${cigar.id}')">🗑️</button>`;
+    }
     
     const quantityDisplay = isOutOfStock ? '<div class="quantity-badge" style="color: #e74c3c;">0 left</div>' : `<div class="quantity-badge">${cigar.quantity} left</div>`;
     
@@ -906,6 +920,12 @@ async function handleFormSubmit(event) {
 }
 
 async function editCigar(id) {
+    // Check permission
+    if (currentHumidorPermission === 'view') {
+        showToast('You only have view permission for this humidor', 'error');
+        return;
+    }
+    
     try {
         const cigar = await API.getCigar(id);
         openCigarModal(cigar.humidor_id, cigar);
@@ -916,6 +936,12 @@ async function editCigar(id) {
 }
 
 async function deleteCigar(id) {
+    // Check permission
+    if (currentHumidorPermission !== 'full') {
+        showToast('You need full permission to delete cigars', 'error');
+        return;
+    }
+    
     if (!confirm('Are you sure you want to delete this cigar?')) {
         return;
     }
@@ -2129,6 +2155,10 @@ async function showHumidorDetail(humidorId) {
     
     console.log('Found humidor:', humidor);
     
+    // Set current humidor permission (default to 'full' if owner or not specified)
+    currentHumidorPermission = humidor.permission_level || 'full';
+    console.log('Current humidor permission:', currentHumidorPermission);
+    
     const welcomeSection = document.getElementById('welcomeSection');
     const mainContentSection = document.getElementById('mainContentSection');
     const humidorsContainer = document.getElementById('humidorsContainer');
@@ -2199,18 +2229,21 @@ function renderSingleHumidorSection(humidor, humidorCigars) {
                         <div>
                             <h2 class="humidor-name">${escapeHtml(humidor.name)}</h2>
                             ${humidor.location ? `<p class="humidor-location">${escapeHtml(humidor.location)}</p>` : ''}
+                            ${currentHumidorPermission !== 'full' ? `<span class="permission-badge" style="background: #3498db; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; margin-left: 8px;">SHARED - ${currentHumidorPermission.toUpperCase()}</span>` : ''}
                         </div>
                     </div>
                     <div class="humidor-actions">
-                        <button class="btn-icon" onclick="openShareHumidorModal('${humidor.id}', '${escapeHtml(humidor.name).replace(/'/g, "\\'")}')" title="Share Humidor">
-                            <i class="mdi mdi-share-variant"></i>
-                        </button>
-                        <button class="btn-icon" onclick="editHumidor('${humidor.id}')" title="Edit Humidor">
-                            <i class="mdi mdi-pencil"></i>
-                        </button>
-                        <button class="btn-icon" onclick="deleteHumidor('${humidor.id}')" title="Delete Humidor">
-                            <i class="mdi mdi-delete"></i>
-                        </button>
+                        ${currentHumidorPermission === 'full' ? `
+                            <button class="btn-icon" onclick="openShareHumidorModal('${humidor.id}', '${escapeHtml(humidor.name).replace(/'/g, "\\'")}')" title="Share Humidor">
+                                <i class="mdi mdi-share-variant"></i>
+                            </button>
+                            <button class="btn-icon" onclick="editHumidor('${humidor.id}')" title="Edit Humidor">
+                                <i class="mdi mdi-pencil"></i>
+                            </button>
+                            <button class="btn-icon" onclick="deleteHumidor('${humidor.id}')" title="Delete Humidor">
+                                <i class="mdi mdi-delete"></i>
+                            </button>
+                        ` : ''}
                     </div>
                 </div>
                 <div class="humidor-stats">
@@ -2244,9 +2277,11 @@ function renderSingleHumidorSection(humidor, humidorCigars) {
                 <div class="empty-state">
                     <i class="mdi mdi-cigar-off"></i>
                     <p>No cigars in this humidor yet</p>
-                    <button class="btn-primary" onclick="openCigarModal(${humidor.id})">
-                        <i class="mdi mdi-plus"></i> Add First Cigar
-                    </button>
+                    ${currentHumidorPermission !== 'view' ? `
+                        <button class="btn-primary" onclick="openCigarModal('${humidor.id}')">
+                            <i class="mdi mdi-plus"></i> Add First Cigar
+                        </button>
+                    ` : ''}
                 </div>
             `}
         </div>
@@ -3225,6 +3260,12 @@ async function deleteCigar(id) {
 
 // Restock cigar function
 async function restockCigar(id) {
+    // Check permission
+    if (currentHumidorPermission === 'view') {
+        showToast('You only have view permission for this humidor', 'error');
+        return;
+    }
+    
     const quantity = prompt('Enter the quantity to restock:', '1');
     
     if (quantity === null) return; // User cancelled
@@ -3270,10 +3311,6 @@ async function updateCigarQuantity(cigarId, currentQuantity, change) {
     
     // If quantity reaches 0, mark as out of stock by setting is_active=false
     if (newQuantity === 0) {
-        if (!confirm('Mark this cigar as out of stock? You can restock it later.')) {
-            return;
-        }
-        
         try {
             // Update with quantity 0, which will set is_active=false on the backend
             const response = await makeAuthenticatedRequest(`/api/v1/cigars/${cigarId}`, {
@@ -3287,7 +3324,7 @@ async function updateCigarQuantity(cigarId, currentQuantity, change) {
             });
             
             if (response && response.ok) {
-                showToast('Cigar marked as out of stock');
+                showToast('Cigar marked as out of stock (quantity: 0)', 'info');
                 await loadHumidors();
             } else {
                 throw new Error('Failed to mark cigar as out of stock');
@@ -4082,14 +4119,14 @@ async function toggleUserActive(userId) {
         });
         
         if (response && response.ok) {
-            alert(`User ${action}d successfully`, 'success');
+            showToast(`User ${action}d successfully`, 'success');
             loadUsers(usersCurrentPage);
         } else {
-            alert(`Failed to ${action} user`, 'error');
+            showToast(`Failed to ${action} user`, 'error');
         }
     } catch (error) {
         console.error(`Error ${action}ing user:`, error);
-        alert(`Error ${action}ing user`, 'error');
+        showToast(`Error ${action}ing user`, 'error');
     }
 }
 
@@ -4669,17 +4706,34 @@ function closeShareHumidorModal() {
 }
 
 async function loadCurrentShares(humidorId) {
+    console.log('=== loadCurrentShares() called ===');
+    console.log('humidorId:', humidorId);
+    
+    const url = `/api/v1/humidors/${humidorId}/shares`;
+    console.log('Fetching from URL:', url);
+    
     try {
-        const response = await makeAuthenticatedRequest(`/api/v1/humidors/${humidorId}/shares`);
+        const response = await makeAuthenticatedRequest(url);
+        
+        console.log('Shares response status:', response.status);
         
         if (!response.ok) {
             throw new Error('Failed to load shares');
         }
         
         const data = await response.json();
+        console.log('Shares data received:', data);
+        console.log('Data type:', typeof data);
+        console.log('Is array?:', Array.isArray(data));
+        console.log('Data keys:', Object.keys(data));
+        console.log('data.shares:', data.shares);
+        console.log('Number of shares:', data.shares ? data.shares.length : 0);
+        
         const sharesList = document.getElementById('currentSharesList');
+        console.log('sharesList element:', sharesList);
         
         if (data.shares && data.shares.length > 0) {
+            console.log('Rendering', data.shares.length, 'shares');
             sharesList.innerHTML = data.shares.map(share => `
                 <div class="share-item">
                     <div class="share-user-info">
@@ -4704,53 +4758,77 @@ async function loadCurrentShares(humidorId) {
             // Repopulate dropdown excluding newly loaded shares
             populateUserDropdown(data.shares);
         } else {
+            console.log('No shares found, showing empty message');
             sharesList.innerHTML = '<p class="text-muted">This humidor is not currently shared with anyone.</p>';
             
             // Populate dropdown with all available users
             populateUserDropdown([]);
         }
+        
+        console.log('=== loadCurrentShares() complete ===');
     } catch (error) {
         console.error('Error loading shares:', error);
-        alert('Failed to load shares. Please try again.');
+        showToast('Failed to load shares. Please try again.', 'error');
     }
 }
 
 async function shareHumidor() {
+    console.log('=== shareHumidor() called ===');
+    console.log('currentShareHumidorId:', currentShareHumidorId);
+    
     const userSelect = document.getElementById('shareUserSelect');
     const selectedUserId = userSelect.value;
     
+    console.log('selectedUserId:', selectedUserId);
+    
     if (!selectedUserId) {
-        alert('Please select a user to share with');
+        showToast('Please select a user to share with', 'error');
         return;
     }
     
     const permissionLevel = document.getElementById('sharePermissionLevel').value;
+    console.log('permissionLevel:', permissionLevel);
     
     try {
-        const response = await makeAuthenticatedRequest(`/api/v1/humidors/${currentShareHumidorId}/share`, {
+        const url = `/api/v1/humidors/${currentShareHumidorId}/share`;
+        const body = {
+            user_id: selectedUserId,
+            permission_level: permissionLevel
+        };
+        
+        console.log('Making POST request to:', url);
+        console.log('Request body:', body);
+        
+        const response = await makeAuthenticatedRequest(url, {
             method: 'POST',
-            body: JSON.stringify({
-                user_id: selectedUserId,
-                permission_level: permissionLevel
-            })
+            body: JSON.stringify(body)
         });
+        
+        console.log('Response status:', response.status);
+        console.log('Response ok:', response.ok);
         
         if (!response.ok) {
             const error = await response.json();
+            console.error('Share failed with error:', error);
             throw new Error(error.error || 'Failed to share humidor');
         }
         
-        alert('Humidor shared successfully!');
+        const result = await response.json();
+        console.log('Share successful, result:', result);
+        
+        showToast('Humidor shared successfully!', 'success');
         
         // Reset selection
         userSelect.value = '';
         document.getElementById('sharePermissionLevel').value = 'edit';
         
         // Reload shares list (which will also update the dropdown)
-        loadCurrentShares(currentShareHumidorId);
+        console.log('Reloading shares list...');
+        await loadCurrentShares(currentShareHumidorId);
+        console.log('Shares list reloaded');
     } catch (error) {
         console.error('Error sharing humidor:', error);
-        alert(`Failed to share humidor: ${error.message}`);
+        showToast(`Failed to share humidor: ${error.message}`, 'error');
     }
 }
 
@@ -4767,11 +4845,11 @@ async function updateSharePermission(humidorId, userId, newPermission) {
             throw new Error('Failed to update permission');
         }
         
-        alert('Permission updated successfully!');
-        loadCurrentShares(humidorId);
+        showToast('Permission updated successfully!', 'success');
+        await loadCurrentShares(humidorId);
     } catch (error) {
         console.error('Error updating permission:', error);
-        alert('Failed to update permission. Please try again.');
+        showToast('Failed to update permission. Please try again.', 'error');
     }
 }
 
@@ -4789,11 +4867,11 @@ async function revokeShare(humidorId, userId) {
             throw new Error('Failed to revoke share');
         }
         
-        alert('Access revoked successfully!');
-        loadCurrentShares(humidorId);
+        showToast('Access revoked successfully!', 'success');
+        await loadCurrentShares(humidorId);
     } catch (error) {
         console.error('Error revoking share:', error);
-        alert('Failed to revoke access. Please try again.');
+        showToast('Failed to revoke access. Please try again.', 'error');
     }
 }
 

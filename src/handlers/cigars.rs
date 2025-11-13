@@ -169,15 +169,19 @@ pub async fn get_cigars(
 
     let offset = (page - 1) * page_size;
 
-    // Build query with JOIN to filter by user-owned humidors
-    let base_query = "SELECT c.id, c.humidor_id, c.brand_id, c.name, c.size_id, c.strength_id, c.origin_id, c.wrapper, c.binder, c.filler, c.price, c.purchase_date, c.notes, c.quantity, c.ring_gauge_id, c.length, c.image_url, c.retail_link, c.is_active, c.created_at, c.updated_at FROM cigars c INNER JOIN humidors h ON c.humidor_id = h.id";
-    let count_query = "SELECT COUNT(*) FROM cigars c INNER JOIN humidors h ON c.humidor_id = h.id";
+    // Build query with JOIN to filter by user-owned humidors OR shared humidors
+    let base_query = "SELECT c.id, c.humidor_id, c.brand_id, c.name, c.size_id, c.strength_id, c.origin_id, c.wrapper, c.binder, c.filler, c.price, c.purchase_date, c.notes, c.quantity, c.ring_gauge_id, c.length, c.image_url, c.retail_link, c.is_active, c.created_at, c.updated_at FROM cigars c INNER JOIN humidors h ON c.humidor_id = h.id LEFT JOIN humidor_shares hs ON c.humidor_id = hs.humidor_id AND hs.shared_with_user_id = $1";
+    let count_query = "SELECT COUNT(*) FROM cigars c INNER JOIN humidors h ON c.humidor_id = h.id LEFT JOIN humidor_shares hs ON c.humidor_id = hs.humidor_id AND hs.shared_with_user_id = $1";
     let mut conditions = Vec::new();
     let mut param_values: Vec<Box<dyn ToSql + Sync + Send>> = Vec::new();
     let mut param_counter = 1;
 
-    // CRITICAL: Always filter by user_id to ensure data isolation
-    conditions.push(format!("h.user_id = ${}", param_counter));
+    // CRITICAL: Filter by user-owned humidors OR humidors shared with user
+    // $1 is already used in the LEFT JOIN above
+    conditions.push(format!(
+        "(h.user_id = ${} OR hs.shared_with_user_id = ${})",
+        param_counter, param_counter
+    ));
     param_values.push(Box::new(auth.user_id));
     param_counter += 1;
 

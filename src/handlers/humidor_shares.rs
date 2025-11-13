@@ -442,7 +442,16 @@ pub async fn get_humidor_shares(
 
     let total = shares.len();
 
-    Ok(reply::json(&HumidorSharesListResponse { shares, total }))
+    let response = HumidorSharesListResponse { shares, total };
+
+    tracing::info!(
+        "Returning {} shares for humidor {}",
+        response.total,
+        humidor_id
+    );
+    tracing::debug!("Response structure: {:?}", response);
+
+    Ok(reply::json(&response))
 }
 
 /// Get list of humidors shared with the current user

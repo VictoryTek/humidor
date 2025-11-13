@@ -47,6 +47,8 @@ pub async fn get_humidors(auth: AuthContext, pool: DbPool) -> Result<impl Reply,
                     location: row.get(6),
                     created_at: row.get(7),
                     updated_at: row.get(8),
+                    is_owner: Some(row.get(9)),
+                    permission_level: Some(row.get(10)),
                 })
                 .collect();
 
@@ -106,6 +108,8 @@ pub async fn get_humidor(
                         location: row.get(6),
                         created_at: row.get(7),
                         updated_at: row.get(8),
+                        is_owner: None,
+                        permission_level: None,
                     };
 
                     Ok(reply::with_status(reply::json(&humidor), StatusCode::OK))
@@ -217,6 +221,8 @@ pub async fn create_humidor(
                 location: row.get(6),
                 created_at: row.get(7),
                 updated_at: row.get(8),
+                is_owner: Some(true), // User creating is always owner
+                permission_level: Some("full".to_string()),
             };
 
             Ok(reply::with_status(
@@ -300,6 +306,8 @@ pub async fn update_humidor(
                 location: row.get(6),
                 created_at: row.get(7),
                 updated_at: row.get(8),
+                is_owner: None, // Not needed for update response
+                permission_level: None,
             };
 
             Ok(reply::with_status(reply::json(&humidor), StatusCode::OK))
