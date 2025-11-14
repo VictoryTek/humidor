@@ -295,6 +295,16 @@ async fn test_concurrent_quantity_updates() {
         .await
         .unwrap();
 
+    // Verify the cigar was created and is visible
+    let client = ctx.pool.get().await.unwrap();
+    let row = client
+        .query_one("SELECT quantity FROM cigars WHERE id = $1", &[&cigar_id])
+        .await
+        .expect("Cigar should exist after creation");
+    let initial_quantity: i32 = row.get(0);
+    assert_eq!(initial_quantity, 100, "Initial quantity should be 100");
+    drop(client); // Release connection back to pool
+
     // Ensure the cigar is committed before starting concurrent updates
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
@@ -344,4 +354,6 @@ async fn test_concurrent_quantity_updates() {
         quantity, 95,
         "5 concurrent decrements should result in quantity 95"
     );
+
+    cleanup_db(&ctx.pool).await.unwrap();
 }
