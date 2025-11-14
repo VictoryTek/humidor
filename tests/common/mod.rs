@@ -77,10 +77,38 @@ pub async fn setup_test_db() -> TestContext {
             .await;
     }
 
+    // Ensure humidor_shares table exists (V12 migration)
+    {
+        let client = pool
+            .get()
+            .await
+            .expect("Failed to get client for humidor_shares setup");
+        let _ = client
+            .batch_execute(
+                "
+            CREATE TABLE IF NOT EXISTS humidor_shares (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                humidor_id UUID NOT NULL REFERENCES humidors(id) ON DELETE CASCADE,
+                shared_with_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                shared_by_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                permission_level VARCHAR(20) NOT NULL CHECK (permission_level IN ('view', 'edit', 'full')),
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                CONSTRAINT unique_humidor_share UNIQUE (humidor_id, shared_with_user_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_humidor_shares_humidor_id ON humidor_shares(humidor_id);
+            CREATE INDEX IF NOT EXISTS idx_humidor_shares_shared_with_user_id ON humidor_shares(shared_with_user_id);
+            CREATE INDEX IF NOT EXISTS idx_humidor_shares_shared_by_user_id ON humidor_shares(shared_by_user_id);
+        ",
+            )
+            .await;
+    }
+
     // Now clean up any existing test data with a fresh client
     {
         let client = pool.get().await.expect("Failed to get client for cleanup");
-        // Use DELETE to clean up test data
+        // Use DELETE to clean up test data (order matters due to foreign keys)
+        let _ = client.execute("DELETE FROM humidor_shares", &[]).await;
         let _ = client.execute("DELETE FROM wish_list", &[]).await;
         let _ = client.execute("DELETE FROM favorites", &[]).await;
         let _ = client.execute("DELETE FROM cigars", &[]).await;
@@ -227,6 +255,8 @@ pub async fn cleanup_db(pool: &Pool) -> Result<(), Box<dyn std::error::Error>> {
     let client = pool.get().await?;
 
     // Delete in order to respect foreign key constraints
+    client.execute("DELETE FROM humidor_shares", &[]).await?;
+    client.execute("DELETE FROM wish_list", &[]).await?;
     client.execute("DELETE FROM favorites", &[]).await?;
     client.execute("DELETE FROM cigars", &[]).await?;
     client.execute("DELETE FROM humidors", &[]).await?;
