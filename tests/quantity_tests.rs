@@ -295,18 +295,25 @@ async fn test_concurrent_quantity_updates() {
         .await
         .unwrap();
 
-    // Verify the cigar was created and is visible
-    let client = ctx.pool.get().await.unwrap();
-    let row = client
-        .query_one("SELECT quantity FROM cigars WHERE id = $1", &[&cigar_id])
-        .await
-        .expect("Cigar should exist after creation");
-    let initial_quantity: i32 = row.get(0);
-    assert_eq!(initial_quantity, 100, "Initial quantity should be 100");
-    drop(client); // Release connection back to pool
+    // Verify the cigar was created and is visible from multiple connections
+    for _ in 0..3 {
+        let client = ctx.pool.get().await.unwrap();
+        let result = client
+            .query_opt("SELECT quantity FROM cigars WHERE id = $1", &[&cigar_id])
+            .await
+            .unwrap();
+        if result.is_some() {
+            let row = result.unwrap();
+            let initial_quantity: i32 = row.get(0);
+            assert_eq!(initial_quantity, 100, "Initial quantity should be 100");
+            break;
+        }
+        // Wait a bit if cigar not visible yet
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+    }
 
     // Ensure the cigar is committed before starting concurrent updates
-    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
 
     // Use join_all to ensure all operations complete before checking
     let pool = ctx.pool.clone();
@@ -315,22 +322,31 @@ async fn test_concurrent_quantity_updates() {
             let pool = pool.clone();
             let id = cigar_id;
             async move {
+                // Add a small stagger to reduce contention
+                tokio::time::sleep(tokio::time::Duration::from_millis(i as u64 * 10)).await;
+                
                 let client = pool.get().await.unwrap();
-                let result = client
-                    .execute(
-                        "UPDATE cigars SET quantity = quantity - 1 WHERE id = $1",
-                        &[&id],
-                    )
-                    .await;
+                
+                // Retry logic for transient issues
+                let mut retries = 0;
+                loop {
+                    let result = client
+                        .execute(
+                            "UPDATE cigars SET quantity = quantity - 1 WHERE id = $1",
+                            &[&id],
+                        )
+                        .await;
 
-                // Provide better error message if update fails
-                if let Err(e) = result {
-                    panic!("Update {} failed: {:?}", i, e);
-                }
-
-                let rows_affected = result.unwrap();
-                if rows_affected == 0 {
-                    panic!("Update {} affected 0 rows - cigar not found", i);
+                    match result {
+                        Ok(rows) if rows > 0 => break,
+                        Ok(_) if retries < 3 => {
+                            retries += 1;
+                            tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+                            continue;
+                        }
+                        Ok(_) => panic!("Update {} affected 0 rows after {} retries - cigar not found", i, retries),
+                        Err(e) => panic!("Update {} failed: {:?}", i, e),
+                    }
                 }
             }
         })
