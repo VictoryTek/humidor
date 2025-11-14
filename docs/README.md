@@ -31,7 +31,6 @@ Welcome to the Humidor documentation! This is the central hub for all documentat
 ## Quick Links
 
 - **[Main README](../README.md)** - Project overview and quick start
-- **[Features TODO](FEATURES_TODO.md)** - Development roadmap and completed features
 - **[Security Updates](SECURITY_UPDATES.md)** - Security patches and updates
 
 ## Getting Help
