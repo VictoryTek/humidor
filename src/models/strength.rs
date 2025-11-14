@@ -6,6 +6,7 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Strength {
     pub id: Uuid,
+    pub user_id: Uuid,
     pub name: String,
     pub level: i32,
     pub description: Option<String>,

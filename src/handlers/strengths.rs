@@ -3,9 +3,9 @@ use serde_json::json;
 use uuid::Uuid;
 use warp::{Rejection, Reply};
 
-use crate::{errors::AppError, models::*, validation::Validate, DbPool};
+use crate::{errors::AppError, middleware::AuthContext, models::*, validation::Validate, DbPool};
 
-pub async fn get_strengths(pool: DbPool) -> Result<impl Reply, Rejection> {
+pub async fn get_strengths(auth: AuthContext, pool: DbPool) -> Result<impl Reply, Rejection> {
     let db = pool.get().await.map_err(|e| {
         tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError(
@@ -14,19 +14,20 @@ pub async fn get_strengths(pool: DbPool) -> Result<impl Reply, Rejection> {
     })?;
 
     match db.query(
-        "SELECT id, name, description, level, created_at, updated_at FROM strengths ORDER BY level ASC",
-        &[]
+        "SELECT id, user_id, name, level, description, created_at, updated_at FROM strengths WHERE user_id = $1 ORDER BY level ASC",
+        &[&auth.user_id]
     ).await {
         Ok(rows) => {
             let mut strengths = Vec::new();
             for row in rows {
                 let strength = Strength {
                     id: row.get(0),
-                    name: row.get(1),
-                    description: row.get(2),
+                    user_id: row.get(1),
+                    name: row.get(2),
                     level: row.get(3),
-                    created_at: row.get(4),
-                    updated_at: row.get(5),
+                    description: row.get(4),
+                    created_at: row.get(5),
+                    updated_at: row.get(6),
                 };
                 strengths.push(strength);
             }
@@ -40,6 +41,7 @@ pub async fn get_strengths(pool: DbPool) -> Result<impl Reply, Rejection> {
 }
 
 pub async fn create_strength(
+    auth: AuthContext,
     create_strength: CreateStrength,
     pool: DbPool,
 ) -> Result<impl Reply, Rejection> {
@@ -58,14 +60,15 @@ pub async fn create_strength(
 
     match db
         .query_one(
-            "INSERT INTO strengths (id, name, description, level, created_at, updated_at) 
-         VALUES ($1, $2, $3, $4, $5, $6) 
-         RETURNING id, name, description, level, created_at, updated_at",
+            "INSERT INTO strengths (id, user_id, name, level, description, created_at, updated_at) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7) 
+         RETURNING id, user_id, name, level, description, created_at, updated_at",
             &[
                 &id,
+                &auth.user_id,
                 &create_strength.name,
-                &create_strength.description,
                 &create_strength.level,
+                &create_strength.description,
                 &now,
                 &now,
             ],
@@ -75,11 +78,12 @@ pub async fn create_strength(
         Ok(row) => {
             let strength = Strength {
                 id: row.get(0),
-                name: row.get(1),
-                description: row.get(2),
+                user_id: row.get(1),
+                name: row.get(2),
                 level: row.get(3),
-                created_at: row.get(4),
-                updated_at: row.get(5),
+                description: row.get(4),
+                created_at: row.get(5),
+                updated_at: row.get(6),
             };
             Ok(warp::reply::json(&strength))
         }
@@ -94,6 +98,7 @@ pub async fn create_strength(
 
 pub async fn update_strength(
     id: Uuid,
+    auth: AuthContext,
     update_strength: UpdateStrength,
     pool: DbPool,
 ) -> Result<impl Reply, Rejection> {
@@ -110,35 +115,40 @@ pub async fn update_strength(
     })?;
 
     match db
-        .query_one(
+        .query_opt(
             "UPDATE strengths SET 
          name = COALESCE($2, name),
-         description = COALESCE($3, description),
-         level = COALESCE($4, level),
+         level = COALESCE($3, level),
+         description = COALESCE($4, description),
          updated_at = $5
-         WHERE id = $1
-         RETURNING id, name, description, level, created_at, updated_at",
+         WHERE id = $1 AND user_id = $6
+         RETURNING id, user_id, name, level, description, created_at, updated_at",
             &[
                 &id,
                 &update_strength.name,
-                &update_strength.description,
                 &update_strength.level,
+                &update_strength.description,
                 &now,
+                &auth.user_id,
             ],
         )
         .await
     {
-        Ok(row) => {
+        Ok(Some(row)) => {
             let strength = Strength {
                 id: row.get(0),
-                name: row.get(1),
-                description: row.get(2),
+                user_id: row.get(1),
+                name: row.get(2),
                 level: row.get(3),
-                created_at: row.get(4),
-                updated_at: row.get(5),
+                description: row.get(4),
+                created_at: row.get(5),
+                updated_at: row.get(6),
             };
             Ok(warp::reply::json(&strength))
         }
+        Ok(None) => Ok(warp::reply::json(
+            &json!({"error": "Strength not found or unauthorized"}),
+        )),
         Err(e) => {
             tracing::error!(error = %e, "Database error");
             Ok(warp::reply::json(
@@ -148,7 +158,11 @@ pub async fn update_strength(
     }
 }
 
-pub async fn delete_strength(id: Uuid, pool: DbPool) -> Result<impl Reply, Rejection> {
+pub async fn delete_strength(
+    id: Uuid,
+    auth: AuthContext,
+    pool: DbPool,
+) -> Result<impl Reply, Rejection> {
     let db = pool.get().await.map_err(|e| {
         tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError(
@@ -157,7 +171,10 @@ pub async fn delete_strength(id: Uuid, pool: DbPool) -> Result<impl Reply, Rejec
     })?;
 
     match db
-        .execute("DELETE FROM strengths WHERE id = $1", &[&id])
+        .execute(
+            "DELETE FROM strengths WHERE id = $1 AND user_id = $2",
+            &[&id, &auth.user_id],
+        )
         .await
     {
         Ok(rows_affected) => {
@@ -166,7 +183,9 @@ pub async fn delete_strength(id: Uuid, pool: DbPool) -> Result<impl Reply, Rejec
                     &json!({"message": "Strength deleted successfully"}),
                 ))
             } else {
-                Ok(warp::reply::json(&json!({"error": "Strength not found"})))
+                Ok(warp::reply::json(
+                    &json!({"error": "Strength not found or unauthorized"}),
+                ))
             }
         }
         Err(e) => {

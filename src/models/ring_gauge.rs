@@ -8,6 +8,7 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RingGauge {
     pub id: Uuid,
+    pub user_id: Uuid,
     pub gauge: i32,
     pub description: Option<String>,
     pub common_names: Option<Vec<String>>,

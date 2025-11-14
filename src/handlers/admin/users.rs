@@ -1,4 +1,5 @@
 use crate::errors::AppError;
+use crate::handlers::auth::seed_default_organizers;
 use crate::middleware::AuthContext;
 use crate::models::{
     AdminChangePasswordRequest, AdminCreateUserRequest, AdminToggleActiveRequest,
@@ -211,6 +212,12 @@ pub async fn create_user(
                 created_at: row.get("created_at"),
                 updated_at: row.get("updated_at"),
             };
+
+            // Seed default organizers for the new user
+            if let Err(e) = seed_default_organizers(&db, &user_id).await {
+                tracing::error!(error = %e, user_id = %user_id, "Failed to seed default organizers for new user");
+                // Don't fail user creation if organizer seeding fails
+            }
 
             tracing::info!(
                 admin_id = %auth.user_id,

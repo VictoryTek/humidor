@@ -30,6 +30,21 @@ pub struct Cigar {
     pub updated_at: DateTime<Utc>,
 }
 
+/// Enhanced cigar response with organizer names included for display
+/// This avoids the need for the frontend to look up organizers separately,
+/// which is important for shared humidors where the viewing user may not have
+/// the same organizers as the humidor owner
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CigarWithNames {
+    #[serde(flatten)]
+    pub cigar: Cigar,
+    pub brand_name: Option<String>,
+    pub size_name: Option<String>,
+    pub strength_name: Option<String>,
+    pub origin_name: Option<String>,
+    pub ring_gauge: Option<i32>,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct CreateCigar {
     pub brand_id: Option<Uuid>,

@@ -15,7 +15,7 @@ use crate::{
 
 #[derive(Debug, Serialize)]
 pub struct CigarResponse {
-    pub cigars: Vec<Cigar>,
+    pub cigars: Vec<CigarWithNames>,
     pub total: i64,
     pub page: i64,
     pub page_size: i64,
@@ -169,8 +169,24 @@ pub async fn get_cigars(
 
     let offset = (page - 1) * page_size;
 
-    // Build query with JOIN to filter by user-owned humidors OR shared humidors
-    let base_query = "SELECT c.id, c.humidor_id, c.brand_id, c.name, c.size_id, c.strength_id, c.origin_id, c.wrapper, c.binder, c.filler, c.price, c.purchase_date, c.notes, c.quantity, c.ring_gauge_id, c.length, c.image_url, c.retail_link, c.is_active, c.created_at, c.updated_at FROM cigars c INNER JOIN humidors h ON c.humidor_id = h.id LEFT JOIN humidor_shares hs ON c.humidor_id = hs.humidor_id AND hs.shared_with_user_id = $1";
+    // Build query with JOINs to include organizer names from the humidor owner's organizers
+    // This ensures shared humidors display correctly even when the viewer doesn't have those organizers
+    let base_query = "
+        SELECT 
+            c.id, c.humidor_id, c.brand_id, c.name, c.size_id, c.strength_id, c.origin_id, 
+            c.wrapper, c.binder, c.filler, c.price, c.purchase_date, c.notes, c.quantity, 
+            c.ring_gauge_id, c.length, c.image_url, c.retail_link, c.is_active, c.created_at, c.updated_at,
+            b.name as brand_name, s.name as size_name, st.name as strength_name, 
+            o.name as origin_name, rg.gauge as ring_gauge
+        FROM cigars c 
+        INNER JOIN humidors h ON c.humidor_id = h.id 
+        LEFT JOIN humidor_shares hs ON c.humidor_id = hs.humidor_id AND hs.shared_with_user_id = $1
+        LEFT JOIN brands b ON c.brand_id = b.id AND b.user_id = h.user_id
+        LEFT JOIN sizes s ON c.size_id = s.id AND s.user_id = h.user_id
+        LEFT JOIN strengths st ON c.strength_id = st.id AND st.user_id = h.user_id
+        LEFT JOIN origins o ON c.origin_id = o.id AND o.user_id = h.user_id
+        LEFT JOIN ring_gauges rg ON c.ring_gauge_id = rg.id AND rg.user_id = h.user_id
+    ";
     let count_query = "SELECT COUNT(*) FROM cigars c INNER JOIN humidors h ON c.humidor_id = h.id LEFT JOIN humidor_shares hs ON c.humidor_id = hs.humidor_id AND hs.shared_with_user_id = $1";
     let mut conditions = Vec::new();
     let mut param_values: Vec<Box<dyn ToSql + Sync + Send>> = Vec::new();
@@ -312,7 +328,17 @@ pub async fn get_cigars(
                     created_at: row.get(19),
                     updated_at: row.get(20),
                 };
-                cigars.push(cigar);
+
+                let cigar_with_names = CigarWithNames {
+                    cigar,
+                    brand_name: row.get(21),
+                    size_name: row.get(22),
+                    strength_name: row.get(23),
+                    origin_name: row.get(24),
+                    ring_gauge: row.get(25),
+                };
+
+                cigars.push(cigar_with_names);
             }
 
             let elapsed = start_time.elapsed();

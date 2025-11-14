@@ -6,6 +6,7 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Origin {
     pub id: Uuid,
+    pub user_id: Uuid,
     pub name: String,
     pub country: String,
     pub region: Option<String>,

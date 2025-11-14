@@ -9,6 +9,7 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Size {
     pub id: Uuid,
+    pub user_id: Uuid,
     pub name: String,
     pub length_inches: Option<f64>,
     pub ring_gauge: Option<i32>,

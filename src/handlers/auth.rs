@@ -226,6 +226,13 @@ pub async fn create_setup_user(
                 .into_response());
             }
 
+            // Seed default organizers for the new user
+            if let Err(e) = seed_default_organizers(&db, &user_id).await {
+                tracing::error!(error = %e, user_id = %user_id, "Failed to seed default organizers");
+                // Don't fail the setup if organizer seeding fails
+                // User can still create their own organizers
+            }
+
             let response = json!({
                 "user": user_response,
                 "token": token,
@@ -942,4 +949,268 @@ pub async fn check_email_config() -> Result<impl Reply, warp::Rejection> {
     Ok(warp::reply::json(&json!({
         "email_configured": is_configured
     })))
+}
+
+/// Seed default organizers for a new user
+pub async fn seed_default_organizers(
+    db: &deadpool_postgres::Client,
+    user_id: &Uuid,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let now = Utc::now();
+
+    // Seed strengths
+    let strengths = vec![
+        ("Mild", 1, "Light and smooth, perfect for beginners"),
+        (
+            "Medium-Mild",
+            2,
+            "Slightly more body than mild, still approachable",
+        ),
+        ("Medium", 3, "Balanced strength with good complexity"),
+        ("Medium-Full", 4, "Strong flavor with substantial body"),
+        ("Full", 5, "Bold and intense, for experienced smokers"),
+    ];
+
+    for (name, level, desc) in strengths {
+        db.execute(
+            "INSERT INTO strengths (id, user_id, name, level, description, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+            &[&Uuid::new_v4(), user_id, &name, &level, &desc, &now, &now],
+        ).await?;
+    }
+
+    // Seed ring gauges
+    let ring_gauges = vec![
+        (38, "Very thin gauge, quick smoke"),
+        (42, "Classic thin gauge"),
+        (44, "Standard corona size"),
+        (46, "Popular medium gauge"),
+        (48, "Medium-thick gauge"),
+        (50, "Classic robusto gauge"),
+        (52, "Thick robusto gauge"),
+        (54, "Toro gauge"),
+        (56, "Churchill gauge"),
+        (58, "Thick churchill"),
+        (60, "Very thick gauge"),
+    ];
+
+    for (gauge, desc) in ring_gauges {
+        db.execute(
+            "INSERT INTO ring_gauges (id, user_id, gauge, description, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6)",
+            &[&Uuid::new_v4(), user_id, &gauge, &desc, &now, &now],
+        ).await?;
+    }
+
+    // Seed brands - Top 25 premium cigar brands
+    let brands = vec![
+        (
+            "Arturo Fuente",
+            "Premium Dominican cigars, known for OpusX and Hemingway lines",
+            "Dominican Republic",
+        ),
+        (
+            "Davidoff",
+            "Luxury Swiss brand with premium tobacco",
+            "Switzerland",
+        ),
+        (
+            "Padron",
+            "Family-owned Nicaraguan brand known for quality and consistency",
+            "Nicaragua",
+        ),
+        ("Cohiba", "Iconic Cuban brand, flagship of Habanos", "Cuba"),
+        (
+            "Montecristo",
+            "One of the most recognized Cuban brands worldwide",
+            "Cuba",
+        ),
+        (
+            "Romeo y Julieta",
+            "Classic Cuban brand with wide range of vitolas",
+            "Cuba",
+        ),
+        (
+            "Oliva",
+            "Nicaraguan family business with consistent quality",
+            "Nicaragua",
+        ),
+        (
+            "My Father",
+            "Premium Nicaraguan brand by Jose 'Pepin' Garcia",
+            "Nicaragua",
+        ),
+        (
+            "Drew Estate",
+            "Innovative American brand, makers of Liga Privada and Acid",
+            "United States",
+        ),
+        (
+            "Rocky Patel",
+            "Popular brand with wide range of blends",
+            "Honduras",
+        ),
+        (
+            "Ashton",
+            "Premium brand with Dominican and Nicaraguan lines",
+            "United States",
+        ),
+        (
+            "Perdomo",
+            "Nicaraguan brand with extensive aging and quality control",
+            "Nicaragua",
+        ),
+        (
+            "Alec Bradley",
+            "Honduran brand known for Prensado and Tempus lines",
+            "Honduras",
+        ),
+        (
+            "Tatuaje",
+            "Boutique brand by Pete Johnson with Cuban-style blends",
+            "Nicaragua",
+        ),
+        (
+            "Liga Privada",
+            "Drew Estate's ultra-premium line",
+            "United States",
+        ),
+        (
+            "Partagás",
+            "Historic Cuban brand with full-bodied character",
+            "Cuba",
+        ),
+        (
+            "Hoyo de Monterrey",
+            "Refined Cuban brand with balanced profiles",
+            "Cuba",
+        ),
+        (
+            "H. Upmann",
+            "Classic Cuban brand with elegant smoking experience",
+            "Cuba",
+        ),
+        (
+            "Bolivar",
+            "Strong Cuban brand for experienced smokers",
+            "Cuba",
+        ),
+        (
+            "La Flor Dominicana",
+            "Dominican boutique brand known for bold flavors",
+            "Dominican Republic",
+        ),
+        (
+            "CAO",
+            "Wide range of blends from mild to full-bodied",
+            "Nicaragua",
+        ),
+        (
+            "Punch",
+            "Traditional Cuban brand with consistent quality",
+            "Cuba",
+        ),
+        (
+            "Macanudo",
+            "Mild, smooth Dominican brand perfect for beginners",
+            "Dominican Republic",
+        ),
+        (
+            "Crowned Heads",
+            "Boutique brand with unique collaborations",
+            "Nicaragua",
+        ),
+        (
+            "Illusione",
+            "Small-batch Nicaraguan brand with exceptional quality",
+            "Nicaragua",
+        ),
+    ];
+
+    for (name, desc, country) in brands {
+        db.execute(
+            "INSERT INTO brands (id, user_id, name, description, country, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+            &[&Uuid::new_v4(), user_id, &name, &desc, &country, &now, &now],
+        ).await?;
+    }
+
+    // Seed origins
+    let origins = vec![
+        (
+            "Cuba",
+            "Cuba",
+            "Historic birthplace of premium cigars, known for rich flavor profiles",
+        ),
+        (
+            "Dominican Republic",
+            "Dominican Republic",
+            "World's largest cigar producer, known for smooth, mild to medium cigars",
+        ),
+        (
+            "Nicaragua",
+            "Nicaragua",
+            "Produces full-bodied, peppery cigars with bold flavors",
+        ),
+        (
+            "Honduras",
+            "Honduras",
+            "Known for robust, flavorful cigars with Cuban-seed tobacco",
+        ),
+        (
+            "Mexico",
+            "Mexico",
+            "Produces rich, earthy cigars with quality wrapper tobacco",
+        ),
+        (
+            "United States",
+            "United States",
+            "Home to premium brands and innovative blends",
+        ),
+        (
+            "Ecuador",
+            "Ecuador",
+            "Famous for high-quality Connecticut Shade wrapper tobacco",
+        ),
+    ];
+
+    for (name, country, desc) in origins {
+        db.execute(
+            "INSERT INTO origins (id, user_id, name, country, description, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+            &[&Uuid::new_v4(), user_id, &name, &country, &desc, &now, &now],
+        ).await?;
+    }
+
+    // Seed sizes
+    let sizes = vec![
+        (
+            "Petit Corona",
+            4.5,
+            42,
+            "Small classic size, 30-40 minute smoke",
+        ),
+        (
+            "Corona",
+            5.5,
+            42,
+            "Traditional Cuban size, balanced proportions",
+        ),
+        ("Robusto", 5.0, 50, "Most popular size, 45-60 minute smoke"),
+        ("Toro", 6.0, 50, "Popular modern size, well-balanced"),
+        (
+            "Churchill",
+            7.0,
+            47,
+            "Named after Winston Churchill, elegant size",
+        ),
+        ("Gordo", 6.0, 60, "Large ring gauge, cooler smoke"),
+        ("Lancero", 7.5, 38, "Long and thin, concentrated flavors"),
+        ("Torpedo", 6.125, 52, "Tapered head, concentrated flavors"),
+    ];
+
+    for (name, length, gauge, desc) in sizes {
+        db.execute(
+            "INSERT INTO sizes (id, user_id, name, length_inches, ring_gauge, description, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+            &[&Uuid::new_v4(), user_id, &name, &length, &gauge, &desc, &now, &now],
+        ).await?;
+    }
+
+    Ok(())
 }

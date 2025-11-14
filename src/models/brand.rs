@@ -6,6 +6,7 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Brand {
     pub id: Uuid,
+    pub user_id: Uuid,
     pub name: String,
     pub description: Option<String>,
     pub country: Option<String>,

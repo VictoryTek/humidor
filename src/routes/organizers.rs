@@ -1,10 +1,10 @@
-use super::helpers::{json_body, with_db, with_uuid};
+use super::helpers::{json_body, with_current_user, with_db, with_uuid};
 use crate::handlers;
 use crate::DbPool;
 use warp::Filter;
 
 /// Create all organizer routes (brands, origins, sizes, strengths, ring gauges)
-/// These routes do not require authentication as they are reference data
+/// These routes now require authentication as they are user-specific
 pub fn create_organizer_routes(
     db_pool: DbPool,
 ) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
@@ -13,6 +13,7 @@ pub fn create_organizer_routes(
         .and(warp::path("v1"))
         .and(warp::path("brands"))
         .and(warp::get())
+        .and(with_current_user(db_pool.clone()))
         .and(with_db(db_pool.clone()))
         .and_then(handlers::get_brands);
 
@@ -20,6 +21,7 @@ pub fn create_organizer_routes(
         .and(warp::path("v1"))
         .and(warp::path("brands"))
         .and(warp::post())
+        .and(with_current_user(db_pool.clone()))
         .and(json_body())
         .and(with_db(db_pool.clone()))
         .and_then(handlers::create_brand);
@@ -29,6 +31,7 @@ pub fn create_organizer_routes(
         .and(warp::path("brands"))
         .and(with_uuid())
         .and(warp::put())
+        .and(with_current_user(db_pool.clone()))
         .and(json_body())
         .and(with_db(db_pool.clone()))
         .and_then(handlers::update_brand);
@@ -38,6 +41,7 @@ pub fn create_organizer_routes(
         .and(warp::path("brands"))
         .and(with_uuid())
         .and(warp::delete())
+        .and(with_current_user(db_pool.clone()))
         .and(with_db(db_pool.clone()))
         .and_then(handlers::delete_brand);
 
@@ -46,6 +50,7 @@ pub fn create_organizer_routes(
         .and(warp::path("v1"))
         .and(warp::path("sizes"))
         .and(warp::get())
+        .and(with_current_user(db_pool.clone()))
         .and(with_db(db_pool.clone()))
         .and_then(handlers::get_sizes);
 
@@ -53,6 +58,7 @@ pub fn create_organizer_routes(
         .and(warp::path("v1"))
         .and(warp::path("sizes"))
         .and(warp::post())
+        .and(with_current_user(db_pool.clone()))
         .and(json_body())
         .and(with_db(db_pool.clone()))
         .and_then(handlers::create_size);
@@ -62,6 +68,7 @@ pub fn create_organizer_routes(
         .and(warp::path("sizes"))
         .and(with_uuid())
         .and(warp::put())
+        .and(with_current_user(db_pool.clone()))
         .and(json_body())
         .and(with_db(db_pool.clone()))
         .and_then(handlers::update_size);
@@ -71,6 +78,7 @@ pub fn create_organizer_routes(
         .and(warp::path("sizes"))
         .and(with_uuid())
         .and(warp::delete())
+        .and(with_current_user(db_pool.clone()))
         .and(with_db(db_pool.clone()))
         .and_then(handlers::delete_size);
 
@@ -79,6 +87,7 @@ pub fn create_organizer_routes(
         .and(warp::path("v1"))
         .and(warp::path("origins"))
         .and(warp::get())
+        .and(with_current_user(db_pool.clone()))
         .and(with_db(db_pool.clone()))
         .and_then(handlers::get_origins);
 
@@ -86,6 +95,7 @@ pub fn create_organizer_routes(
         .and(warp::path("v1"))
         .and(warp::path("origins"))
         .and(warp::post())
+        .and(with_current_user(db_pool.clone()))
         .and(json_body())
         .and(with_db(db_pool.clone()))
         .and_then(handlers::create_origin);
@@ -95,6 +105,7 @@ pub fn create_organizer_routes(
         .and(warp::path("origins"))
         .and(with_uuid())
         .and(warp::put())
+        .and(with_current_user(db_pool.clone()))
         .and(json_body())
         .and(with_db(db_pool.clone()))
         .and_then(handlers::update_origin);
@@ -104,6 +115,7 @@ pub fn create_organizer_routes(
         .and(warp::path("origins"))
         .and(with_uuid())
         .and(warp::delete())
+        .and(with_current_user(db_pool.clone()))
         .and(with_db(db_pool.clone()))
         .and_then(handlers::delete_origin);
 
@@ -112,6 +124,7 @@ pub fn create_organizer_routes(
         .and(warp::path("v1"))
         .and(warp::path("strengths"))
         .and(warp::get())
+        .and(with_current_user(db_pool.clone()))
         .and(with_db(db_pool.clone()))
         .and_then(handlers::get_strengths);
 
@@ -119,6 +132,7 @@ pub fn create_organizer_routes(
         .and(warp::path("v1"))
         .and(warp::path("strengths"))
         .and(warp::post())
+        .and(with_current_user(db_pool.clone()))
         .and(json_body())
         .and(with_db(db_pool.clone()))
         .and_then(handlers::create_strength);
@@ -128,6 +142,7 @@ pub fn create_organizer_routes(
         .and(warp::path("strengths"))
         .and(with_uuid())
         .and(warp::put())
+        .and(with_current_user(db_pool.clone()))
         .and(json_body())
         .and(with_db(db_pool.clone()))
         .and_then(handlers::update_strength);
@@ -137,6 +152,7 @@ pub fn create_organizer_routes(
         .and(warp::path("strengths"))
         .and(with_uuid())
         .and(warp::delete())
+        .and(with_current_user(db_pool.clone()))
         .and(with_db(db_pool.clone()))
         .and_then(handlers::delete_strength);
 
@@ -145,6 +161,7 @@ pub fn create_organizer_routes(
         .and(warp::path("v1"))
         .and(warp::path("ring-gauges"))
         .and(warp::get())
+        .and(with_current_user(db_pool.clone()))
         .and(with_db(db_pool.clone()))
         .and_then(handlers::get_ring_gauges);
 
@@ -152,6 +169,7 @@ pub fn create_organizer_routes(
         .and(warp::path("v1"))
         .and(warp::path("ring-gauges"))
         .and(warp::post())
+        .and(with_current_user(db_pool.clone()))
         .and(json_body())
         .and(with_db(db_pool.clone()))
         .and_then(handlers::create_ring_gauge);
@@ -161,6 +179,7 @@ pub fn create_organizer_routes(
         .and(warp::path("ring-gauges"))
         .and(with_uuid())
         .and(warp::put())
+        .and(with_current_user(db_pool.clone()))
         .and(json_body())
         .and(with_db(db_pool.clone()))
         .and_then(handlers::update_ring_gauge);
@@ -170,6 +189,7 @@ pub fn create_organizer_routes(
         .and(warp::path("ring-gauges"))
         .and(with_uuid())
         .and(warp::delete())
+        .and(with_current_user(db_pool.clone()))
         .and(with_db(db_pool.clone()))
         .and_then(handlers::delete_ring_gauge);
 

@@ -496,16 +496,48 @@ async function addSampleData(token, humidorId) {
     
     // First, fetch all organizers to get their IDs
     console.log('Fetching organizers...');
+    console.log('Token being used:', token ? token.substring(0, 20) + '...' : 'MISSING');
     let brands, sizes, origins, strengths, ringGauges;
     
     try {
+        const headers = {
+            'Authorization': `Bearer ${token}`
+        };
+        
         const [brandsRes, sizesRes, originsRes, strengthsRes, ringGaugesRes] = await Promise.all([
-            fetch('/api/v1/brands'),
-            fetch('/api/v1/sizes'),
-            fetch('/api/v1/origins'),
-            fetch('/api/v1/strengths'),
-            fetch('/api/v1/ring-gauges')
+            fetch('/api/v1/brands', { headers }),
+            fetch('/api/v1/sizes', { headers }),
+            fetch('/api/v1/origins', { headers }),
+            fetch('/api/v1/strengths', { headers }),
+            fetch('/api/v1/ring-gauges', { headers })
         ]);
+        
+        // Check for errors before parsing
+        if (!brandsRes.ok) {
+            const errorText = await brandsRes.text();
+            console.error('Brands fetch failed:', brandsRes.status, errorText);
+            throw new Error(`Failed to fetch brands: ${brandsRes.status}`);
+        }
+        if (!sizesRes.ok) {
+            const errorText = await sizesRes.text();
+            console.error('Sizes fetch failed:', sizesRes.status, errorText);
+            throw new Error(`Failed to fetch sizes: ${sizesRes.status}`);
+        }
+        if (!originsRes.ok) {
+            const errorText = await originsRes.text();
+            console.error('Origins fetch failed:', originsRes.status, errorText);
+            throw new Error(`Failed to fetch origins: ${originsRes.status}`);
+        }
+        if (!strengthsRes.ok) {
+            const errorText = await strengthsRes.text();
+            console.error('Strengths fetch failed:', strengthsRes.status, errorText);
+            throw new Error(`Failed to fetch strengths: ${strengthsRes.status}`);
+        }
+        if (!ringGaugesRes.ok) {
+            const errorText = await ringGaugesRes.text();
+            console.error('Ring gauges fetch failed:', ringGaugesRes.status, errorText);
+            throw new Error(`Failed to fetch ring gauges: ${ringGaugesRes.status}`);
+        }
         
         brands = await brandsRes.json();
         sizes = await sizesRes.json();
@@ -516,7 +548,7 @@ async function addSampleData(token, humidorId) {
         console.log('✓ Organizers loaded:', { brands: brands.length, sizes: sizes.length, origins: origins.length, strengths: strengths.length, ringGauges: ringGauges.length });
     } catch (error) {
         console.error('✗ Failed to load organizers:', error);
-        showToast('Failed to load organizer data for sample cigars', 'error');
+        showToast('Failed to load organizer data for sample cigars. Authentication may have failed.', 'error');
         return;
     }
     

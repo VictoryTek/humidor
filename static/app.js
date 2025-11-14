@@ -324,15 +324,14 @@ const API = {
 const OrganizerAPI = {
     // Brand API
     async getBrands() {
-        const response = await fetch('/api/v1/brands');
+        const response = await makeAuthenticatedRequest('/api/v1/brands');
         if (!response.ok) throw new Error('Failed to fetch brands');
         return response.json();
     },
 
     async createBrand(brand) {
-        const response = await fetch('/api/v1/brands', {
+        const response = await makeAuthenticatedRequest('/api/v1/brands', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(brand)
         });
         if (!response.ok) throw new Error('Failed to create brand');
@@ -340,9 +339,8 @@ const OrganizerAPI = {
     },
 
     async updateBrand(id, brand) {
-        const response = await fetch(`/api/v1/brands/${id}`, {
+        const response = await makeAuthenticatedRequest(`/api/v1/brands/${id}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(brand)
         });
         if (!response.ok) throw new Error('Failed to update brand');
@@ -350,7 +348,7 @@ const OrganizerAPI = {
     },
 
     async deleteBrand(id) {
-        const response = await fetch(`/api/v1/brands/${id}`, {
+        const response = await makeAuthenticatedRequest(`/api/v1/brands/${id}`, {
             method: 'DELETE'
         });
         if (!response.ok) throw new Error('Failed to delete brand');
@@ -359,15 +357,14 @@ const OrganizerAPI = {
 
     // Size API
     async getSizes() {
-        const response = await fetch('/api/v1/sizes');
+        const response = await makeAuthenticatedRequest('/api/v1/sizes');
         if (!response.ok) throw new Error('Failed to fetch sizes');
         return response.json();
     },
 
     async createSize(size) {
-        const response = await fetch('/api/v1/sizes', {
+        const response = await makeAuthenticatedRequest('/api/v1/sizes', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(size)
         });
         if (!response.ok) throw new Error('Failed to create size');
@@ -375,9 +372,8 @@ const OrganizerAPI = {
     },
 
     async updateSize(id, size) {
-        const response = await fetch(`/api/v1/sizes/${id}`, {
+        const response = await makeAuthenticatedRequest(`/api/v1/sizes/${id}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(size)
         });
         if (!response.ok) throw new Error('Failed to update size');
@@ -385,7 +381,7 @@ const OrganizerAPI = {
     },
 
     async deleteSize(id) {
-        const response = await fetch(`/api/v1/sizes/${id}`, {
+        const response = await makeAuthenticatedRequest(`/api/v1/sizes/${id}`, {
             method: 'DELETE'
         });
         if (!response.ok) throw new Error('Failed to delete size');
@@ -394,15 +390,14 @@ const OrganizerAPI = {
 
     // Origin API
     async getOrigins() {
-        const response = await fetch('/api/v1/origins');
+        const response = await makeAuthenticatedRequest('/api/v1/origins');
         if (!response.ok) throw new Error('Failed to fetch origins');
         return response.json();
     },
 
     async createOrigin(origin) {
-        const response = await fetch('/api/v1/origins', {
+        const response = await makeAuthenticatedRequest('/api/v1/origins', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(origin)
         });
         if (!response.ok) throw new Error('Failed to create origin');
@@ -410,9 +405,8 @@ const OrganizerAPI = {
     },
 
     async updateOrigin(id, origin) {
-        const response = await fetch(`/api/v1/origins/${id}`, {
+        const response = await makeAuthenticatedRequest(`/api/v1/origins/${id}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(origin)
         });
         if (!response.ok) throw new Error('Failed to update origin');
@@ -420,7 +414,7 @@ const OrganizerAPI = {
     },
 
     async deleteOrigin(id) {
-        const response = await fetch(`/api/v1/origins/${id}`, {
+        const response = await makeAuthenticatedRequest(`/api/v1/origins/${id}`, {
             method: 'DELETE'
         });
         if (!response.ok) throw new Error('Failed to delete origin');
@@ -429,15 +423,14 @@ const OrganizerAPI = {
 
     // Strength API
     async getStrengths() {
-        const response = await fetch('/api/v1/strengths');
+        const response = await makeAuthenticatedRequest('/api/v1/strengths');
         if (!response.ok) throw new Error('Failed to fetch strengths');
         return response.json();
     },
 
     async createStrength(strength) {
-        const response = await fetch('/api/v1/strengths', {
+        const response = await makeAuthenticatedRequest('/api/v1/strengths', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(strength)
         });
         if (!response.ok) throw new Error('Failed to create strength');
@@ -445,9 +438,8 @@ const OrganizerAPI = {
     },
 
     async updateStrength(id, strength) {
-        const response = await fetch(`/api/v1/strengths/${id}`, {
+        const response = await makeAuthenticatedRequest(`/api/v1/strengths/${id}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(strength)
         });
         if (!response.ok) throw new Error('Failed to update strength');
@@ -455,7 +447,7 @@ const OrganizerAPI = {
     },
 
     async deleteStrength(id) {
-        const response = await fetch(`/api/v1/strengths/${id}`, {
+        const response = await makeAuthenticatedRequest(`/api/v1/strengths/${id}`, {
             method: 'DELETE'
         });
         if (!response.ok) throw new Error('Failed to delete strength');
@@ -464,15 +456,14 @@ const OrganizerAPI = {
 
     // Ring Gauge API
     async getRingGauges() {
-        const response = await fetch('/api/v1/ring-gauges');
+        const response = await makeAuthenticatedRequest('/api/v1/ring-gauges');
         if (!response.ok) throw new Error('Failed to fetch ring gauges');
         return response.json();
     },
 
     async createRingGauge(ringGauge) {
-        const response = await fetch('/api/v1/ring-gauges', {
+        const response = await makeAuthenticatedRequest('/api/v1/ring-gauges', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(ringGauge)
         });
         if (!response.ok) throw new Error('Failed to create ring gauge');
@@ -480,9 +471,8 @@ const OrganizerAPI = {
     },
 
     async updateRingGauge(id, ringGauge) {
-        const response = await fetch(`/api/v1/ring-gauges/${id}`, {
+        const response = await makeAuthenticatedRequest(`/api/v1/ring-gauges/${id}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(ringGauge)
         });
         if (!response.ok) throw new Error('Failed to update ring gauge');
@@ -490,7 +480,7 @@ const OrganizerAPI = {
     },
 
     async deleteRingGauge(id) {
-        const response = await fetch(`/api/v1/ring-gauges/${id}`, {
+        const response = await makeAuthenticatedRequest(`/api/v1/ring-gauges/${id}`, {
             method: 'DELETE'
         });
         if (!response.ok) throw new Error('Failed to delete ring gauge');
@@ -2302,10 +2292,10 @@ function applySearchAndFilters() {
     if (searchQuery) {
         const query = searchQuery.toLowerCase();
         filteredCigars = filteredCigars.filter(cigar => 
-            getBrandName(cigar.brand_id)?.toLowerCase().includes(query) ||
+            (cigar.brand_name || getBrandName(cigar.brand_id))?.toLowerCase().includes(query) ||
             cigar.name?.toLowerCase().includes(query) ||
-            getSizeName(cigar.size_id)?.toLowerCase().includes(query) ||
-            getOriginName(cigar.origin_id)?.toLowerCase().includes(query) ||
+            (cigar.size_name || getSizeName(cigar.size_id))?.toLowerCase().includes(query) ||
+            (cigar.origin_name || getOriginName(cigar.origin_id))?.toLowerCase().includes(query) ||
             cigar.wrapper?.toLowerCase().includes(query) ||
             cigar.notes?.toLowerCase().includes(query)
         );
@@ -2314,35 +2304,35 @@ function applySearchAndFilters() {
     // Apply brand filter (comparing brand names)
     if (selectedBrands.length > 0) {
         filteredCigars = filteredCigars.filter(cigar => 
-            selectedBrands.includes(getBrandName(cigar.brand_id))
+            selectedBrands.includes(cigar.brand_name || getBrandName(cigar.brand_id))
         );
     }
     
     // Apply size filter (comparing size names)
     if (selectedSizes.length > 0) {
         filteredCigars = filteredCigars.filter(cigar => 
-            selectedSizes.includes(getSizeName(cigar.size_id))
+            selectedSizes.includes(cigar.size_name || getSizeName(cigar.size_id))
         );
     }
     
     // Apply origin filter (comparing origin names)
     if (selectedOrigins.length > 0) {
         filteredCigars = filteredCigars.filter(cigar => 
-            selectedOrigins.includes(getOriginName(cigar.origin_id))
+            selectedOrigins.includes(cigar.origin_name || getOriginName(cigar.origin_id))
         );
     }
     
     // Apply strength filter (comparing strength names)
     if (selectedStrengths.length > 0) {
         filteredCigars = filteredCigars.filter(cigar => 
-            selectedStrengths.includes(getStrengthName(cigar.strength_id))
+            selectedStrengths.includes(cigar.strength_name || getStrengthName(cigar.strength_id))
         );
     }
     
     // Apply ring gauge filter (comparing ring gauge values as strings)
     if (selectedRingGauges.length > 0) {
         filteredCigars = filteredCigars.filter(cigar => 
-            selectedRingGauges.includes(getRingGaugeName(cigar.ring_gauge_id))
+            selectedRingGauges.includes(String(cigar.ring_gauge) || getRingGaugeName(cigar.ring_gauge_id))
         );
     }
     
@@ -2597,8 +2587,8 @@ function createHumidorSection(humidor, humidorCigars) {
 }
 
 function createCigarCard(cigar) {
-    // Use helper functions to resolve IDs to names
-    const brandName = getBrandName(cigar.brand_id);
+    // Use brand_name from API response (for shared humidors), fallback to lookup
+    const brandName = cigar.brand_name || getBrandName(cigar.brand_id);
     const isOutOfStock = !cigar.is_active;
     
     console.log(`→ Creating card for "${cigar.name}" with image_url:`, cigar.image_url, 'is_active:', cigar.is_active);
@@ -2699,17 +2689,17 @@ function openReportCard(cigarId) {
     image.src = cigar.image_url || '/static/cigar-placeholder.png';
     
     // Set brand and name
-    document.getElementById('reportCardBrand').textContent = getBrandName(cigar.brand_id);
+    document.getElementById('reportCardBrand').textContent = cigar.brand_name || getBrandName(cigar.brand_id);
     document.getElementById('reportCardName').textContent = cigar.name;
     
     // Set details
     const humidor = humidors.find(h => h.id === cigar.humidor_id);
     document.getElementById('reportCardHumidor').textContent = humidor ? humidor.name : '-';
     document.getElementById('reportCardQuantity').textContent = cigar.quantity || '-';
-    document.getElementById('reportCardSize').textContent = getSizeName(cigar.size_id);
-    document.getElementById('reportCardRingGauge').textContent = getRingGaugeName(cigar.ring_gauge_id);
-    document.getElementById('reportCardStrength').textContent = getStrengthName(cigar.strength_id);
-    document.getElementById('reportCardOrigin').textContent = getOriginName(cigar.origin_id);
+    document.getElementById('reportCardSize').textContent = cigar.size_name || getSizeName(cigar.size_id);
+    document.getElementById('reportCardRingGauge').textContent = cigar.ring_gauge || getRingGaugeName(cigar.ring_gauge_id);
+    document.getElementById('reportCardStrength').textContent = cigar.strength_name || getStrengthName(cigar.strength_id);
+    document.getElementById('reportCardOrigin').textContent = cigar.origin_name || getOriginName(cigar.origin_id);
     document.getElementById('reportCardPrice').textContent = cigar.price ? `$${parseFloat(cigar.price).toFixed(2)}` : '-';
     
     // Format purchase date

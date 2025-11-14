@@ -3,9 +3,9 @@ use serde_json::json;
 use uuid::Uuid;
 use warp::{Rejection, Reply};
 
-use crate::{errors::AppError, models::*, validation::Validate, DbPool};
+use crate::{errors::AppError, middleware::AuthContext, models::*, validation::Validate, DbPool};
 
-pub async fn get_sizes(pool: DbPool) -> Result<impl Reply, Rejection> {
+pub async fn get_sizes(auth: AuthContext, pool: DbPool) -> Result<impl Reply, Rejection> {
     let db = pool.get().await.map_err(|e| {
         tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError(
@@ -14,20 +14,21 @@ pub async fn get_sizes(pool: DbPool) -> Result<impl Reply, Rejection> {
     })?;
 
     match db.query(
-        "SELECT id, name, length_inches, ring_gauge, description, created_at, updated_at FROM sizes ORDER BY name ASC",
-        &[]
+        "SELECT id, user_id, name, length_inches, ring_gauge, description, created_at, updated_at FROM sizes WHERE user_id = $1 ORDER BY name ASC",
+        &[&auth.user_id]
     ).await {
         Ok(rows) => {
             let mut sizes = Vec::new();
             for row in rows {
                 let size = Size {
                     id: row.get(0),
-                    name: row.get(1),
-                    length_inches: row.get(2),
-                    ring_gauge: row.get(3),
-                    description: row.get(4),
-                    created_at: row.get(5),
-                    updated_at: row.get(6),
+                    user_id: row.get(1),
+                    name: row.get(2),
+                    length_inches: row.get(3),
+                    ring_gauge: row.get(4),
+                    description: row.get(5),
+                    created_at: row.get(6),
+                    updated_at: row.get(7),
                 };
                 sizes.push(size);
             }
@@ -40,7 +41,11 @@ pub async fn get_sizes(pool: DbPool) -> Result<impl Reply, Rejection> {
     }
 }
 
-pub async fn create_size(create_size: CreateSize, pool: DbPool) -> Result<impl Reply, Rejection> {
+pub async fn create_size(
+    auth: AuthContext,
+    create_size: CreateSize,
+    pool: DbPool,
+) -> Result<impl Reply, Rejection> {
     // Validate input
     create_size.validate().map_err(warp::reject::custom)?;
 
@@ -55,20 +60,21 @@ pub async fn create_size(create_size: CreateSize, pool: DbPool) -> Result<impl R
     })?;
 
     match db.query_one(
-        "INSERT INTO sizes (id, name, length_inches, ring_gauge, description, created_at, updated_at) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7) 
-         RETURNING id, name, length_inches, ring_gauge, description, created_at, updated_at",
-        &[&id, &create_size.name, &create_size.length_inches, &create_size.ring_gauge, &create_size.description, &now, &now]
+        "INSERT INTO sizes (id, user_id, name, length_inches, ring_gauge, description, created_at, updated_at) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+         RETURNING id, user_id, name, length_inches, ring_gauge, description, created_at, updated_at",
+        &[&id, &auth.user_id, &create_size.name, &create_size.length_inches, &create_size.ring_gauge, &create_size.description, &now, &now]
     ).await {
         Ok(row) => {
             let size = Size {
                 id: row.get(0),
-                name: row.get(1),
-                length_inches: row.get(2),
-                ring_gauge: row.get(3),
-                description: row.get(4),
-                created_at: row.get(5),
-                updated_at: row.get(6),
+                user_id: row.get(1),
+                name: row.get(2),
+                length_inches: row.get(3),
+                ring_gauge: row.get(4),
+                description: row.get(5),
+                created_at: row.get(6),
+                updated_at: row.get(7),
             };
             Ok(warp::reply::json(&size))
         }
@@ -81,6 +87,7 @@ pub async fn create_size(create_size: CreateSize, pool: DbPool) -> Result<impl R
 
 pub async fn update_size(
     id: Uuid,
+    auth: AuthContext,
     update_size: UpdateSize,
     pool: DbPool,
 ) -> Result<impl Reply, Rejection> {
@@ -97,15 +104,15 @@ pub async fn update_size(
     })?;
 
     match db
-        .query_one(
+        .query_opt(
             "UPDATE sizes SET 
          name = COALESCE($2, name),
          length_inches = COALESCE($3, length_inches),
          ring_gauge = COALESCE($4, ring_gauge),
          description = COALESCE($5, description),
          updated_at = $6
-         WHERE id = $1
-         RETURNING id, name, length_inches, ring_gauge, description, created_at, updated_at",
+         WHERE id = $1 AND user_id = $7
+         RETURNING id, user_id, name, length_inches, ring_gauge, description, created_at, updated_at",
             &[
                 &id,
                 &update_size.name,
@@ -113,21 +120,26 @@ pub async fn update_size(
                 &update_size.ring_gauge,
                 &update_size.description,
                 &now,
+                &auth.user_id,
             ],
         )
         .await
     {
-        Ok(row) => {
+        Ok(Some(row)) => {
             let size = Size {
                 id: row.get(0),
-                name: row.get(1),
-                length_inches: row.get(2),
-                ring_gauge: row.get(3),
-                description: row.get(4),
-                created_at: row.get(5),
-                updated_at: row.get(6),
+                user_id: row.get(1),
+                name: row.get(2),
+                length_inches: row.get(3),
+                ring_gauge: row.get(4),
+                description: row.get(5),
+                created_at: row.get(6),
+                updated_at: row.get(7),
             };
             Ok(warp::reply::json(&size))
+        }
+        Ok(None) => {
+            Ok(warp::reply::json(&json!({"error": "Size not found or unauthorized"})))
         }
         Err(e) => {
             tracing::error!(error = %e, "Database error");
@@ -138,7 +150,11 @@ pub async fn update_size(
     }
 }
 
-pub async fn delete_size(id: Uuid, pool: DbPool) -> Result<impl Reply, Rejection> {
+pub async fn delete_size(
+    id: Uuid,
+    auth: AuthContext,
+    pool: DbPool,
+) -> Result<impl Reply, Rejection> {
     let db = pool.get().await.map_err(|e| {
         tracing::error!(error = %e, "Failed to get database connection");
         warp::reject::custom(AppError::DatabaseError(
@@ -146,14 +162,22 @@ pub async fn delete_size(id: Uuid, pool: DbPool) -> Result<impl Reply, Rejection
         ))
     })?;
 
-    match db.execute("DELETE FROM sizes WHERE id = $1", &[&id]).await {
+    match db
+        .execute(
+            "DELETE FROM sizes WHERE id = $1 AND user_id = $2",
+            &[&id, &auth.user_id],
+        )
+        .await
+    {
         Ok(rows_affected) => {
             if rows_affected > 0 {
                 Ok(warp::reply::json(
                     &json!({"message": "Size deleted successfully"}),
                 ))
             } else {
-                Ok(warp::reply::json(&json!({"error": "Size not found"})))
+                Ok(warp::reply::json(
+                    &json!({"error": "Size not found or unauthorized"}),
+                ))
             }
         }
         Err(e) => {
