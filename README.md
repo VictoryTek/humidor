@@ -12,8 +12,31 @@ This project was started because I am a homelabber and couldn't find anything to
 ## Features
 
 - **Inventory Management**: Add, edit, and delete cigars from your collection
+- **Humidor Organization**: Organize cigars into multiple humidors
+- **User Permissions**: Admin and standard user roles with proper access control
+- **Humidor Sharing**: Share your humidors with other users (view/edit/full permissions)
+- **Favorites & Wish Lists**: Mark favorite cigars and maintain a wish list
 - **Search & Filter**: Find cigars by brand, strength, origin, or search terms
 - **Mobile-Friendly**: Responsive design for phones and tablets
+- **Multi-User Support**: Complete data isolation with secure sharing
+
+## Documentation
+
+📚 **[Documentation Hub](docs/README.md)** - Complete documentation index
+
+**User Documentation:**
+- [User Guide](docs/USER_GUIDE.md) - Getting started and usage
+- [Humidor Sharing](docs/SHARING.md) - Share your collection with others
+- [User Permissions](docs/PERMISSIONS.md) - Roles and access control
+
+**Administrator Documentation:**
+- [Admin Guide](docs/ADMIN_GUIDE.md) - User management and administration
+- [Security Model](docs/SECURITY_MODEL.md) - Security architecture
+
+**Developer Documentation:**
+- [API Documentation](docs/API.md) - REST API reference
+- [Database Migrations](docs/MIGRATIONS.md) - Schema management
+- [Security Audit Report](docs/SECURITY_AUDIT_2025-01-11.md) - Security review
 
 ## Quick Start
 
