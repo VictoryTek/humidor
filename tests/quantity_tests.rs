@@ -324,9 +324,9 @@ async fn test_concurrent_quantity_updates() {
             async move {
                 // Add a small stagger to reduce contention
                 tokio::time::sleep(tokio::time::Duration::from_millis(i as u64 * 10)).await;
-                
+
                 let client = pool.get().await.unwrap();
-                
+
                 // Retry logic for transient issues
                 let mut retries = 0;
                 loop {
@@ -344,7 +344,10 @@ async fn test_concurrent_quantity_updates() {
                             tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
                             continue;
                         }
-                        Ok(_) => panic!("Update {} affected 0 rows after {} retries - cigar not found", i, retries),
+                        Ok(_) => panic!(
+                            "Update {} affected 0 rows after {} retries - cigar not found",
+                            i, retries
+                        ),
                         Err(e) => panic!("Update {} failed: {:?}", i, e),
                     }
                 }
