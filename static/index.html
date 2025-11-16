@@ -10,9 +10,11 @@
     <link rel="stylesheet" href="static/styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css">
+    <link rel="stylesheet" href="static/fonts/mdi-local.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css" crossorigin="anonymous">
 </head>
 <body>
     <div id="app">
@@ -993,11 +995,13 @@
                 <button class="close-btn" id="closeCigarModal">&times;</button>
             </div>
             
+            <!-- Import from URL feature temporarily disabled
             <div class="import-url-section">
                 <button type="button" class="btn-secondary" id="importFromUrlBtn">
                     🔗 Import from URL
                 </button>
             </div>
+            -->
             
             <form id="cigarForm" class="cigar-form">
                 <div class="form-grid">
@@ -1108,9 +1112,33 @@
                 <div class="form-group">
                     <input type="url" id="importUrl" placeholder="https://www.cigarsinternational.com/p/..." class="url-input">
                 </div>
+                
+                <!-- Show after successful scrape -->
+                <div id="importDestination" style="display: none;">
+                    <div class="form-group">
+                        <label for="importLocation">Add to:</label>
+                        <select id="importLocation" class="form-control">
+                            <option value="">Select destination...</option>
+                            <option value="humidor">Humidor</option>
+                            <option value="wishlist">Wish List</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group" id="importHumidorGroup" style="display: none;">
+                        <label for="importHumidor">Select Humidor:</label>
+                        <select id="importHumidor" class="form-control"></select>
+                    </div>
+                    
+                    <div class="form-group" id="importQuantityGroup" style="display: none;">
+                        <label for="importQuantity">Quantity:</label>
+                        <input type="number" id="importQuantity" min="1" value="1" class="form-control">
+                    </div>
+                </div>
+                
                 <div id="importStatus" class="import-status"></div>
                 <div class="form-actions">
-                    <button type="button" class="btn-primary" id="startImportBtn">Import</button>
+                    <button type="button" class="btn-primary" id="startImportBtn">Scrape Cigar Info</button>
+                    <button type="button" class="btn-primary" id="confirmImportBtn" style="display: none;">Add Cigar</button>
                 </div>
             </div>
         </div>

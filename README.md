@@ -2,7 +2,7 @@
   <img src="static/logo.png" alt="Humidor Logo" width="150" height="150">
   <h1>Humidor</h1>
   <p><em>Cigar Inventory Management System</em></p>
-  <p><em>** WORK IN PROGRESS **</em></p>
+  <p><strong>Version 1.0.0 Release Candidate 1</strong></p>
 </div>
 
 Heavily inspired by Mealie. 
@@ -42,17 +42,53 @@ This project was started because I am a homelabber and couldn't find anything to
 
 ### Docker Compose (Recommended)
 
+The simplest way to run Humidor with default settings:
+
 ```bash
 docker-compose up --build
 ```
 
-This single command spins up the entire stack:
-- PostgreSQL 15 database (port 5432)
+This single command spins up the entire stack with sensible defaults:
+- PostgreSQL 17 database (port 5432)
 - Humidor web application (port 9898)
 - Persistent volume for database storage
 - Automatic health checks and service dependencies
 
 Access the application at `http://localhost:9898`
+
+**Default Credentials:**
+- Database: `humidor_user` / `humidor_pass`
+- First user: Created during setup wizard on first launch
+
+**Production Configuration:**
+
+For production, override defaults using environment variables in a `.env` file:
+
+```bash
+# Database Configuration
+POSTGRES_DB=humidor_db
+POSTGRES_USER=your_db_user
+POSTGRES_PASSWORD=your_secure_password
+
+# Application Configuration
+PORT=9898
+RUST_LOG=info
+ALLOWED_ORIGINS=https://your-domain.com
+JWT_SECRET=your-long-random-secret-key-here
+
+# Optional Email Configuration
+BASE_URL=https://your-domain.com
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASSWORD=your-app-password
+SMTP_FROM_EMAIL=noreply@your-domain.com
+```
+
+Then run:
+```bash
+docker-compose up -d
+```
 
 ### Docker Run (Manual)
 
@@ -64,6 +100,8 @@ docker run -d --name humidor -p 9898:9898 -e DATABASE_URL=postgresql://humidor_u
 
 ## Docker Compose File
 
+The docker-compose.yml uses environment variables with sensible defaults for easy deployment:
+
 ```yaml
 name: humidor
 
@@ -71,15 +109,15 @@ services:
   db:
     image: postgres:17
     environment:
-      POSTGRES_DB: humidor_db
-      POSTGRES_USER: humidor_user
-      POSTGRES_PASSWORD: humidor_pass
+      POSTGRES_DB: ${POSTGRES_DB:-humidor_db}
+      POSTGRES_USER: ${POSTGRES_USER:-humidor_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-humidor_pass}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U humidor_user -d humidor_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-humidor_user} -d ${POSTGRES_DB:-humidor_db}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -87,9 +125,12 @@ services:
   web:
     build: .
     environment:
-      DATABASE_URL: postgresql://humidor_user:humidor_pass@db:5432/humidor_db
-      RUST_LOG: info
-      PORT: 9898
+      DATABASE_URL: postgresql://${POSTGRES_USER:-humidor_user}:${POSTGRES_PASSWORD:-humidor_pass}@db:5432/${POSTGRES_DB:-humidor_db}
+      RUST_LOG: ${RUST_LOG:-info}
+      PORT: ${PORT:-9898}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:9898,http://127.0.0.1:9898}
+      JWT_SECRET: ${JWT_SECRET:-}
+      JWT_TOKEN_LIFETIME_HOURS: ${JWT_TOKEN_LIFETIME_HOURS:-2}
     ports:
       - "9898:9898"
     depends_on:
@@ -102,14 +143,18 @@ volumes:
 
 ## Environment Variables
 
-The following environment variables can be configured:
+The following environment variables can be configured (all have sensible defaults):
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `DATABASE_URL` | Yes | - | PostgreSQL connection string (e.g., `postgresql://user:pass@host:5432/dbname`) |
+| `POSTGRES_DB` | No | `humidor_db` | PostgreSQL database name |
+| `POSTGRES_USER` | No | `humidor_user` | PostgreSQL username |
+| `POSTGRES_PASSWORD` | No | `humidor_pass` | PostgreSQL password |
+| `DATABASE_URL` | Auto | Auto-generated | Full PostgreSQL connection string |
 | `PORT` | No | `9898` | Port for the web server to listen on |
 | `RUST_LOG` | No | `info` | Logging level (`trace`, `debug`, `info`, `warn`, `error`) |
-| `JWT_SECRET` | Yes* | - | Secret key for JWT token signing (auto-generated if not provided) |
+| `JWT_SECRET` | No | Auto-generated | Secret key for JWT token signing (auto-generated if not provided) |
+| `JWT_TOKEN_LIFETIME_HOURS` | No | `2` | JWT token lifetime in hours |
 | `BASE_URL` | No | `http://localhost:9898` | Base URL for the application (used in password reset emails) |
 | `ALLOWED_ORIGINS` | No | `http://localhost:9898,http://127.0.0.1:9898` | Comma-separated list of allowed CORS origins |
 | `SMTP_HOST` | No | - | SMTP server hostname for sending emails (optional) |
@@ -118,7 +163,7 @@ The following environment variables can be configured:
 | `SMTP_PASSWORD` | No | - | SMTP authentication password |
 | `SMTP_FROM_EMAIL` | No | - | Email address to send from |
 
-**Note**: Variables marked with * are required for production but can be auto-generated in development.
+**Note**: For production deployments, always override the default database credentials and JWT secret!
 
 ### Password Reset Email Configuration
 
@@ -136,11 +181,18 @@ See [docs/PASSWORD_RESET_README.md](docs/PASSWORD_RESET_README.md) for detailed 
 - **Frontend**: HTML, CSS, JavaScript
 - **Deployment**: Docker & Docker Compose
 
-## Security
+## Security Considerations
+## Security Considerations
 
-This application uses **Docker Compose secrets** for sensitive data like database credentials and JWT signing keys. See [DOCKER_SECRETS.md](DOCKER_SECRETS.md) for detailed setup instructions.
+**Default Credentials:** The default database credentials (`humidor_user`/`humidor_pass`) are intended for development only.
 
-For production deployments, consider using:
-- Docker Swarm secrets
-- Kubernetes secrets
-- Cloud provider secret managers (AWS Secrets Manager, Azure Key Vault, etc.)
+**Production Recommendations:**
+- Use strong, unique passwords for database access
+- Set a secure `JWT_SECRET` (minimum 32 characters)
+- Configure HTTPS/TLS with a reverse proxy (nginx, Traefik, Caddy)
+- Use Docker Swarm secrets, Kubernetes secrets, or cloud provider secret managers (AWS Secrets Manager, Azure Key Vault, etc.)
+- Restrict `ALLOWED_ORIGINS` to your actual domain(s)
+- Enable firewall rules to restrict database port access
+- Regular security updates and backups
+
+See [Security Model](docs/SECURITY_MODEL.md) for detailed security architecture.

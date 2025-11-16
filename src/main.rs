@@ -390,8 +390,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         })
     }
 
-    // Serve static files
-    let static_files = warp::path("static").and(warp::fs::dir("static"));
+    // Serve static files with cache headers
+    let static_files = warp::path("static")
+        .and(warp::fs::dir("static"))
+        .with(warp::reply::with::header(
+            "Cache-Control",
+            "public, max-age=31536000, immutable"
+        ));
 
     // Create all API routes using route modules
     let auth_routes = routes::create_auth_routes(db_pool.clone(), rate_limiter.clone()).boxed();

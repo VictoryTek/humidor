@@ -20,6 +20,9 @@ let ringGauges = [];
 let currentOrganizer = null;
 let isEditingOrganizer = false;
 
+// Import State
+let scrapedCigarData = null;
+
 // Search and Filter State
 let searchQuery = '';
 let selectedBrands = [];
@@ -1327,12 +1330,17 @@ function openImportUrlModal() {
     modal.classList.add('show');
     document.getElementById('importUrl').value = '';
     document.getElementById('importStatus').innerHTML = '';
+    document.getElementById('importDestination').style.display = 'none';
+    document.getElementById('startImportBtn').style.display = 'inline-block';
+    document.getElementById('confirmImportBtn').style.display = 'none';
+    scrapedCigarData = null;
     document.getElementById('importUrl').focus();
 }
 
 function closeImportUrlModal() {
     const modal = document.getElementById('importUrlModal');
     modal.classList.remove('show');
+    scrapedCigarData = null;
 }
 
 async function importFromUrl() {
@@ -1370,32 +1378,238 @@ async function importFromUrl() {
         
         if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.message || 'Failed to scrape URL');
+            throw new Error(error.error || 'Failed to scrape URL');
         }
         
-        const cigarData = await response.json();
+        scrapedCigarData = await response.json();
+        console.log('Scraped cigar data:', scrapedCigarData);
         
-        // Populate the cigar form with scraped data
-        if (cigarData.brand) document.getElementById('cigarBrand').value = cigarData.brand;
-        if (cigarData.name) document.getElementById('cigarName').value = cigarData.name;
-        if (cigarData.size) document.getElementById('cigarSize').value = cigarData.size;
-        if (cigarData.ring_gauge) document.getElementById('cigarRingGauge').value = cigarData.ring_gauge;
-        if (cigarData.strength) document.getElementById('cigarStrength').value = cigarData.strength;
-        if (cigarData.origin) document.getElementById('cigarOrigin').value = cigarData.origin;
+        // Build a summary of what was found
+        let summary = '<div class="scraped-summary"><strong>Found:</strong><ul>';
+        if (scrapedCigarData.brand) summary += `<li>Brand: ${scrapedCigarData.brand}</li>`;
+        if (scrapedCigarData.name) summary += `<li>Name: ${scrapedCigarData.name}</li>`;
+        if (scrapedCigarData.size) summary += `<li>Size: ${scrapedCigarData.size}</li>`;
+        if (scrapedCigarData.ring_gauge) summary += `<li>Ring Gauge: ${scrapedCigarData.ring_gauge}</li>`;
+        if (scrapedCigarData.strength) summary += `<li>Strength: ${scrapedCigarData.strength}</li>`;
+        if (scrapedCigarData.origin) summary += `<li>Origin: ${scrapedCigarData.origin}</li>`;
+        summary += '</ul></div>';
         
-        // Show success message
-        statusDiv.innerHTML = '<p class="success-message"><i class="mdi mdi-check-circle"></i> Cigar information imported successfully!</p>';
+        statusDiv.innerHTML = `<p class="success-message"><i class="mdi mdi-check-circle"></i> Successfully scraped cigar information!</p>${summary}`;
         
-        // Close the import modal after a short delay
-        setTimeout(() => {
-            closeImportUrlModal();
-        }, 1500);
+        // Show destination selection
+        document.getElementById('importDestination').style.display = 'block';
+        document.getElementById('startImportBtn').style.display = 'none';
+        document.getElementById('confirmImportBtn').style.display = 'inline-block';
+        
+        // Populate humidor dropdown
+        await populateImportHumidorDropdown();
         
     } catch (error) {
         console.error('Import error:', error);
         statusDiv.innerHTML = `<p class="error-message"><i class="mdi mdi-alert-circle"></i> ${error.message}</p>`;
     } finally {
         importBtn.disabled = false;
+    }
+}
+
+async function populateImportHumidorDropdown() {
+    const humidorSelect = document.getElementById('importHumidor');
+    humidorSelect.innerHTML = '<option value="">Select humidor...</option>';
+    
+    humidors.forEach(humidor => {
+        const option = document.createElement('option');
+        option.value = humidor.id;
+        option.textContent = humidor.name;
+        humidorSelect.appendChild(option);
+    });
+}
+
+async function confirmImport() {
+    const location = document.getElementById('importLocation').value;
+    const statusDiv = document.getElementById('importStatus');
+    const confirmBtn = document.getElementById('confirmImportBtn');
+    
+    if (!location) {
+        statusDiv.innerHTML = '<p class="error-message">Please select where to add this cigar</p>';
+        return;
+    }
+    
+    if (location === 'humidor') {
+        const humidorId = document.getElementById('importHumidor').value;
+        if (!humidorId) {
+            statusDiv.innerHTML = '<p class="error-message">Please select a humidor</p>';
+            return;
+        }
+        
+        const quantity = parseInt(document.getElementById('importQuantity').value) || 1;
+        await createCigarFromScrapedData(humidorId, quantity, false);
+    } else if (location === 'wishlist') {
+        await createCigarFromScrapedData(null, null, true);
+    }
+}
+
+async function createCigarFromScrapedData(humidorId, quantity, isWishList) {
+    const statusDiv = document.getElementById('importStatus');
+    const confirmBtn = document.getElementById('confirmImportBtn');
+    
+    try {
+        confirmBtn.disabled = true;
+        statusDiv.innerHTML = '<p class="loading-message"><i class="mdi mdi-loading mdi-spin"></i> Creating cigar...</p>';
+        
+        // Find or create organizer IDs
+        const brandId = await findOrCreateOrganizer('brand', scrapedCigarData.brand);
+        const sizeId = await findOrCreateOrganizer('size', scrapedCigarData.size);
+        const strengthId = await findOrCreateOrganizer('strength', scrapedCigarData.strength);
+        const originId = await findOrCreateOrganizer('origin', scrapedCigarData.origin);
+        const ringGaugeId = await findOrCreateRingGauge(scrapedCigarData.ring_gauge);
+        
+        const cigarData = {
+            name: scrapedCigarData.name || 'Unknown',
+            brand_id: brandId,
+            size_id: sizeId,
+            strength_id: strengthId,
+            origin_id: originId,
+            ring_gauge_id: ringGaugeId,
+            humidor_id: humidorId,
+            quantity: quantity || null,
+            is_wish_list: isWishList
+        };
+        
+        console.log('Creating cigar with data:', cigarData);
+        
+        const response = await makeAuthenticatedRequest('/api/v1/cigars', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(cigarData)
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to create cigar');
+        }
+        
+        const newCigar = await response.json();
+        console.log('Created cigar:', newCigar);
+        
+        showToast('Cigar added successfully!', 'success');
+        closeImportUrlModal();
+        
+        // Refresh the appropriate view
+        if (isWishList) {
+            await loadWishList();
+        } else if (humidorId) {
+            // Reload the humidor detail view to show the new cigar
+            await showHumidorDetail(humidorId);
+        }
+        
+    } catch (error) {
+        console.error('Error creating cigar:', error);
+        statusDiv.innerHTML = `<p class="error-message"><i class="mdi mdi-alert-circle"></i> ${error.message}</p>`;
+    } finally {
+        confirmBtn.disabled = false;
+    }
+}
+
+async function findOrCreateOrganizer(type, name) {
+    if (!name) return null;
+    
+    // Map type to collection and endpoint
+    const typeMap = {
+        'brand': { collection: brands, endpoint: 'brands' },
+        'size': { collection: sizes, endpoint: 'sizes' },
+        'strength': { collection: strengths, endpoint: 'strengths' },
+        'origin': { collection: origins, endpoint: 'origins' }
+    };
+    
+    const config = typeMap[type];
+    if (!config) return null;
+    
+    // Check if it already exists (case-insensitive)
+    const existing = config.collection.find(
+        item => item.name.toLowerCase() === name.toLowerCase()
+    );
+    
+    if (existing) {
+        console.log(`Found existing ${type}:`, existing.name, '-> ID:', existing.id);
+        return existing.id;
+    }
+    
+    // Create new organizer
+    try {
+        console.log(`Creating new ${type}:`, name);
+        const response = await makeAuthenticatedRequest(`/api/v1/${config.endpoint}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ name })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Failed to create ${type}`);
+        }
+        
+        const newOrganizer = await response.json();
+        console.log(`Created ${type}:`, newOrganizer.name, '-> ID:', newOrganizer.id);
+        
+        // Add to local collection
+        config.collection.push(newOrganizer);
+        
+        return newOrganizer.id;
+    } catch (error) {
+        console.error(`Error creating ${type}:`, error);
+        return null;
+    }
+}
+
+async function findOrCreateRingGauge(gaugeValue) {
+    if (!gaugeValue) return null;
+    
+    // Parse the gauge number
+    const gaugeNum = parseInt(gaugeValue);
+    if (isNaN(gaugeNum)) return null;
+    
+    // Validate range (backend requires 20-100)
+    if (gaugeNum < 20 || gaugeNum > 100) {
+        console.log(`Ring gauge ${gaugeNum} is outside valid range (20-100), skipping`);
+        return null;
+    }
+    
+    // Check if it already exists
+    const existing = ringGauges.find(rg => rg.gauge === gaugeNum);
+    
+    if (existing) {
+        console.log('Found existing ring gauge:', existing.gauge, '-> ID:', existing.id);
+        return existing.id;
+    }
+    
+    // Create new ring gauge
+    try {
+        console.log('Creating new ring gauge:', gaugeNum);
+        const response = await makeAuthenticatedRequest('/api/v1/ring-gauges', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ gauge: gaugeNum })
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to create ring gauge');
+        }
+        
+        const newRingGauge = await response.json();
+        console.log('Created ring gauge:', newRingGauge.gauge, '-> ID:', newRingGauge.id);
+        
+        // Add to local collection
+        ringGauges.push(newRingGauge);
+        
+        return newRingGauge.id;
+    } catch (error) {
+        console.error('Error creating ring gauge:', error);
+        return null;
     }
 }
 
@@ -1515,6 +1729,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const importFromUrlBtn = document.getElementById('importFromUrlBtn');
     const closeImportUrlBtn = document.getElementById('closeImportUrlModal');
     const startImportBtn = document.getElementById('startImportBtn');
+    const confirmImportBtn = document.getElementById('confirmImportBtn');
+    const importLocation = document.getElementById('importLocation');
     const importUrlModal = document.getElementById('importUrlModal');
     const importUrlInput = document.getElementById('importUrl');
     
@@ -1526,6 +1742,26 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     if (startImportBtn) {
         startImportBtn.addEventListener('click', importFromUrl);
+    }
+    if (confirmImportBtn) {
+        confirmImportBtn.addEventListener('click', confirmImport);
+    }
+    if (importLocation) {
+        importLocation.addEventListener('change', (e) => {
+            const humidorGroup = document.getElementById('importHumidorGroup');
+            const quantityGroup = document.getElementById('importQuantityGroup');
+            
+            if (e.target.value === 'humidor') {
+                humidorGroup.style.display = 'block';
+                quantityGroup.style.display = 'block';
+            } else if (e.target.value === 'wishlist') {
+                humidorGroup.style.display = 'none';
+                quantityGroup.style.display = 'none';
+            } else {
+                humidorGroup.style.display = 'none';
+                quantityGroup.style.display = 'none';
+            }
+        });
     }
     if (importUrlModal) {
         importUrlModal.addEventListener('click', (e) => {
