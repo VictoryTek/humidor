@@ -297,7 +297,7 @@ async fn test_concurrent_quantity_updates() {
 
     // Wait for cigar to be visible in all connections with longer timeout
     let mut cigar_found = false;
-    for attempt in 0..20 {
+    for _attempt in 0..20 {
         let client = ctx.pool.get().await.unwrap();
         let result = client
             .query_opt("SELECT quantity FROM cigars WHERE id = $1", &[&cigar_id])
