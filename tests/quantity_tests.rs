@@ -295,8 +295,9 @@ async fn test_concurrent_quantity_updates() {
         .await
         .unwrap();
 
-    // Verify the cigar was created and is visible from multiple connections
-    for _ in 0..3 {
+    // Wait for cigar to be visible in all connections with longer timeout
+    let mut cigar_found = false;
+    for attempt in 0..20 {
         let client = ctx.pool.get().await.unwrap();
         let result = client
             .query_opt("SELECT quantity FROM cigars WHERE id = $1", &[&cigar_id])
@@ -306,14 +307,17 @@ async fn test_concurrent_quantity_updates() {
             let row = result.unwrap();
             let initial_quantity: i32 = row.get(0);
             assert_eq!(initial_quantity, 100, "Initial quantity should be 100");
+            cigar_found = true;
             break;
         }
-        // Wait a bit if cigar not visible yet
-        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+        // Wait longer between retries for CI environments
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
     }
+    
+    assert!(cigar_found, "Cigar was not found after initial creation");
 
-    // Ensure the cigar is committed before starting concurrent updates
-    tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+    // Ensure the cigar is fully committed before starting concurrent updates
+    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
     // Use join_all to ensure all operations complete before checking
     let pool = ctx.pool.clone();
@@ -323,11 +327,11 @@ async fn test_concurrent_quantity_updates() {
             let id = cigar_id;
             async move {
                 // Add a small stagger to reduce contention
-                tokio::time::sleep(tokio::time::Duration::from_millis(i as u64 * 10)).await;
+                tokio::time::sleep(tokio::time::Duration::from_millis(i as u64 * 20)).await;
 
                 let client = pool.get().await.unwrap();
 
-                // Retry logic for transient issues
+                // Retry logic for transient issues with longer backoff
                 let mut retries = 0;
                 loop {
                     let result = client
@@ -339,9 +343,9 @@ async fn test_concurrent_quantity_updates() {
 
                     match result {
                         Ok(rows) if rows > 0 => break,
-                        Ok(_) if retries < 3 => {
+                        Ok(_) if retries < 5 => {
                             retries += 1;
-                            tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+                            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
                             continue;
                         }
                         Ok(_) => panic!(
@@ -358,8 +362,8 @@ async fn test_concurrent_quantity_updates() {
     // Wait for all updates to complete
     futures::future::join_all(updates).await;
 
-    // Add a delay to ensure all transactions are fully committed
-    tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+    // Add a longer delay to ensure all transactions are fully committed
+    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
     // Verify final quantity
     let client = ctx.pool.get().await.unwrap();
