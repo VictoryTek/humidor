@@ -313,7 +313,7 @@ async fn test_concurrent_quantity_updates() {
         // Wait longer between retries for CI environments
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
     }
-    
+
     assert!(cigar_found, "Cigar was not found after initial creation");
 
     // Ensure the cigar is fully committed before starting concurrent updates
