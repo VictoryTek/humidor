@@ -8,16 +8,17 @@ services:
       - ./secrets:/secrets
     command: >
       sh -c "
+      set -e
       mkdir -p /secrets
-      if [ ! -f /secrets/jwt_secret ]; then
+      if [ ! -f /secrets/jwt_secret ] || [ ! -s /secrets/jwt_secret ]; then
         echo 'Generating JWT secret...'
-        apk add --no-cache openssl
-        openssl rand -base64 32 | tr -d '\n' > /secrets/jwt_secret
+        apk add --no-cache openssl > /dev/null 2>&1
+        SECRET=$$(openssl rand -base64 32 | tr -d '\n')
+        echo -n \"$$SECRET\" > /secrets/jwt_secret
         chmod 600 /secrets/jwt_secret
-        echo ''
-        echo 'JWT secret generated successfully'
+        echo \"JWT secret generated: $$(wc -c < /secrets/jwt_secret) bytes\"
       else
-        echo 'JWT secret already exists'
+        echo \"JWT secret already exists: $$(wc -c < /secrets/jwt_secret) bytes\"
       fi
       "
     restart: "no"
