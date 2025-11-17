@@ -1,4 +1,4 @@
-use crate::validation::{validate_length, validate_required, Validate, ValidationResult};
+use crate::validation::{Validate, ValidationResult, validate_length, validate_required};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;

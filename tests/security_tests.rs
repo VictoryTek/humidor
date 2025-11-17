@@ -149,7 +149,7 @@ async fn test_password_never_stored_plaintext() {
 #[tokio::test]
 #[serial]
 async fn test_jwt_token_has_expiration() {
-    use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
+    use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode};
     use serde::{Deserialize, Serialize};
 
     #[derive(Debug, Serialize, Deserialize)]
@@ -171,7 +171,7 @@ async fn test_jwt_token_has_expiration() {
         std::env::var("JWT_SECRET").unwrap_or_else(|_| "test_secret_key_for_testing".to_string());
 
     // Create a mock token
-    use jsonwebtoken::{encode, EncodingKey, Header};
+    use jsonwebtoken::{EncodingKey, Header, encode};
     let now = chrono::Utc::now().timestamp() as usize;
     let claims = Claims {
         sub: "test-user-id".to_string(),

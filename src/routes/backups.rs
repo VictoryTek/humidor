@@ -1,6 +1,6 @@
 use super::helpers::{with_current_user, with_db};
-use crate::handlers;
 use crate::DbPool;
+use crate::handlers;
 use warp::Filter;
 
 /// Create all backup/restore-related routes (requires authentication except setup_restore)

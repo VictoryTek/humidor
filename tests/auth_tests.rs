@@ -124,7 +124,7 @@ async fn test_jwt_token_generation() {
 #[tokio::test]
 #[serial]
 async fn test_jwt_token_contains_user_info() {
-    use jsonwebtoken::{decode, DecodingKey, Validation};
+    use jsonwebtoken::{DecodingKey, Validation, decode};
     use serde::{Deserialize, Serialize};
 
     #[derive(Debug, Serialize, Deserialize)]

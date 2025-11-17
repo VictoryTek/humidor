@@ -1,6 +1,6 @@
 use super::helpers::{json_body, with_current_user, with_db, with_uuid};
-use crate::handlers;
 use crate::DbPool;
+use crate::handlers;
 use warp::Filter;
 
 /// Create all cigar-related routes (requires authentication)

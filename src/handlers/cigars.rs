@@ -5,12 +5,12 @@ use uuid::Uuid;
 use warp::{Rejection, Reply};
 
 use crate::{
+    DbPool,
     errors::AppError,
     handlers::humidor_shares::{can_edit_humidor, can_view_humidor},
     middleware::auth::AuthContext,
     models::*,
     validation::Validate,
-    DbPool,
 };
 
 #[derive(Debug, Serialize)]
@@ -611,13 +611,13 @@ pub async fn delete_cigar(
         Ok(None) => {
             return Err(warp::reject::custom(AppError::NotFound(
                 "Cigar not found".to_string(),
-            )))
+            )));
         }
         Err(e) => {
             return Err(warp::reject::custom(AppError::DatabaseError(format!(
                 "Failed to find cigar: {}",
                 e
-            ))))
+            ))));
         }
     };
 

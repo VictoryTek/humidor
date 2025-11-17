@@ -1,9 +1,9 @@
+use crate::DbPool;
 use crate::errors::AppError;
 use crate::models::{
     CreateHumidorRequest, Humidor, LoginRequest, LoginResponse, SetupRequest, SetupStatusResponse,
     UserResponse,
 };
-use crate::DbPool;
 use chrono::Utc;
 use serde_json::json;
 use std::env;
@@ -12,8 +12,8 @@ use uuid::Uuid;
 use warp::Reply;
 
 // Authentication and JWT utilities
-use bcrypt::{hash, verify, DEFAULT_COST};
-use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
+use bcrypt::{DEFAULT_COST, hash, verify};
+use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use serde::{Deserialize, Serialize};
 
 // Async-safe bcrypt operations using tokio::task::spawn_blocking

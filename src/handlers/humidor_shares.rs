@@ -7,7 +7,7 @@ use crate::models::{
 use deadpool_postgres::Pool;
 use std::str::FromStr;
 use uuid::Uuid;
-use warp::{reject, reply, Rejection, Reply};
+use warp::{Rejection, Reply, reject, reply};
 
 /// Helper function to get user's permission level for a humidor
 /// Returns None if user has no access (not owner, not shared)

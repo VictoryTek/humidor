@@ -1,7 +1,7 @@
 use super::helpers::{json_body, with_client_ip, with_db, with_rate_limiter};
+use crate::DbPool;
 use crate::handlers;
 use crate::middleware::RateLimiter;
-use crate::DbPool;
 use warp::Filter;
 
 /// Create all authentication-related routes

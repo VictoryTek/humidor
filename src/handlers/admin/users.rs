@@ -1,3 +1,4 @@
+use crate::DbPool;
 use crate::errors::AppError;
 use crate::handlers::auth::seed_default_organizers;
 use crate::middleware::AuthContext;
@@ -5,14 +6,13 @@ use crate::models::{
     AdminChangePasswordRequest, AdminCreateUserRequest, AdminToggleActiveRequest,
     AdminUpdateUserRequest, UserListResponse, UserResponse,
 };
-use crate::DbPool;
 use chrono::Utc;
 use serde_json::json;
 use uuid::Uuid;
 use warp::Reply;
 
 // Authentication and JWT utilities
-use bcrypt::{hash, DEFAULT_COST};
+use bcrypt::{DEFAULT_COST, hash};
 
 // Async-safe bcrypt operation using tokio::task::spawn_blocking
 async fn hash_password(password: String) -> Result<String, bcrypt::BcryptError> {

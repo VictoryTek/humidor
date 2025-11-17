@@ -1,6 +1,6 @@
 use serde::Serialize;
 use std::fmt;
-use warp::{http::StatusCode, reject::Reject, Reply};
+use warp::{Reply, http::StatusCode, reject::Reject};
 
 /// Custom error types for the application
 #[derive(Debug)]

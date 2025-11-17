@@ -1,9 +1,9 @@
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use warp::{reply::json, Rejection, Reply};
+use warp::{Rejection, Reply, reply::json};
 
-use crate::{errors::AppError, middleware::auth::AuthContext, DbPool};
+use crate::{DbPool, errors::AppError, middleware::auth::AuthContext};
 
 #[derive(Debug, Serialize)]
 pub struct FavoriteResponse {

@@ -11,14 +11,14 @@ mod validation;
 use anyhow::{anyhow, bail};
 use deadpool_postgres::{Config, ManagerConfig, Pool, RecyclingMethod, Runtime};
 use metrics_exporter_prometheus::PrometheusBuilder;
-use middleware::{handle_rejection, RateLimiter};
+use middleware::{RateLimiter, handle_rejection};
 use once_cell::sync::Lazy;
 use refinery::embed_migrations;
 use std::env;
 use std::fs;
 use std::time::Instant;
 use tokio_postgres::NoTls;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 use warp::log;
 use warp::{Filter, Reply};
 

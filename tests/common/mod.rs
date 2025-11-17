@@ -172,7 +172,7 @@ pub async fn create_user_and_login(
 /// Create a JWT token for testing
 #[allow(dead_code)]
 fn create_test_jwt(user_id: Uuid, username: &str) -> Result<String, Box<dyn std::error::Error>> {
-    use jsonwebtoken::{encode, EncodingKey, Header};
+    use jsonwebtoken::{EncodingKey, Header, encode};
     use serde::{Deserialize, Serialize};
 
     #[derive(Debug, Serialize, Deserialize)]

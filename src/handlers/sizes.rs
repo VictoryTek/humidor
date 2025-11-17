@@ -3,7 +3,7 @@ use serde_json::json;
 use uuid::Uuid;
 use warp::{Rejection, Reply};
 
-use crate::{errors::AppError, middleware::AuthContext, models::*, validation::Validate, DbPool};
+use crate::{DbPool, errors::AppError, middleware::AuthContext, models::*, validation::Validate};
 
 pub async fn get_sizes(auth: AuthContext, pool: DbPool) -> Result<impl Reply, Rejection> {
     let db = pool.get().await.map_err(|e| {

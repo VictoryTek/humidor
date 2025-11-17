@@ -1,8 +1,8 @@
 use anyhow::Result;
 use lettre::{
-    message::{header::ContentType, Message},
-    transport::smtp::authentication::Credentials,
     SmtpTransport, Transport,
+    message::{Message, header::ContentType},
+    transport::smtp::authentication::Credentials,
 };
 use std::env;
 

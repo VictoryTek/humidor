@@ -1,5 +1,5 @@
-use crate::middleware::RateLimiter;
 use crate::DbPool;
+use crate::middleware::RateLimiter;
 use std::net::IpAddr;
 use warp::Filter;
 
@@ -25,8 +25,8 @@ pub fn with_rate_limiter(
 }
 
 /// Helper function to extract client IP address
-pub fn with_client_ip(
-) -> impl Filter<Extract = (Option<IpAddr>,), Error = std::convert::Infallible> + Clone {
+pub fn with_client_ip()
+-> impl Filter<Extract = (Option<IpAddr>,), Error = std::convert::Infallible> + Clone {
     warp::addr::remote().map(|addr: Option<std::net::SocketAddr>| addr.map(|socket| socket.ip()))
 }
 
@@ -39,8 +39,8 @@ pub fn with_uuid() -> impl Filter<Extract = (uuid::Uuid,), Error = warp::Rejecti
 
 /// Helper function to parse JSON body with size limit
 /// Default limit: 1MB for JSON payloads (reasonable for API requests)
-pub fn json_body<T: Send + serde::de::DeserializeOwned>(
-) -> impl Filter<Extract = (T,), Error = warp::Rejection> + Clone {
+pub fn json_body<T: Send + serde::de::DeserializeOwned>()
+-> impl Filter<Extract = (T,), Error = warp::Rejection> + Clone {
     warp::body::content_length_limit(1024 * 1024) // 1MB
         .and(warp::body::json())
 }

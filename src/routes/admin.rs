@@ -1,7 +1,7 @@
 use super::helpers::{json_body, with_db};
+use crate::DbPool;
 use crate::handlers::admin;
 use crate::middleware::auth::with_admin;
-use crate::DbPool;
 use uuid::Uuid;
 use warp::Filter;
 

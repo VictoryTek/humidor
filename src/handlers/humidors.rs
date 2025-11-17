@@ -1,12 +1,12 @@
+use crate::DbPool;
 use crate::handlers::humidor_shares::can_view_humidor;
 use crate::middleware::AuthContext;
 use crate::models::{CreateHumidorRequest, Humidor, UpdateHumidorRequest};
 use crate::validation::Validate;
-use crate::DbPool;
 use serde_json::json;
 use std::convert::Infallible;
 use uuid::Uuid;
-use warp::{http::StatusCode, reply, Reply};
+use warp::{Reply, http::StatusCode, reply};
 
 pub async fn get_humidors(auth: AuthContext, pool: DbPool) -> Result<impl Reply, Infallible> {
     let db = match pool.get().await {

@@ -1,10 +1,10 @@
+use crate::DbPool;
 use crate::errors::AppError;
 use crate::handlers::auth::verify_token;
 use crate::models::UserResponse;
-use crate::DbPool;
 use std::convert::Infallible;
 use uuid::Uuid;
-use warp::{reject, Filter, Rejection};
+use warp::{Filter, Rejection, reject};
 
 // Authentication context that gets passed to handlers
 #[derive(Debug, Clone)]
@@ -139,8 +139,8 @@ pub fn with_current_user(
 
 // Optional auth that doesn't fail if no token is present
 #[allow(dead_code)]
-pub fn with_optional_auth(
-) -> impl Filter<Extract = (Option<AuthContext>,), Error = Infallible> + Clone {
+pub fn with_optional_auth()
+-> impl Filter<Extract = (Option<AuthContext>,), Error = Infallible> + Clone {
     warp::header::headers_cloned().map(|headers: warp::http::HeaderMap| {
         let token = match extract_token_from_headers(&headers) {
             Some(token) => token,

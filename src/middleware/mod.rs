@@ -2,7 +2,7 @@ pub mod auth;
 pub mod metrics;
 pub mod rate_limiter;
 
-pub use auth::{with_current_user, AuthContext};
+pub use auth::{AuthContext, with_current_user};
 pub use metrics::record_response_metrics;
 pub use rate_limiter::RateLimiter;
 
