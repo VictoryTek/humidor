@@ -6,19 +6,19 @@ services:
     image: alpine:latest
     volumes:
       - ./secrets:/secrets
-    command: >
-      sh -c "
-      mkdir -p /secrets &&
-      if [ ! -f /secrets/jwt_secret ] || [ ! -s /secrets/jwt_secret ]; then
-        echo 'Generating JWT secret...' &&
-        apk add --no-cache openssl >/dev/null 2>&1 &&
-        openssl rand -base64 32 | tr -d '\\n' > /secrets/jwt_secret &&
-        chmod 600 /secrets/jwt_secret &&
-        echo 'JWT secret generated successfully'
-      else
-        echo 'JWT secret already exists'
-      fi
-      "
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        mkdir -p /secrets
+        if [ ! -f /secrets/jwt_secret ] || [ ! -s /secrets/jwt_secret ]; then
+          echo 'Generating JWT secret...'
+          apk add --no-cache openssl >/dev/null 2>&1
+          openssl rand -base64 32 | tr -d '\n' > /secrets/jwt_secret
+          chmod 600 /secrets/jwt_secret
+          echo 'JWT secret generated successfully'
+        else
+          echo 'JWT secret already exists'
+        fi
     restart: "no"
 
   db:
