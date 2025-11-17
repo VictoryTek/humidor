@@ -1,16 +1,17 @@
 # syntax=docker/dockerfile:1
-FROM rust:1.90-slim AS builder
+FROM rust:1.90-alpine AS builder
 
 WORKDIR /app
 
 # Cache busting argument
 ARG CACHEBUST=1
 
-# Install build dependencies
-RUN apt-get update && apt-get install -y \
-    pkg-config \
-    libssl-dev \
-    && rm -rf /var/lib/apt/lists/*
+# Install build dependencies for Alpine
+RUN apk add --no-cache \
+    musl-dev \
+    pkgconfig \
+    openssl-dev \
+    openssl-libs-static
 
 # Create dummy project for dependency caching
 # We need both binary and library targets to match Cargo.toml
@@ -60,15 +61,14 @@ COPY static ./static
 COPY migrations ./migrations
 RUN touch src/main.rs && cargo build --release && strip target/release/humidor
 
-# Runtime stage
-FROM debian:bookworm-slim
+# Runtime stage - Alpine
+FROM alpine:3.21
 
-RUN apt-get update && apt-get install -y \
+RUN apk add --no-cache \
     ca-certificates \
-    libssl3 \
+    libgcc \
     curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && groupadd -r humidor && useradd -r -g humidor humidor
+    && addgroup -S humidor && adduser -S -G humidor humidor
 
 WORKDIR /app
 

@@ -391,13 +391,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Serve static files with cache headers
-    let static_files =
-        warp::path("static")
-            .and(warp::fs::dir("static"))
-            .with(warp::reply::with::header(
-                "Cache-Control",
-                "public, max-age=31536000, immutable",
-            ));
+    // Cache control can be configured via STATIC_CACHE_MAX_AGE env var
+    // Default: short cache for development, use STATIC_CACHE_MAX_AGE=31536000 for production
+    let cache_max_age = env::var("STATIC_CACHE_MAX_AGE")
+        .ok()
+        .and_then(|v| v.parse::<u32>().ok())
+        .unwrap_or(300); // Default: 5 minutes
+
+    let cache_control = if cache_max_age > 86400 {
+        // > 1 day: use immutable for long-term caching
+        format!("public, max-age={}, immutable", cache_max_age)
+    } else {
+        // <= 1 day: regular cache with revalidation
+        format!("public, max-age={}", cache_max_age)
+    };
+
+    let static_files = warp::path("static")
+        .and(warp::fs::dir("static"))
+        .with(warp::reply::with::header("Cache-Control", cache_control));
 
     // Create all API routes using route modules
     let auth_routes = routes::create_auth_routes(db_pool.clone(), rate_limiter.clone()).boxed();

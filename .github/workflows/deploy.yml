@@ -68,50 +68,52 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64
+          load: false
 
-      - name: Generate SBOM
+      - name: Build local image for scanning
+        id: build-local
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          load: true
+          tags: humidor:scan
+          cache-from: type=gha
+
+      - name: Run Trivy vulnerability scanner on local image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: humidor:scan
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Generate SBOM from local image
         uses: anchore/sbom-action@v0
         continue-on-error: true
         with:
-          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+          image: humidor:scan
           format: spdx-json
           output-file: sbom.spdx.json
 
       - name: Upload SBOM
         uses: actions/upload-artifact@v4
-        if: success()
+        if: hashFiles('sbom.spdx.json') != ''
         with:
           name: sbom
           path: sbom.spdx.json
-
-  # Scan for vulnerabilities
-  security-scan:
-    name: Security Scan
-    runs-on: ubuntu-latest
-    needs: build-and-push
-    continue-on-error: true
-    permissions:
-      security-events: write
-    steps:
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        continue-on-error: true
-        with:
-          image-ref: ${{ needs.build-and-push.outputs.image-tag }}
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-
-      - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
-        if: success()
-        with:
-          sarif_file: 'trivy-results.sarif'
 
   # Deploy to environment
   deploy:
     name: Deploy to ${{ github.event.inputs.environment || 'production' }}
     runs-on: ubuntu-latest
-    needs: [build-and-push, security-scan]
+    needs: [build-and-push]
     environment:
       name: ${{ github.event.inputs.environment || 'production' }}
       url: ${{ steps.deploy.outputs.url }}
