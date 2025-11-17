@@ -33,6 +33,20 @@ type DbPool = Pool;
 /// Read a secret from Docker secrets or fall back to environment variable
 /// Docker secrets are mounted at /run/secrets/<secret_name>
 fn read_secret(secret_name: &str, env_var: &str) -> Option<String> {
+    // Check if a custom secret file path is provided via environment variable
+    let file_env_var = format!("{}_FILE", env_var);
+    if let Ok(custom_path) = env::var(&file_env_var) {
+        if let Ok(content) = fs::read_to_string(&custom_path) {
+            tracing::debug!(
+                secret_name = secret_name,
+                path = custom_path,
+                source = "custom_file",
+                "Successfully read secret from custom file path"
+            );
+            return Some(content.trim().to_string());
+        }
+    }
+
     let secret_path = format!("/run/secrets/{}", secret_name);
 
     // Try Docker secret file first
@@ -68,8 +82,11 @@ fn read_secret(secret_name: &str, env_var: &str) -> Option<String> {
 fn validate_jwt_secret() -> anyhow::Result<()> {
     let secret = read_secret("jwt_secret", "JWT_SECRET").ok_or_else(|| {
         anyhow!(
-            "JWT_SECRET not found in /run/secrets/jwt_secret or JWT_SECRET environment variable. \
-                 Generate a secure secret with: openssl rand -base64 32"
+            "JWT_SECRET not found. Tried:\n\
+             1. JWT_SECRET_FILE environment variable (custom path)\n\
+             2. /run/secrets/jwt_secret (Docker secrets)\n\
+             3. JWT_SECRET environment variable\n\
+             Generate a secure secret with: openssl rand -base64 32"
         )
     })?;
 
