@@ -189,13 +189,13 @@ impl CigarScraper {
         let mut result = ScrapedCigarData::new();
 
         // Try to find title
-        if let Ok(selector) = Selector::parse("h1.entry-title, h1") {
-            if let Some(title) = document.select(&selector).next() {
-                let full_name = title.text().collect::<String>();
-                let (brand, name) = self.extract_brand_and_name(&full_name);
-                result.brand = brand;
-                result.name = name;
-            }
+        if let Ok(selector) = Selector::parse("h1.entry-title, h1")
+            && let Some(title) = document.select(&selector).next()
+        {
+            let full_name = title.text().collect::<String>();
+            let (brand, name) = self.extract_brand_and_name(&full_name);
+            result.brand = brand;
+            result.name = name;
         }
 
         // Look through all text for details
@@ -234,15 +234,15 @@ impl CigarScraper {
         let title_selectors = vec!["h1.product-name", "h1.product-title", "h1"];
 
         for selector_str in title_selectors {
-            if let Ok(selector) = Selector::parse(selector_str) {
-                if let Some(title) = document.select(&selector).next() {
-                    let full_name = title.text().collect::<String>().trim().to_string();
-                    if !full_name.is_empty() {
-                        let (brand, name) = self.extract_brand_and_name(&full_name);
-                        result.brand = brand;
-                        result.name = name;
-                        break;
-                    }
+            if let Ok(selector) = Selector::parse(selector_str)
+                && let Some(title) = document.select(&selector).next()
+            {
+                let full_name = title.text().collect::<String>().trim().to_string();
+                if !full_name.is_empty() {
+                    let (brand, name) = self.extract_brand_and_name(&full_name);
+                    result.brand = brand;
+                    result.name = name;
+                    break;
                 }
             }
         }
@@ -256,23 +256,23 @@ impl CigarScraper {
         ];
 
         for selector_str in spec_selectors {
-            if let Ok(selector) = Selector::parse(selector_str) {
-                if let Some(specs) = document.select(&selector).next() {
-                    let specs_text = specs.text().collect::<String>();
+            if let Ok(selector) = Selector::parse(selector_str)
+                && let Some(specs) = document.select(&selector).next()
+            {
+                let specs_text = specs.text().collect::<String>();
 
-                    let (length, ring_gauge) = self.extract_size_info(&specs_text);
-                    if length.is_some() {
-                        result.length = length;
-                        result.ring_gauge = ring_gauge;
-                    }
+                let (length, ring_gauge) = self.extract_size_info(&specs_text);
+                if length.is_some() {
+                    result.length = length;
+                    result.ring_gauge = ring_gauge;
+                }
 
-                    if result.strength.is_none() {
-                        result.strength = self.extract_strength(&specs_text);
-                    }
+                if result.strength.is_none() {
+                    result.strength = self.extract_strength(&specs_text);
+                }
 
-                    if result.origin.is_none() {
-                        result.origin = self.extract_origin(&specs_text);
-                    }
+                if result.origin.is_none() {
+                    result.origin = self.extract_origin(&specs_text);
                 }
             }
         }
@@ -316,15 +316,15 @@ impl CigarScraper {
         ];
 
         for selector_str in title_selectors {
-            if let Ok(selector) = Selector::parse(selector_str) {
-                if let Some(title) = document.select(&selector).next() {
-                    let full_name = title.text().collect::<String>().trim().to_string();
-                    if !full_name.is_empty() {
-                        let (brand, name) = self.extract_brand_and_name(&full_name);
-                        result.brand = brand;
-                        result.name = name;
-                        break;
-                    }
+            if let Ok(selector) = Selector::parse(selector_str)
+                && let Some(title) = document.select(&selector).next()
+            {
+                let full_name = title.text().collect::<String>().trim().to_string();
+                if !full_name.is_empty() {
+                    let (brand, name) = self.extract_brand_and_name(&full_name);
+                    result.brand = brand;
+                    result.name = name;
+                    break;
                 }
             }
         }
@@ -338,24 +338,24 @@ impl CigarScraper {
         ];
 
         for selector_str in detail_selectors {
-            if let Ok(selector) = Selector::parse(selector_str) {
-                if let Some(details) = document.select(&selector).next() {
-                    let details_text = details.text().collect::<String>();
+            if let Ok(selector) = Selector::parse(selector_str)
+                && let Some(details) = document.select(&selector).next()
+            {
+                let details_text = details.text().collect::<String>();
 
-                    // Extract size, strength, origin from details
-                    let (length, ring_gauge) = self.extract_size_info(&details_text);
-                    if length.is_some() {
-                        result.length = length;
-                        result.ring_gauge = ring_gauge;
-                    }
+                // Extract size, strength, origin from details
+                let (length, ring_gauge) = self.extract_size_info(&details_text);
+                if length.is_some() {
+                    result.length = length;
+                    result.ring_gauge = ring_gauge;
+                }
 
-                    if result.strength.is_none() {
-                        result.strength = self.extract_strength(&details_text);
-                    }
+                if result.strength.is_none() {
+                    result.strength = self.extract_strength(&details_text);
+                }
 
-                    if result.origin.is_none() {
-                        result.origin = self.extract_origin(&details_text);
-                    }
+                if result.origin.is_none() {
+                    result.origin = self.extract_origin(&details_text);
                 }
             }
         }
@@ -391,15 +391,15 @@ impl CigarScraper {
         let title_selectors = vec!["h1.product-title", "h1.prod-title", "h1"];
 
         for selector_str in title_selectors {
-            if let Ok(selector) = Selector::parse(selector_str) {
-                if let Some(title) = document.select(&selector).next() {
-                    let full_name = title.text().collect::<String>().trim().to_string();
-                    if !full_name.is_empty() {
-                        let (brand, name) = self.extract_brand_and_name(&full_name);
-                        result.brand = brand;
-                        result.name = name;
-                        break;
-                    }
+            if let Ok(selector) = Selector::parse(selector_str)
+                && let Some(title) = document.select(&selector).next()
+            {
+                let full_name = title.text().collect::<String>().trim().to_string();
+                if !full_name.is_empty() {
+                    let (brand, name) = self.extract_brand_and_name(&full_name);
+                    result.brand = brand;
+                    result.name = name;
+                    break;
                 }
             }
         }
@@ -408,23 +408,23 @@ impl CigarScraper {
         let detail_selectors = vec![".product-details", ".prod-specs", ".specifications"];
 
         for selector_str in detail_selectors {
-            if let Ok(selector) = Selector::parse(selector_str) {
-                if let Some(details) = document.select(&selector).next() {
-                    let details_text = details.text().collect::<String>();
+            if let Ok(selector) = Selector::parse(selector_str)
+                && let Some(details) = document.select(&selector).next()
+            {
+                let details_text = details.text().collect::<String>();
 
-                    let (length, ring_gauge) = self.extract_size_info(&details_text);
-                    if length.is_some() {
-                        result.length = length;
-                        result.ring_gauge = ring_gauge;
-                    }
+                let (length, ring_gauge) = self.extract_size_info(&details_text);
+                if length.is_some() {
+                    result.length = length;
+                    result.ring_gauge = ring_gauge;
+                }
 
-                    if result.strength.is_none() {
-                        result.strength = self.extract_strength(&details_text);
-                    }
+                if result.strength.is_none() {
+                    result.strength = self.extract_strength(&details_text);
+                }
 
-                    if result.origin.is_none() {
-                        result.origin = self.extract_origin(&details_text);
-                    }
+                if result.origin.is_none() {
+                    result.origin = self.extract_origin(&details_text);
                 }
             }
         }
@@ -457,13 +457,13 @@ impl CigarScraper {
         let mut result = ScrapedCigarData::new();
 
         // Try to find any h1 as product name
-        if let Ok(selector) = Selector::parse("h1") {
-            if let Some(title) = document.select(&selector).next() {
-                let full_name = title.text().collect::<String>();
-                let (brand, name) = self.extract_brand_and_name(&full_name);
-                result.brand = brand;
-                result.name = name;
-            }
+        if let Ok(selector) = Selector::parse("h1")
+            && let Some(title) = document.select(&selector).next()
+        {
+            let full_name = title.text().collect::<String>();
+            let (brand, name) = self.extract_brand_and_name(&full_name);
+            result.brand = brand;
+            result.name = name;
         }
 
         // Scrape all text

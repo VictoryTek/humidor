@@ -39,10 +39,10 @@ impl Validate for CreateStrength {
             ));
         }
 
-        if let Some(desc) = &self.description {
-            if !desc.is_empty() {
-                validate_length(desc, "description", 1, 500)?;
-            }
+        if let Some(desc) = &self.description
+            && !desc.is_empty()
+        {
+            validate_length(desc, "description", 1, 500)?;
         }
 
         Ok(())
@@ -56,18 +56,18 @@ impl Validate for UpdateStrength {
             validate_length(name, "name", 1, 100)?;
         }
 
-        if let Some(level) = self.level {
-            if !(1..=5).contains(&level) {
-                return Err(crate::errors::AppError::ValidationError(
-                    "level must be between 1 and 5".to_string(),
-                ));
-            }
+        if let Some(level) = self.level
+            && !(1..=5).contains(&level)
+        {
+            return Err(crate::errors::AppError::ValidationError(
+                "level must be between 1 and 5".to_string(),
+            ));
         }
 
-        if let Some(desc) = &self.description {
-            if !desc.is_empty() {
-                validate_length(desc, "description", 1, 500)?;
-            }
+        if let Some(desc) = &self.description
+            && !desc.is_empty()
+        {
+            validate_length(desc, "description", 1, 500)?;
         }
 
         Ok(())

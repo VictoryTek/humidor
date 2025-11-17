@@ -35,10 +35,10 @@ impl Validate for CreateRingGauge {
         validate_positive(self.gauge, "gauge")?;
         validate_range(self.gauge, "gauge", 20, 100)?;
 
-        if let Some(desc) = &self.description {
-            if !desc.is_empty() {
-                validate_length(desc, "description", 1, 500)?;
-            }
+        if let Some(desc) = &self.description
+            && !desc.is_empty()
+        {
+            validate_length(desc, "description", 1, 500)?;
         }
 
         Ok(())
@@ -52,10 +52,10 @@ impl Validate for UpdateRingGauge {
             validate_range(gauge, "gauge", 20, 100)?;
         }
 
-        if let Some(desc) = &self.description {
-            if !desc.is_empty() {
-                validate_length(desc, "description", 1, 500)?;
-            }
+        if let Some(desc) = &self.description
+            && !desc.is_empty()
+        {
+            validate_length(desc, "description", 1, 500)?;
         }
 
         Ok(())

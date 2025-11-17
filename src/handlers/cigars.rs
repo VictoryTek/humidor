@@ -202,55 +202,55 @@ pub async fn get_cigars(
     param_counter += 1;
 
     // Check for humidor_id filter
-    if let Some(humidor_id_str) = params.get("humidor_id") {
-        if let Ok(humidor_uuid) = Uuid::parse_str(humidor_id_str) {
-            // Verify the humidor belongs to the user or is shared (view permission is enough)
-            if let Err(e) =
-                verify_humidor_ownership(&pool, Some(humidor_uuid), auth.user_id, false).await
-            {
-                return Err(warp::reject::custom(e));
-            }
-            conditions.push(format!("c.humidor_id = ${}", param_counter));
-            param_values.push(Box::new(humidor_uuid));
-            param_counter += 1;
+    if let Some(humidor_id_str) = params.get("humidor_id")
+        && let Ok(humidor_uuid) = Uuid::parse_str(humidor_id_str)
+    {
+        // Verify the humidor belongs to the user or is shared (view permission is enough)
+        if let Err(e) =
+            verify_humidor_ownership(&pool, Some(humidor_uuid), auth.user_id, false).await
+        {
+            return Err(warp::reject::custom(e));
         }
+        conditions.push(format!("c.humidor_id = ${}", param_counter));
+        param_values.push(Box::new(humidor_uuid));
+        param_counter += 1;
     }
 
     // Check for organizer filters (brand, size, origin, strength, ring_gauge)
-    if let Some(brand_id_str) = params.get("brand_id") {
-        if let Ok(brand_uuid) = Uuid::parse_str(brand_id_str) {
-            conditions.push(format!("c.brand_id = ${}", param_counter));
-            param_values.push(Box::new(brand_uuid));
-            param_counter += 1;
-        }
+    if let Some(brand_id_str) = params.get("brand_id")
+        && let Ok(brand_uuid) = Uuid::parse_str(brand_id_str)
+    {
+        conditions.push(format!("c.brand_id = ${}", param_counter));
+        param_values.push(Box::new(brand_uuid));
+        param_counter += 1;
     }
-    if let Some(size_id_str) = params.get("size_id") {
-        if let Ok(size_uuid) = Uuid::parse_str(size_id_str) {
-            conditions.push(format!("c.size_id = ${}", param_counter));
-            param_values.push(Box::new(size_uuid));
-            param_counter += 1;
-        }
+    if let Some(size_id_str) = params.get("size_id")
+        && let Ok(size_uuid) = Uuid::parse_str(size_id_str)
+    {
+        conditions.push(format!("c.size_id = ${}", param_counter));
+        param_values.push(Box::new(size_uuid));
+        param_counter += 1;
     }
-    if let Some(origin_id_str) = params.get("origin_id") {
-        if let Ok(origin_uuid) = Uuid::parse_str(origin_id_str) {
-            conditions.push(format!("c.origin_id = ${}", param_counter));
-            param_values.push(Box::new(origin_uuid));
-            param_counter += 1;
-        }
+    if let Some(origin_id_str) = params.get("origin_id")
+        && let Ok(origin_uuid) = Uuid::parse_str(origin_id_str)
+    {
+        conditions.push(format!("c.origin_id = ${}", param_counter));
+        param_values.push(Box::new(origin_uuid));
+        param_counter += 1;
     }
-    if let Some(strength_id_str) = params.get("strength_id") {
-        if let Ok(strength_uuid) = Uuid::parse_str(strength_id_str) {
-            conditions.push(format!("c.strength_id = ${}", param_counter));
-            param_values.push(Box::new(strength_uuid));
-            param_counter += 1;
-        }
+    if let Some(strength_id_str) = params.get("strength_id")
+        && let Ok(strength_uuid) = Uuid::parse_str(strength_id_str)
+    {
+        conditions.push(format!("c.strength_id = ${}", param_counter));
+        param_values.push(Box::new(strength_uuid));
+        param_counter += 1;
     }
-    if let Some(ring_gauge_id_str) = params.get("ring_gauge_id") {
-        if let Ok(ring_gauge_uuid) = Uuid::parse_str(ring_gauge_id_str) {
-            conditions.push(format!("c.ring_gauge_id = ${}", param_counter));
-            param_values.push(Box::new(ring_gauge_uuid));
-            param_counter += 1;
-        }
+    if let Some(ring_gauge_id_str) = params.get("ring_gauge_id")
+        && let Ok(ring_gauge_uuid) = Uuid::parse_str(ring_gauge_id_str)
+    {
+        conditions.push(format!("c.ring_gauge_id = ${}", param_counter));
+        param_values.push(Box::new(ring_gauge_uuid));
+        param_counter += 1;
     }
 
     // Build WHERE clause

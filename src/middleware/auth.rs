@@ -44,22 +44,21 @@ impl AuthContext {
 // Extract token from Authorization header or cookie
 fn extract_token_from_headers(headers: &warp::http::HeaderMap) -> Option<String> {
     // First, try Authorization header
-    if let Some(auth_header) = headers.get(warp::http::header::AUTHORIZATION) {
-        if let Ok(auth_str) = auth_header.to_str() {
-            if let Some(stripped) = auth_str.strip_prefix("Bearer ") {
-                return Some(stripped.to_string());
-            }
-        }
+    if let Some(auth_header) = headers.get(warp::http::header::AUTHORIZATION)
+        && let Ok(auth_str) = auth_header.to_str()
+        && let Some(stripped) = auth_str.strip_prefix("Bearer ")
+    {
+        return Some(stripped.to_string());
     }
 
     // Then try cookie
-    if let Some(cookie_header) = headers.get(warp::http::header::COOKIE) {
-        if let Ok(cookie_str) = cookie_header.to_str() {
-            for cookie in cookie_str.split(';') {
-                let cookie = cookie.trim();
-                if let Some(stripped) = cookie.strip_prefix("humidor_token=") {
-                    return Some(stripped.to_string());
-                }
+    if let Some(cookie_header) = headers.get(warp::http::header::COOKIE)
+        && let Ok(cookie_str) = cookie_header.to_str()
+    {
+        for cookie in cookie_str.split(';') {
+            let cookie = cookie.trim();
+            if let Some(token) = cookie.strip_prefix("auth_token=") {
+                return Some(token.to_string());
             }
         }
     }

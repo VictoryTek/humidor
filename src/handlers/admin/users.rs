@@ -262,21 +262,21 @@ pub async fn update_user(
     })?;
 
     // Check if trying to demote self
-    if let Some(is_admin) = request.is_admin {
-        if !is_admin && user_id == auth.user_id {
-            return Err(warp::reject::custom(AppError::BadRequest(
-                "Cannot demote yourself from admin".to_string(),
-            )));
-        }
+    if let Some(is_admin) = request.is_admin
+        && !is_admin && user_id == auth.user_id
+    {
+        return Err(warp::reject::custom(AppError::BadRequest(
+            "Cannot demote yourself from admin".to_string(),
+        )));
     }
 
     // Check if trying to deactivate self
-    if let Some(is_active) = request.is_active {
-        if !is_active && user_id == auth.user_id {
-            return Err(warp::reject::custom(AppError::BadRequest(
-                "Cannot deactivate your own account".to_string(),
-            )));
-        }
+    if let Some(is_active) = request.is_active
+        && !is_active && user_id == auth.user_id
+    {
+        return Err(warp::reject::custom(AppError::BadRequest(
+            "Cannot deactivate your own account".to_string(),
+        )));
     }
 
     let mut updates = Vec::new();

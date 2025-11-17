@@ -39,16 +39,16 @@ impl Validate for CreateOrigin {
         validate_required(&self.country, "country")?;
         validate_length(&self.country, "country", 1, 100)?;
 
-        if let Some(region) = &self.region {
-            if !region.is_empty() {
-                validate_length(region, "region", 1, 100)?;
-            }
+        if let Some(region) = &self.region
+            && !region.is_empty()
+        {
+            validate_length(region, "region", 1, 100)?;
         }
 
-        if let Some(desc) = &self.description {
-            if !desc.is_empty() {
-                validate_length(desc, "description", 1, 500)?;
-            }
+        if let Some(desc) = &self.description
+            && !desc.is_empty()
+        {
+            validate_length(desc, "description", 1, 500)?;
         }
 
         Ok(())
@@ -67,16 +67,16 @@ impl Validate for UpdateOrigin {
             validate_length(country, "country", 1, 100)?;
         }
 
-        if let Some(region) = &self.region {
-            if !region.is_empty() {
-                validate_length(region, "region", 1, 100)?;
-            }
+        if let Some(region) = &self.region
+            && !region.is_empty()
+        {
+            validate_length(region, "region", 1, 100)?;
         }
 
-        if let Some(desc) = &self.description {
-            if !desc.is_empty() {
-                validate_length(desc, "description", 1, 500)?;
-            }
+        if let Some(desc) = &self.description
+            && !desc.is_empty()
+        {
+            validate_length(desc, "description", 1, 500)?;
         }
 
         Ok(())

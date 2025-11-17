@@ -45,10 +45,10 @@ impl Validate for CreateHumidorRequest {
         validate_required(&self.name, "name")?;
         validate_length(&self.name, "name", 1, 100)?;
 
-        if let Some(desc) = &self.description {
-            if !desc.is_empty() {
-                validate_length(desc, "description", 1, 500)?;
-            }
+        if let Some(desc) = &self.description
+            && !desc.is_empty()
+        {
+            validate_length(desc, "description", 1, 500)?;
         }
 
         if let Some(capacity) = self.capacity {
@@ -60,18 +60,18 @@ impl Validate for CreateHumidorRequest {
             }
         }
 
-        if let Some(humidity) = self.target_humidity {
-            if !(50..=85).contains(&humidity) {
-                return Err(crate::errors::AppError::ValidationError(
-                    "target_humidity must be between 50 and 85".to_string(),
-                ));
-            }
+        if let Some(humidity) = self.target_humidity
+            && !(50..=85).contains(&humidity)
+        {
+            return Err(crate::errors::AppError::ValidationError(
+                "target_humidity must be between 50 and 85".to_string(),
+            ));
         }
 
-        if let Some(location) = &self.location {
-            if !location.is_empty() {
-                validate_length(location, "location", 1, 200)?;
-            }
+        if let Some(location) = &self.location
+            && !location.is_empty()
+        {
+            validate_length(location, "location", 1, 200)?;
         }
 
         Ok(())
@@ -85,10 +85,10 @@ impl Validate for UpdateHumidorRequest {
             validate_length(name, "name", 1, 100)?;
         }
 
-        if let Some(desc) = &self.description {
-            if !desc.is_empty() {
-                validate_length(desc, "description", 1, 500)?;
-            }
+        if let Some(desc) = &self.description
+            && !desc.is_empty()
+        {
+            validate_length(desc, "description", 1, 500)?;
         }
 
         if let Some(capacity) = self.capacity {
@@ -100,18 +100,18 @@ impl Validate for UpdateHumidorRequest {
             }
         }
 
-        if let Some(humidity) = self.target_humidity {
-            if !(50..=85).contains(&humidity) {
-                return Err(crate::errors::AppError::ValidationError(
-                    "target_humidity must be between 50 and 85".to_string(),
-                ));
-            }
+        if let Some(humidity) = self.target_humidity
+            && !(50..=85).contains(&humidity)
+        {
+            return Err(crate::errors::AppError::ValidationError(
+                "target_humidity must be between 50 and 85".to_string(),
+            ));
         }
 
-        if let Some(location) = &self.location {
-            if !location.is_empty() {
-                validate_length(location, "location", 1, 200)?;
-            }
+        if let Some(location) = &self.location
+            && !location.is_empty()
+        {
+            validate_length(location, "location", 1, 200)?;
         }
 
         Ok(())
