@@ -49,10 +49,10 @@ pub struct Claims {
 /// If the secret is missing, this will return a default that will cause authentication to fail
 fn jwt_secret() -> String {
     // Check custom path from JWT_SECRET_FILE first
-    if let Ok(custom_path) = env::var("JWT_SECRET_FILE") {
-        if let Ok(content) = fs::read_to_string(&custom_path) {
-            return content.trim().to_string();
-        }
+    if let Ok(custom_path) = env::var("JWT_SECRET_FILE")
+        && let Ok(content) = fs::read_to_string(&custom_path)
+    {
+        return content.trim().to_string();
     }
 
     // Try Docker secret file

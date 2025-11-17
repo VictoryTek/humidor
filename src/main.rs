@@ -35,16 +35,16 @@ type DbPool = Pool;
 fn read_secret(secret_name: &str, env_var: &str) -> Option<String> {
     // Check if a custom secret file path is provided via environment variable
     let file_env_var = format!("{}_FILE", env_var);
-    if let Ok(custom_path) = env::var(&file_env_var) {
-        if let Ok(content) = fs::read_to_string(&custom_path) {
-            tracing::debug!(
-                secret_name = secret_name,
-                path = custom_path,
-                source = "custom_file",
-                "Successfully read secret from custom file path"
-            );
-            return Some(content.trim().to_string());
-        }
+    if let Ok(custom_path) = env::var(&file_env_var)
+        && let Ok(content) = fs::read_to_string(&custom_path)
+    {
+        tracing::debug!(
+            secret_name = secret_name,
+            path = custom_path,
+            source = "custom_file",
+            "Successfully read secret from custom file path"
+        );
+        return Some(content.trim().to_string());
     }
 
     let secret_path = format!("/run/secrets/{}", secret_name);
