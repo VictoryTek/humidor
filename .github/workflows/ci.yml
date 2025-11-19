@@ -186,6 +186,24 @@ jobs:
           docker compose -f docker/docker-compose.yml build
           docker compose -f docker/docker-compose.yml config --quiet
 
+      - name: Pull Docker image for Trivy scan
+        run: |
+          echo "Pulling image for Trivy scan..."
+          docker pull ghcr.io/victorytek/humidor:latest || true
+
+      - name: Run Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@v0.16.0
+        with:
+          image-ref: ghcr.io/victorytek/humidor:latest
+          format: sarif
+          output: trivy-results.sarif
+
+      - name: Upload Trivy SARIF report
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-results.sarif
+          checkout_path: ${{ github.workspace }}
+
   # Code Coverage (optional)
   coverage:
     name: Code Coverage
