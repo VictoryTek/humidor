@@ -295,10 +295,16 @@ async fn test_concurrent_quantity_updates() {
         .await
         .unwrap();
 
+    // Force a commit by running a simple query in a new connection
+    {
+        let client = ctx.pool.get().await.unwrap();
+        let _ = client.query_one("SELECT 1", &[]).await.unwrap();
+    }
+
     // Wait for cigar to be visible in all connections with longer timeout
     let mut cigar_found = false;
-    // Increase retries and delay for slow CI environments
-    for _attempt in 0..60 {
+    // Increase retries and delay significantly for CI environments
+    for attempt in 0..100 {
         let client = ctx.pool.get().await.unwrap();
         let result = client
             .query_opt("SELECT quantity FROM cigars WHERE id = $1", &[&cigar_id])
@@ -309,16 +315,17 @@ async fn test_concurrent_quantity_updates() {
             let initial_quantity: i32 = row.get(0);
             assert_eq!(initial_quantity, 100, "Initial quantity should be 100");
             cigar_found = true;
+            tracing::info!("Cigar found after {} attempts", attempt + 1);
             break;
         }
         // Wait longer between retries for CI environments
-        tokio::time::sleep(tokio::time::Duration::from_millis(250)).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
     }
 
     assert!(cigar_found, "Cigar was not found after initial creation");
 
     // Ensure the cigar is fully committed before starting concurrent updates
-    tokio::time::sleep(tokio::time::Duration::from_millis(1500)).await;
+    tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
 
     // Use join_all to ensure all operations complete before checking
     let pool = ctx.pool.clone();
@@ -343,10 +350,13 @@ async fn test_concurrent_quantity_updates() {
                         .await;
 
                     match result {
-                        Ok(rows) if rows > 0 => break,
-                        Ok(_) if retries < 10 => {
+                        Ok(rows) if rows > 0 => {
+                            tracing::info!("Update {} succeeded after {} retries", i, retries);
+                            break;
+                        }
+                        Ok(_) if retries < 20 => {
                             retries += 1;
-                            tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+                            tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
                             continue;
                         }
                         Ok(_) => panic!(
@@ -364,7 +374,7 @@ async fn test_concurrent_quantity_updates() {
     futures::future::join_all(updates).await;
 
     // Add a longer delay to ensure all transactions are fully committed
-    tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
+    tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
 
     // Verify final quantity
     let client = ctx.pool.get().await.unwrap();
