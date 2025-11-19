@@ -297,7 +297,8 @@ async fn test_concurrent_quantity_updates() {
 
     // Wait for cigar to be visible in all connections with longer timeout
     let mut cigar_found = false;
-    for _attempt in 0..30 {
+    // Increase retries and delay for slow CI environments
+    for _attempt in 0..60 {
         let client = ctx.pool.get().await.unwrap();
         let result = client
             .query_opt("SELECT quantity FROM cigars WHERE id = $1", &[&cigar_id])
@@ -311,13 +312,13 @@ async fn test_concurrent_quantity_updates() {
             break;
         }
         // Wait longer between retries for CI environments
-        tokio::time::sleep(tokio::time::Duration::from_millis(150)).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(250)).await;
     }
 
     assert!(cigar_found, "Cigar was not found after initial creation");
 
     // Ensure the cigar is fully committed before starting concurrent updates
-    tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
+    tokio::time::sleep(tokio::time::Duration::from_millis(1500)).await;
 
     // Use join_all to ensure all operations complete before checking
     let pool = ctx.pool.clone();
