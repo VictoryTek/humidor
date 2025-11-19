@@ -106,9 +106,7 @@ fn get_or_generate_jwt_secret() -> anyhow::Result<String> {
     }
 
     // No secret found - auto-generate and persist one
-    tracing::warn!(
-        "No JWT_SECRET found. Auto-generating and persisting a random secret."
-    );
+    tracing::warn!("No JWT_SECRET found. Auto-generating and persisting a random secret.");
 
     use rand::Rng;
     let secret: String = rand::thread_rng()
