@@ -166,7 +166,7 @@ jobs:
           docker pull ghcr.io/victorytek/humidor:latest || true
 
       - name: Run Trivy vulnerability scan
-        uses: aquasecurity/trivy-action@v0.16.0
+          uses: aquasecurity/trivy-action@v0.16.2
         with:
           image-ref: ghcr.io/victorytek/humidor:latest
           format: sarif
