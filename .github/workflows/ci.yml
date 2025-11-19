@@ -157,8 +157,8 @@ jobs:
 
       - name: Test Docker image
         run: |
-          docker compose build
-          docker compose config --quiet
+          docker compose -f docker/docker-compose.yml build
+          docker compose -f docker/docker-compose.yml config --quiet
 
   # Code Coverage (optional)
   coverage:
