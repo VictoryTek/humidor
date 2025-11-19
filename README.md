@@ -42,39 +42,56 @@ This project was started because I am a homelabber and couldn't find anything to
 
 ### Docker Compose (Recommended)
 
-The simplest way to run Humidor with default settings:
+All Docker files are in the [`docker/`](docker/) directory. See [docker/README.md](docker/README.md) for detailed instructions.
+
+**Local Development:**
 
 ```bash
-docker-compose up --build
+# From project root
+docker compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml up --build
 ```
 
-This single command spins up the entire stack with sensible defaults:
-- PostgreSQL 17 database (port 5432)
-- Humidor web application (port 9898)
-- Persistent volume for database storage
-- Automatic health checks and service dependencies
+**What you get:**
+- Web app at http://localhost:9898
+- Mailpit (email testing) at http://localhost:8025
+- Debug logging and development tools
+
+**Production Deployment:**
+
+```bash
+# From project root  
+docker compose -f docker/docker-compose.yml up -d
+```
+
+**What you get:**
+- Pre-built image from GitHub Container Registry
+- Auto-generated JWT secret (persisted)
+- Production-ready configuration
 
 Access the application at `http://localhost:9898`
 
-**Default Credentials:**
-- Database: `humidor_user` / `humidor_pass`
-- First user: Created during setup wizard on first launch
+**First Run:**
+- Complete the setup wizard to create your admin account
+- JWT secret auto-generates and persists across restarts
+- Configure SMTP for password reset emails (optional)
 
 **Production Configuration:**
 
-For production, override defaults using environment variables in a `.env` file:
+For production, set environment variables in Dockge or create a `.env` file:
 
 ```bash
-# Database Configuration
+# Required for production
+JWT_SECRET=<generate with: openssl rand -base64 32>
+
+# Database (optional, defaults provided)
 POSTGRES_DB=humidor_db
 POSTGRES_USER=your_db_user
 POSTGRES_PASSWORD=your_secure_password
 
-# Application Configuration
+# Application (optional, defaults provided)
 PORT=9898
 RUST_LOG=info
 ALLOWED_ORIGINS=https://your-domain.com
-JWT_SECRET=your-long-random-secret-key-here
 
 # Optional Email Configuration
 BASE_URL=https://your-domain.com

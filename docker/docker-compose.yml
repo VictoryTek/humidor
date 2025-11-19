@@ -1,0 +1,51 @@
+name: humidor
+
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-humidor_db}
+      POSTGRES_USER: ${POSTGRES_USER:-humidor_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-humidor_pass}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-humidor_user} -d ${POSTGRES_DB:-humidor_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    image: ghcr.io/victorytek/humidor:latest
+    pull_policy: always
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-humidor_user}:${POSTGRES_PASSWORD:-humidor_pass}@db:5432/${POSTGRES_DB:-humidor_db}
+      RUST_LOG: ${RUST_LOG:-info}
+      PORT: ${PORT:-9898}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:9898,http://127.0.0.1:9898}
+      JWT_TOKEN_LIFETIME_HOURS: ${JWT_TOKEN_LIFETIME_HOURS:-2}
+      BASE_URL: ${BASE_URL:-http://localhost:9898}
+      # =====================================
+      # JWT Secret Configuration (REQUIRED for production)
+      # If not set, a random secret will be auto-generated (tokens invalidated on restart!)
+      # Generate a secure secret: openssl rand -base64 32
+      # Then set JWT_SECRET in Dockge environment variables or .env file
+      # =====================================
+      # Email Configuration (Optional)
+      # Uncomment and set these to enable password reset emails
+      # SMTP_HOST: ${SMTP_HOST:-}
+      # SMTP_PORT: ${SMTP_PORT:-587}
+      # SMTP_USER: ${SMTP_USER:-}
+      # SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      # SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
+    ports:
+      - "9898:9898"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

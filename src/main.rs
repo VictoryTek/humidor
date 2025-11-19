@@ -8,7 +8,7 @@ mod routes;
 mod services;
 mod validation;
 
-use anyhow::{anyhow, bail};
+use anyhow::bail;
 use deadpool_postgres::{Config, ManagerConfig, Pool, RecyclingMethod, Runtime};
 use metrics_exporter_prometheus::PrometheusBuilder;
 use middleware::{RateLimiter, handle_rejection};
@@ -59,6 +59,17 @@ fn read_secret(secret_name: &str, env_var: &str) -> Option<String> {
         return Some(content.trim().to_string());
     }
 
+    // Try persisted auto-generated secret
+    let persisted_path = format!("/app/data/{}", secret_name);
+    if let Ok(content) = fs::read_to_string(&persisted_path) {
+        tracing::debug!(
+            secret_name = secret_name,
+            source = "persisted_file",
+            "Successfully read secret from persisted file"
+        );
+        return Some(content.trim().to_string());
+    }
+
     // Fall back to environment variable
     if let Ok(value) = env::var(env_var) {
         tracing::debug!(
@@ -78,33 +89,49 @@ fn read_secret(secret_name: &str, env_var: &str) -> Option<String> {
     None
 }
 
-/// Validate JWT secret at startup - fail fast before accepting requests
-fn validate_jwt_secret() -> anyhow::Result<()> {
-    let secret = read_secret("jwt_secret", "JWT_SECRET").ok_or_else(|| {
-        anyhow!(
-            "JWT_SECRET not found. Tried:\n\
-             1. JWT_SECRET_FILE environment variable (custom path)\n\
-             2. /run/secrets/jwt_secret (Docker secrets)\n\
-             3. JWT_SECRET environment variable\n\
-             Generate a secure secret with: openssl rand -base64 32"
-        )
-    })?;
+/// Get or generate JWT secret at startup
+fn get_or_generate_jwt_secret() -> anyhow::Result<String> {
+    // Try to read existing secret
+    if let Some(secret) = read_secret("jwt_secret", "JWT_SECRET") {
+        // Validate minimum length for cryptographic security
+        if secret.len() < 32 {
+            bail!(
+                "JWT_SECRET must be at least 32 characters for cryptographic security. \
+                 Current length: {}. Generate a secure secret with: openssl rand -base64 32",
+                secret.len()
+            );
+        }
+        tracing::info!("Using existing JWT secret");
+        return Ok(secret);
+    }
 
-    // Validate minimum length for cryptographic security
-    if secret.len() < 32 {
-        bail!(
-            "JWT_SECRET must be at least 32 characters for cryptographic security. \
-             Current length: {}. Generate a secure secret with: openssl rand -base64 32",
-            secret.len()
+    // No secret found - auto-generate and persist one
+    tracing::warn!(
+        "No JWT_SECRET found. Auto-generating and persisting a random secret."
+    );
+
+    use rand::Rng;
+    let secret: String = rand::thread_rng()
+        .sample_iter(&rand::distributions::Alphanumeric)
+        .take(64)
+        .map(char::from)
+        .collect();
+
+    // Try to persist the secret to a file for future runs
+    let secret_path = "/app/data/jwt_secret";
+    if let Err(e) = fs::write(secret_path, &secret) {
+        tracing::warn!(
+            error = %e,
+            "Failed to persist auto-generated JWT secret. Tokens will be invalidated on restart."
+        );
+    } else {
+        tracing::info!(
+            path = secret_path,
+            "Auto-generated JWT secret persisted successfully"
         );
     }
 
-    tracing::info!(
-        secret_length = secret.len(),
-        "JWT secret validated successfully"
-    );
-
-    Ok(())
+    Ok(secret)
 }
 
 /// Validate database connection at startup - fail fast if database is unreachable
@@ -192,7 +219,7 @@ async fn validate_environment(pool: &DbPool) -> anyhow::Result<()> {
 
     // Validate JWT secret
     tracing::debug!("Validating JWT secret configuration...");
-    validate_jwt_secret()?;
+    get_or_generate_jwt_secret()?;
 
     // Validate database connectivity
     tracing::debug!("Validating database connection...");

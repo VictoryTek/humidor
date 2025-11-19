@@ -1,0 +1,31 @@
+# Development override - use with: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# This file adds local build configuration, dev secrets, and testing tools for local development
+
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    environment:
+      JWT_SECRET: "dev-secret-12345678901234567890123456789012"
+      RUST_LOG: debug
+      # Point to mailpit for email testing
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      SMTP_FROM_EMAIL: "noreply@humidor.local"
+      SMTP_USER: ""
+      SMTP_PASSWORD: ""
+  
+  # Mailpit - Email testing interface
+  # Access at http://localhost:8025 to see captured emails
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: humidor-mailpit
+    restart: unless-stopped
+    ports:
+      - "8025:8025"  # Web UI
+      - "1025:1025"  # SMTP server
+    environment:
+      MP_MAX_MESSAGES: 500
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
