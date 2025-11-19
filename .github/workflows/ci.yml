@@ -149,7 +149,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          dockerfile: docker/Dockerfile
+          file: docker/Dockerfile
           push: false
           tags: humidor:${{ github.sha }}
           cache-from: type=gha
