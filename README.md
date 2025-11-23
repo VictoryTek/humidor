@@ -5,7 +5,6 @@
   <p><strong>Version 1.0.0 Release Candidate 1</strong></p>
 </div>
 
-Heavily inspired by Mealie. 
 An application for managing your cigar collection. Built with Rust, PostgreSQL, and Docker. 
 This project was started because I am a homelabber and couldn't find anything to help me track what I have and what I want, so this started out to fill a personal need. Hopefully if I can make it work, it will be useful to other cigar enjoyers, who want to keep track of their humidor inventory.
 
@@ -19,6 +18,13 @@ This project was started because I am a homelabber and couldn't find anything to
 - **Search & Filter**: Find cigars by brand, strength, origin, or search terms
 - **Mobile-Friendly**: Responsive design for phones and tablets
 - **Multi-User Support**: Complete data isolation with secure sharing
+
+## Tech Stack
+
+- **Backend**: Rust with Warp web framework
+- **Database**: PostgreSQL with tokio-postgres
+- **Frontend**: HTML, CSS, JavaScript
+- **Deployment**: Docker & Docker Compose
 
 ## Documentation
 
@@ -191,13 +197,6 @@ Password reset functionality works without SMTP configured - reset URLs will be 
 
 See [docs/PASSWORD_RESET_README.md](docs/PASSWORD_RESET_README.md) for detailed email provider setup instructions.
 
-## Tech Stack
-
-- **Backend**: Rust with Warp web framework
-- **Database**: PostgreSQL with tokio-postgres
-- **Frontend**: HTML, CSS, JavaScript
-- **Deployment**: Docker & Docker Compose
-
 ## Security Considerations
 ## Security Considerations
 
@@ -211,5 +210,11 @@ See [docs/PASSWORD_RESET_README.md](docs/PASSWORD_RESET_README.md) for detailed 
 - Restrict `ALLOWED_ORIGINS` to your actual domain(s)
 - Enable firewall rules to restrict database port access
 - Regular security updates and backups
+
+## Credits
+
+Humidor is heavily inspired by Mealie. Big thanks to the Mealie team for creating and maintaining such an amazing app!
+
+Please support them at <https://github.com/mealie-recipes/mealie>
 
 See [Security Model](docs/SECURITY_MODEL.md) for detailed security architecture.
