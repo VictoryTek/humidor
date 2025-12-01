@@ -171,12 +171,12 @@ async fn test_batch_quantity_update() {
         .await
         .unwrap();
     println!("Created cigar 1: {}", cigar1_id);
-    
+
     let cigar2_id = create_test_cigar(&ctx.pool, "Cigar 2", 10, None)
         .await
         .unwrap();
     println!("Created cigar 2: {}", cigar2_id);
-    
+
     let cigar3_id = create_test_cigar(&ctx.pool, "Cigar 3", 15, None)
         .await
         .unwrap();
@@ -187,7 +187,7 @@ async fn test_batch_quantity_update() {
 
     // Verify all cigars were created before attempting batch update
     let client = ctx.pool.get().await.unwrap();
-    
+
     // Check each cigar individually
     for (id, name) in [
         (cigar1_id, "Cigar 1"),
@@ -198,10 +198,19 @@ async fn test_batch_quantity_update() {
             .query_opt("SELECT id FROM cigars WHERE id = $1", &[&id])
             .await
             .unwrap();
-        println!("{} ({}): {}", name, id, if exists.is_some() { "EXISTS" } else { "MISSING" });
+        println!(
+            "{} ({}): {}",
+            name,
+            id,
+            if exists.is_some() {
+                "EXISTS"
+            } else {
+                "MISSING"
+            }
+        );
         assert!(exists.is_some(), "{} should exist in database", name);
     }
-    
+
     let count: i64 = client
         .query_one(
             "SELECT COUNT(*) FROM cigars WHERE id = ANY($1)",
@@ -227,7 +236,10 @@ async fn test_batch_quantity_update() {
         .unwrap();
 
     println!("Rows affected by batch update: {}", rows_affected);
-    assert_eq!(rows_affected, 3, "All 3 cigars should be updated in batch operation");
+    assert_eq!(
+        rows_affected, 3,
+        "All 3 cigars should be updated in batch operation"
+    );
 
     // Verify updates
     let row = client
@@ -367,6 +379,20 @@ async fn test_concurrent_quantity_updates() {
     // Ensure the cigar is fully committed before starting concurrent updates
     tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
 
+    // Final verification that cigar still exists before concurrent updates
+    {
+        let client = ctx.pool.get().await.unwrap();
+        let exists = client
+            .query_opt("SELECT quantity FROM cigars WHERE id = $1", &[&cigar_id])
+            .await
+            .unwrap();
+        assert!(
+            exists.is_some(),
+            "Cigar should still exist right before concurrent updates"
+        );
+        println!("Cigar verified present before concurrent updates");
+    }
+
     // Use join_all to ensure all operations complete before checking
     let pool = ctx.pool.clone();
     let updates: Vec<_> = (0..5)
@@ -378,6 +404,18 @@ async fn test_concurrent_quantity_updates() {
                 tokio::time::sleep(tokio::time::Duration::from_millis(i as u64 * 20)).await;
 
                 let client = pool.get().await.unwrap();
+
+                // First verify the cigar exists from this connection
+                let exists = client
+                    .query_opt("SELECT id FROM cigars WHERE id = $1", &[&id])
+                    .await
+                    .unwrap();
+                if exists.is_none() {
+                    println!(
+                        "Update {}: Cigar {} not visible from this connection!",
+                        i, id
+                    );
+                }
 
                 // Retry logic for transient issues with longer backoff
                 let mut retries = 0;
@@ -391,7 +429,7 @@ async fn test_concurrent_quantity_updates() {
 
                     match result {
                         Ok(rows) if rows > 0 => {
-                            tracing::info!("Update {} succeeded after {} retries", i, retries);
+                            println!("Update {} succeeded after {} retries", i, retries);
                             break;
                         }
                         Ok(_) if retries < 20 => {
@@ -399,10 +437,19 @@ async fn test_concurrent_quantity_updates() {
                             tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
                             continue;
                         }
-                        Ok(_) => panic!(
-                            "Update {} affected 0 rows after {} retries - cigar not found",
-                            i, retries
-                        ),
+                        Ok(_) => {
+                            // One more check to see if cigar exists
+                            let still_exists = client
+                                .query_opt("SELECT id FROM cigars WHERE id = $1", &[&id])
+                                .await
+                                .unwrap();
+                            panic!(
+                                "Update {} affected 0 rows after {} retries - cigar exists: {}",
+                                i,
+                                retries,
+                                still_exists.is_some()
+                            );
+                        }
                         Err(e) => panic!("Update {} failed: {:?}", i, e),
                     }
                 }
