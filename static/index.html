@@ -1153,6 +1153,18 @@
             </div>
             
             <form id="humidorForm" class="organizer-form">
+                <div class="form-group full-width">
+                    <label for="humidorImageUrl">Humidor Image</label>
+                    <div class="image-upload-row">
+                        <input type="file" id="humidorImageUpload" accept="image/*" style="display: none;">
+                        <button type="button" class="btn-upload" id="uploadHumidorImageBtn">
+                            📁 Choose Image
+                        </button>
+                        <input type="url" id="humidorImageUrl" name="image_url" placeholder="Or enter image URL...">
+                    </div>
+                    <small class="form-hint" id="uploadHumidorFileName">JPG or PNG, max 5MB</small>
+                </div>
+                
                 <div class="form-grid">
                     <div class="form-group">
                         <label for="humidorName">Name *</label>
@@ -1160,8 +1172,8 @@
                     </div>
                     
                     <div class="form-group">
-                        <label for="humidorType">Type *</label>
-                        <select id="humidorType" name="type" required>
+                        <label for="humidorType">Type</label>
+                        <select id="humidorType" name="type">
                             <option value="">Select Type</option>
                             <option value="Desktop">Desktop Humidor</option>
                             <option value="Cabinet">Cabinet Humidor</option>

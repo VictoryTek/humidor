@@ -86,14 +86,21 @@ jobs:
       - name: Check for newer Rust version
         id: rust-check
         run: |
-          # Extract Rust version from Dockerfile (e.g., "1.90" from "rust:1.90-slim")
-          CURRENT_RUST=$(grep -m 1 'FROM rust:' Dockerfile | sed -n 's/.*FROM rust:\([0-9.]*\).*/\1/p')
+          # Extract Rust version from Dockerfile (e.g., "1.91" from "rust:1.91-alpine")
+          CURRENT_RUST=$(grep -m 1 'FROM rust:' docker/Dockerfile | sed -n 's/.*FROM rust:\([0-9.]*\).*/\1/p')
           
           # Get latest stable Rust version from official channel
           LATEST_RUST=$(curl -s https://static.rust-lang.org/dist/channel-rust-stable.toml | grep -m 1 'version = ' | cut -d'"' -f2 | cut -d' ' -f1)
           
           echo "Current Rust version: $CURRENT_RUST"
           echo "Latest Rust version: $LATEST_RUST"
+          
+          # Validate that we got valid version strings
+          if [ -z "$CURRENT_RUST" ] || [ -z "$LATEST_RUST" ]; then
+            echo "Error: Could not determine Rust versions"
+            echo "update_available=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
           
           echo "current=$CURRENT_RUST" >> $GITHUB_OUTPUT
           echo "latest=$LATEST_RUST" >> $GITHUB_OUTPUT
@@ -123,10 +130,11 @@ jobs:
               `- **Current**: ${current}\n` +
               `- **Latest**: ${latest}\n\n` +
               `**Steps to update:**\n` +
-              `1. Update \`Dockerfile\` to use \`rust:${latest}-slim\`\n` +
+              `1. Update \`docker/Dockerfile\` to use \`rust:${latest}-alpine\`\n` +
               `2. Test the build locally\n` +
               `3. Run full test suite\n` +
-              `4. Update CI/CD if needed\n`;
+              `4. Update CI/CD if needed\n\n` +
+              `**Note**: Using Alpine base image, so update should reference \`-alpine\` suffix.\n`;
             
             github.rest.issues.create({
               owner: context.repo.owner,

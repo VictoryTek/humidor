@@ -1798,6 +1798,26 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    // Humidor image upload button handler
+    const uploadHumidorImageBtn = document.getElementById('uploadHumidorImageBtn');
+    const humidorImageUpload = document.getElementById('humidorImageUpload');
+    const uploadHumidorFileName = document.getElementById('uploadHumidorFileName');
+    
+    if (uploadHumidorImageBtn && humidorImageUpload) {
+        uploadHumidorImageBtn.addEventListener('click', () => {
+            humidorImageUpload.click();
+        });
+        
+        humidorImageUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                uploadHumidorFileName.textContent = `Selected: ${file.name}`;
+            } else {
+                uploadHumidorFileName.textContent = 'JPG or PNG, max 5MB';
+            }
+        });
+    }
+    
     // Humidor dropdown change handler for wish list
     const cigarHumidorSelect = document.getElementById('cigarHumidor');
     const cigarQuantityInput = document.getElementById('cigarQuantity');
@@ -2305,7 +2325,6 @@ function showHumidorHub() {
     humidorsContainer.innerHTML = `
         <div class="humidor-hub">
             <div class="humidor-hub-header">
-                <h2>Your Humidors</h2>
                 <p>Select a humidor to view its contents</p>
             </div>
             <div class="humidor-cards-grid">
@@ -3164,12 +3183,45 @@ async function saveHumidor() {
     const form = document.getElementById('humidorForm');
     const formData = new FormData(form);
     
+    // Check if there's an image file to upload
+    const imageFile = document.getElementById('humidorImageUpload').files[0];
+    const imageUrl = formData.get('image_url');
+    
+    let finalImageUrl = imageUrl;
+    
+    // If a file is selected, upload it first
+    if (imageFile) {
+        try {
+            const uploadFormData = new FormData();
+            uploadFormData.append('image', imageFile);
+            
+            const uploadResponse = await makeAuthenticatedRequest('/api/v1/images/upload', {
+                method: 'POST',
+                body: uploadFormData,
+                headers: {} // Let browser set Content-Type with boundary
+            });
+            
+            if (uploadResponse.ok) {
+                const uploadResult = await uploadResponse.json();
+                finalImageUrl = uploadResult.url;
+            } else {
+                showToast('Failed to upload image', 'error');
+                return;
+            }
+        } catch (error) {
+            console.error('Error uploading image:', error);
+            showToast('Failed to upload image', 'error');
+            return;
+        }
+    }
+    
     const humidorData = {
         name: formData.get('name'),
-        type: formData.get('type'),
+        type: formData.get('type') || null,
         capacity: parseInt(formData.get('capacity')),
         location: formData.get('location') || null,
-        description: formData.get('description') || null
+        description: formData.get('description') || null,
+        image_url: finalImageUrl || null
     };
 
     try {
