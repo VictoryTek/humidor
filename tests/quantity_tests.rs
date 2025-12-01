@@ -170,15 +170,54 @@ async fn test_batch_quantity_update() {
     let cigar1_id = create_test_cigar(&ctx.pool, "Cigar 1", 5, None)
         .await
         .unwrap();
+    println!("Created cigar 1: {}", cigar1_id);
+    
     let cigar2_id = create_test_cigar(&ctx.pool, "Cigar 2", 10, None)
         .await
         .unwrap();
+    println!("Created cigar 2: {}", cigar2_id);
+    
     let cigar3_id = create_test_cigar(&ctx.pool, "Cigar 3", 15, None)
         .await
         .unwrap();
+    println!("Created cigar 3: {}", cigar3_id);
+
+    // Ensure cigars are committed and visible (CI environment may need this)
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+    // Verify all cigars were created before attempting batch update
+    let client = ctx.pool.get().await.unwrap();
+    
+    // Check each cigar individually
+    for (id, name) in [
+        (cigar1_id, "Cigar 1"),
+        (cigar2_id, "Cigar 2"),
+        (cigar3_id, "Cigar 3"),
+    ] {
+        let exists = client
+            .query_opt("SELECT id FROM cigars WHERE id = $1", &[&id])
+            .await
+            .unwrap();
+        println!("{} ({}): {}", name, id, if exists.is_some() { "EXISTS" } else { "MISSING" });
+        assert!(exists.is_some(), "{} should exist in database", name);
+    }
+    
+    let count: i64 = client
+        .query_one(
+            "SELECT COUNT(*) FROM cigars WHERE id = ANY($1)",
+            &[&vec![cigar1_id, cigar2_id, cigar3_id]],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    println!("Count of cigars matching IDs: {}", count);
+    assert_eq!(count, 3, "All 3 cigars should exist before batch update");
+
+    // Get a fresh client for the update to avoid any connection caching issues
+    drop(client);
+    let client = ctx.pool.get().await.unwrap();
 
     // Update all quantities at once
-    let client = ctx.pool.get().await.unwrap();
     let rows_affected = client
         .execute(
             "UPDATE cigars SET quantity = quantity + 5 WHERE id = ANY($1)",
@@ -187,7 +226,8 @@ async fn test_batch_quantity_update() {
         .await
         .unwrap();
 
-    assert_eq!(rows_affected, 3);
+    println!("Rows affected by batch update: {}", rows_affected);
+    assert_eq!(rows_affected, 3, "All 3 cigars should be updated in batch operation");
 
     // Verify updates
     let row = client
