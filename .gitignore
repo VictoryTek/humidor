@@ -12,3 +12,6 @@ test_results.txt
 .env
 secrets/*.txt
 !secrets/*.txt.example
+
+# AI agent instructions (do not commit)
+.github/copilot-instructions.md
