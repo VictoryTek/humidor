@@ -3,6 +3,12 @@ name: CI/CD Pipeline
 on:
   push:
     branches: [ main, develop, review ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - '.gitignore'
+      - 'README.md'
   workflow_dispatch:
 
 env:
