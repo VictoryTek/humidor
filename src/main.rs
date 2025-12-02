@@ -72,13 +72,15 @@ fn read_secret(secret_name: &str, env_var: &str) -> Option<String> {
 
     // Fall back to environment variable
     if let Ok(value) = env::var(env_var) {
-        tracing::debug!(
-            secret_name = secret_name,
-            env_var = env_var,
-            source = "environment",
-            "Successfully read secret from environment"
-        );
-        return Some(value);
+        if !value.trim().is_empty() {
+            tracing::debug!(
+                secret_name = secret_name,
+                env_var = env_var,
+                source = "environment",
+                "Successfully read secret from environment"
+            );
+            return Some(value);
+        }
     }
 
     tracing::warn!(
