@@ -146,14 +146,16 @@ services:
       retries: 5
 
   web:
-    build: .
+    image: ghcr.io/victorytek/humidor:latest
+    pull_policy: always
     environment:
+      JWT_SECRET: ${JWT_SECRET:-}
       DATABASE_URL: postgresql://${POSTGRES_USER:-humidor_user}:${POSTGRES_PASSWORD:-humidor_pass}@db:5432/${POSTGRES_DB:-humidor_db}
       RUST_LOG: ${RUST_LOG:-info}
       PORT: ${PORT:-9898}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:9898,http://127.0.0.1:9898}
-      JWT_SECRET: ${JWT_SECRET:-}
       JWT_TOKEN_LIFETIME_HOURS: ${JWT_TOKEN_LIFETIME_HOURS:-2}
+      BASE_URL: ${BASE_URL:-http://localhost:9898}
     ports:
       - "9898:9898"
     depends_on:
