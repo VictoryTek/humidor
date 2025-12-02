@@ -235,18 +235,19 @@ pub async fn create_test_cigar(
     humidor_id: Option<Uuid>,
 ) -> Result<Uuid, Box<dyn std::error::Error>> {
     let client = pool.get().await?;
+    
+    let cigar_id = Uuid::new_v4();
 
     // Don't explicitly list retail_link - let the database handle the default (NULL)
-    let row = client
-        .query_one(
+    client
+        .execute(
             "INSERT INTO cigars (id, name, quantity, humidor_id, is_active, created_at, updated_at) 
-             VALUES ($1, $2, $3, $4, true, NOW(), NOW()) 
-             RETURNING id",
-            &[&Uuid::new_v4(), &name, &quantity, &humidor_id],
+             VALUES ($1, $2, $3, $4, true, NOW(), NOW())",
+            &[&cigar_id, &name, &quantity, &humidor_id],
         )
         .await?;
 
-    Ok(row.get(0))
+    Ok(cigar_id)
 }
 
 /// Clean up database (delete all test data)
