@@ -26,92 +26,15 @@ This project was started because I am a homelabber and couldn't find anything to
 - **Frontend**: HTML, CSS, JavaScript
 - **Deployment**: Docker & Docker Compose
 
-## Documentation
-
-📚 **[Documentation Hub](docs/README.md)** - Complete documentation index
-
-**User Documentation:**
-- [User Guide](docs/USER_GUIDE.md) - Getting started and usage
-- [Humidor Sharing](docs/SHARING.md) - Share your collection with others
-- [User Permissions](docs/PERMISSIONS.md) - Roles and access control
-
-**Administrator Documentation:**
-- [Admin Guide](docs/ADMIN_GUIDE.md) - User management and administration
-- [Security Model](docs/SECURITY_MODEL.md) - Security architecture
-
-**Developer Documentation:**
-- [API Documentation](docs/API.md) - REST API reference
-- [Database Migrations](docs/MIGRATIONS.md) - Schema management
-- [Security Audit Report](docs/SECURITY_AUDIT_2025-01-11.md) - Security review
-
 ## Quick Start
 
 ### Docker Compose (Recommended)
-
-All Docker files are in the [`docker/`](docker/) directory. See [docker/README.md](docker/README.md) for detailed instructions.
-
-**Local Development:**
-
-```bash
-# From project root
-docker compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml up --build
-```
-
-**What you get:**
-- Web app at http://localhost:9898
-- Mailpit (email testing) at http://localhost:8025
-- Debug logging and development tools
-
-**Production Deployment:**
-
-```bash
-# From project root  
-docker compose -f docker/docker-compose.yml up -d
-```
-
-**What you get:**
-- Pre-built image from GitHub Container Registry
-- Auto-generated JWT secret (persisted)
-- Production-ready configuration
 
 Access the application at `http://localhost:9898`
 
 **First Run:**
 - Complete the setup wizard to create your admin account
-- JWT secret auto-generates and persists across restarts
 - Configure SMTP for password reset emails (optional)
-
-**Production Configuration:**
-
-For production, set environment variables in Dockge or create a `.env` file:
-
-```bash
-# Required for production
-JWT_SECRET=<generate with: openssl rand -base64 32>
-
-# Database (optional, defaults provided)
-POSTGRES_DB=humidor_db
-POSTGRES_USER=your_db_user
-POSTGRES_PASSWORD=your_secure_password
-
-# Application (optional, defaults provided)
-PORT=9898
-RUST_LOG=info
-ALLOWED_ORIGINS=https://your-domain.com
-
-# Optional Email Configuration
-BASE_URL=https://your-domain.com
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASSWORD=your-app-password
-SMTP_FROM_EMAIL=noreply@your-domain.com
-```
-
-Then run:
-```bash
-docker-compose up -d
-```
 
 ### Docker Run (Manual)
 
@@ -169,6 +92,37 @@ volumes:
   humidor_data:
 ```
 
+**Production Configuration:**
+
+For production, set environment variables in Dockge or create a `.env` file:
+
+```bash
+# Required for production
+JWT_SECRET=<generate with: openssl rand -base64 32>
+
+# Database (optional, defaults provided)
+POSTGRES_DB=humidor_db
+POSTGRES_USER=your_db_user
+POSTGRES_PASSWORD=your_secure_password
+
+# Application (optional, defaults provided)
+PORT=9898
+RUST_LOG=info
+ALLOWED_ORIGINS=https://your-domain.com
+
+# Optional Email Configuration
+BASE_URL=https://your-domain.com
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASSWORD=your-app-password
+SMTP_FROM_EMAIL=noreply@your-domain.com
+```
+
+Then run:
+```bash
+docker-compose up -d
+```
 
 ## Environment Variables
 
@@ -193,6 +147,24 @@ The following environment variables can be configured (all have sensible default
 | `SMTP_FROM_EMAIL` | No | - | Email address to send from |
 
 **Note**: For production deployments, always override the default database credentials and JWT secret!
+
+## Documentation
+
+📚 **[Documentation Hub](docs/README.md)** - Complete documentation index
+
+**User Documentation:**
+- [User Guide](docs/USER_GUIDE.md) - Getting started and usage
+- [Humidor Sharing](docs/SHARING.md) - Share your collection with others
+- [User Permissions](docs/PERMISSIONS.md) - Roles and access control
+
+**Administrator Documentation:**
+- [Admin Guide](docs/ADMIN_GUIDE.md) - User management and administration
+- [Security Model](docs/SECURITY_MODEL.md) - Security architecture
+
+**Developer Documentation:**
+- [API Documentation](docs/API.md) - REST API reference
+- [Database Migrations](docs/MIGRATIONS.md) - Schema management
+- [Security Audit Report](docs/SECURITY_AUDIT_2025-01-11.md) - Security review
 
 ### Password Reset Email Configuration
 
