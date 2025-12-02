@@ -508,63 +508,105 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and(warp::get())
         .and_then(serve_reset_password);
 
-    // Configure CORS - restrictive by default for security
-    // Use ALLOWED_ORIGINS env var for production (comma-separated list)
-    let raw_origins = env::var("ALLOWED_ORIGINS")
-        .unwrap_or_else(|_| "http://localhost:9898,http://127.0.0.1:9898".to_string());
+    // Configure CORS with smart defaults
+    //
+    // Auto-detection logic:
+    //   - No CORS_MODE set → permissive mode (works with any IP/domain)
+    //   - CORS_MODE=strict → requires ALLOWED_ORIGINS to be set
+    //   - CORS_MODE=permissive → explicitly allows all origins
+    //
+    // This makes the app "just work" for self-hosted environments while
+    // still supporting strict mode for production deployments.
 
-    // Validate and filter CORS origins
-    let allowed_origins: Vec<String> = raw_origins
-        .split(',')
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-        .filter_map(|origin| {
-            // Validate origin format
-            if origin == "*" {
-                tracing::warn!(
-                    "Wildcard CORS origin (*) is not recommended for production. \
-                     Consider specifying explicit origins for security."
+    let cors_mode = env::var("CORS_MODE")
+        .unwrap_or_else(|_| "permissive".to_string())
+        .to_lowercase();
+
+    let cors = match cors_mode.as_str() {
+        "permissive" => {
+            tracing::info!(
+                "CORS: Permissive mode - allowing all origins. \
+                 Perfect for self-hosted environments with dynamic IPs."
+            );
+
+            warp::cors()
+                .allow_any_origin()
+                .allow_headers(vec!["content-type", "authorization"])
+                .allow_methods(vec!["GET", "POST", "PUT", "DELETE"])
+                .allow_credentials(true)
+        }
+
+        "strict" => {
+            let raw_origins = env::var("ALLOWED_ORIGINS").expect(
+                "CORS_MODE=strict requires ALLOWED_ORIGINS environment variable. \
+                     Example: ALLOWED_ORIGINS=https://yourdomain.com,https://www.yourdomain.com \
+                     Or use CORS_MODE=permissive (default) to allow any origin.",
+            );
+
+            // Validate and filter CORS origins
+            let allowed_origins: Vec<String> = raw_origins
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .filter_map(|origin| {
+                    if origin.starts_with("http://") || origin.starts_with("https://") {
+                        // Basic URL validation - ensure no path, query, or fragment
+                        if origin.contains('?')
+                            || origin.contains('#')
+                            || origin.matches('/').count() > 2
+                        {
+                            tracing::error!(
+                                origin = %origin,
+                                "Invalid CORS origin: must not contain path, query, or fragment. \
+                                 Expected format: http(s)://domain:port"
+                            );
+                            None
+                        } else {
+                            Some(origin)
+                        }
+                    } else {
+                        tracing::error!(
+                            origin = %origin,
+                            "Invalid CORS origin: must start with http:// or https://"
+                        );
+                        None
+                    }
+                })
+                .collect();
+
+            if allowed_origins.is_empty() {
+                panic!(
+                    "CORS_MODE=strict but no valid origins in ALLOWED_ORIGINS. \
+                     Set valid origins or use CORS_MODE=permissive."
                 );
-                Some(origin)
-            } else if origin.starts_with("http://") || origin.starts_with("https://") {
-                // Basic URL validation - ensure no path, query, or fragment
-                if origin.contains('?') || origin.contains('#') || origin.matches('/').count() > 2 {
-                    tracing::error!(
-                        origin = %origin,
-                        "Invalid CORS origin: must not contain path, query, or fragment. \
-                         Expected format: http(s)://domain:port"
-                    );
-                    None
-                } else {
-                    Some(origin)
-                }
-            } else {
-                tracing::error!(
-                    origin = %origin,
-                    "Invalid CORS origin: must start with http:// or https://"
-                );
-                None
             }
-        })
-        .collect();
 
-    if allowed_origins.is_empty() {
-        tracing::error!(
-            "No valid CORS origins configured. API will reject all cross-origin requests. \
-             Set ALLOWED_ORIGINS environment variable with valid origins."
-        );
-    }
+            tracing::info!(
+                mode = "strict",
+                allowed_origins = ?allowed_origins,
+                "CORS: Strict mode - only allowing specified origins"
+            );
 
-    tracing::info!(
-        allowed_origins = ?allowed_origins,
-        "CORS configuration loaded and validated"
-    );
+            warp::cors()
+                .allow_origins(allowed_origins.iter().map(|s| s.as_str()))
+                .allow_headers(vec!["content-type", "authorization"])
+                .allow_methods(vec!["GET", "POST", "PUT", "DELETE"])
+                .allow_credentials(true)
+        }
 
-    let cors = warp::cors()
-        .allow_origins(allowed_origins.iter().map(|s| s.as_str()))
-        .allow_headers(vec!["content-type", "authorization"])
-        .allow_methods(vec!["GET", "POST", "PUT", "DELETE"])
-        .allow_credentials(true); // Required for cookie-based auth
+        mode => {
+            tracing::warn!(
+                mode = %mode,
+                "Unknown CORS_MODE '{}'. Defaulting to permissive mode.", mode
+            );
+
+            warp::cors()
+                .allow_any_origin()
+                .allow_headers(vec!["content-type", "authorization"])
+                .allow_methods(vec!["GET", "POST", "PUT", "DELETE"])
+                .allow_credentials(true)
+        }
+    };
 
     let routes = health
         .or(metrics_route)

@@ -1,52 +1,41 @@
 # Docker Configuration
 
-This directory contains all Docker-related files for the Humidor project, following best practices similar to Mealie.
+This directory contains all Docker-related files for the Humidor project.
+
+## Zero-Config Quick Start ⚡
+
+The app is designed to **just work** with smart defaults:
+
+```bash
+docker compose up -d
+```
+
+That's it! The app will:
+- ✅ Auto-generate and persist JWT secret
+- ✅ Allow access from any IP (perfect for Tailscale, VPNs, dynamic IPs)
+- ✅ Set up database with migrations
+- ✅ Use sensible defaults for everything
+
+**Access**: http://localhost:9898 (or your server's IP)
 
 ## Files
 
 - **`Dockerfile`** - Multi-stage build for production image
-- **`docker-compose.yml`** - Production configuration (pulls pre-built image)
+- **`docker-compose.yml`** - Zero-config production setup
 - **`docker-compose.dev.yml`** - Development overrides (builds locally, adds mailpit)
-- **`.dockerignore`** - Files to exclude from Docker build context
 
-## Quick Start
-
-### Local Development
+## Local Development
 
 Build and run locally with development tools:
 
 ```bash
 # From project root
 docker compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml up --build
-
-# Or from docker/ directory
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
-
-**What you get:**
-- ✅ Local build from source
-- ✅ Debug logging (`RUST_LOG=debug`)
-- ✅ Mailpit for email testing at http://localhost:8025
-- ✅ Hot reload capability (if volumes added)
-- ✅ Development JWT secret
 
 **Access:**
 - App: http://localhost:9898
-- Mailpit UI: http://localhost:8025 (see all captured emails)
-
-### Production Deployment (Dockge, etc.)
-
-Pull and run pre-built image from registry:
-
-```bash
-docker compose -f docker/docker-compose.yml up -d
-```
-
-**What you get:**
-- ✅ Pre-built image from ghcr.io
-- ✅ Auto-generated JWT secret (persisted to volume)
-- ✅ Production logging
-- ⚠️ No mailpit (configure real SMTP)
+- Mailpit UI: http://localhost:8025 (email testing)
 
 ## Common Commands
 
@@ -91,27 +80,51 @@ Set these in Dockge or via `.env` file:
 JWT_SECRET=<generate with: openssl rand -base64 32>
 ```
 
-### Optional Configuration
+## Optional Configuration
 
-```env
-# Database (defaults provided)
-POSTGRES_DB=humidor_db
-POSTGRES_USER=humidor_user
-POSTGRES_PASSWORD=humidor_pass
+**The app works without any configuration**, but you can customize if needed:
 
-# Application
-PORT=9898
-RUST_LOG=info
-JWT_TOKEN_LIFETIME_HOURS=2
-BASE_URL=http://localhost:9898
-ALLOWED_ORIGINS=http://localhost:9898,http://127.0.0.1:9898
+### Production with Fixed Domain (CORS Strict Mode)
 
-# Email (for password reset)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASSWORD=your-app-password
-SMTP_FROM_EMAIL=noreply@yourapp.com
+```yaml
+services:
+  humidor:
+    environment:
+      CORS_MODE: strict
+      ALLOWED_ORIGINS: "https://humidor.example.com"
+```
+
+### Custom Logging
+
+```yaml
+services:
+  humidor:
+    environment:
+      RUST_LOG: debug  # trace, debug, info, warn, error
+```
+
+### Email Configuration (Password Reset)
+
+```yaml
+services:
+  humidor:
+    environment:
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: 587
+      SMTP_USER: your-email@gmail.com
+      SMTP_PASSWORD: your-app-password
+      SMTP_FROM_EMAIL: noreply@yourapp.com
+```
+
+### All Defaults (What You Get Automatically)
+
+```yaml
+# These are the defaults - no need to set them:
+PORT: 9898
+RUST_LOG: info
+CORS_MODE: permissive  # Works with any IP
+JWT_TOKEN_LIFETIME_HOURS: 2
+# JWT_SECRET: Auto-generated and persisted to /app/data/
 ```
 
 ## Email Testing (Development)
@@ -157,24 +170,34 @@ dc-dev up --build
 dc-dev logs -f
 dc-prod up -d
 ```
-
-### PowerShell Functions
-
-Add to your PowerShell profile:
-
-```powershell
-function dc-dev { docker compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml $args }
-function dc-prod { docker compose -f docker/docker-compose.yml $args }
-```
-
-Usage:
-```powershell
-dc-dev up --build
-dc-dev logs -f web
-dc-prod up -d
-```
-
 ## Troubleshooting
+
+### App works! No CORS issues! 🎉
+
+The app uses permissive CORS by default, so it works with:
+- ✅ localhost
+- ✅ LAN IPs (192.168.x.x)
+- ✅ Tailscale IPs (100.x.x.x)
+- ✅ Any VPN or dynamic IP
+
+**Only configure CORS if** you're deploying to production with a fixed domain and want maximum security.
+
+### Build fails with "no such file or directory"
+**Solution**: The app now uses permissive CORS mode by default, which works with ANY IP address.
+
+**If you're still getting this error:**
+1. Check that `CORS_MODE=permissive` is set (it's the default)
+2. Restart containers: `docker compose down && docker compose up -d`
+3. Verify logs: `docker compose logs humidor | grep -i cors`
+   - Should see: "CORS mode set to 'permissive'"
+
+**For production with fixed domain:**
+```env
+CORS_MODE=strict
+ALLOWED_ORIGINS=https://yourdomain.com
+```
+
+**See**: `../docs/CORS_CONFIGURATION.md` for details.
 
 ### Build fails with "no such file or directory"
 
