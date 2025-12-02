@@ -235,7 +235,7 @@ pub async fn create_test_cigar(
     humidor_id: Option<Uuid>,
 ) -> Result<Uuid, Box<dyn std::error::Error>> {
     let client = pool.get().await?;
-    
+
     let cigar_id = Uuid::new_v4();
 
     // Don't explicitly list retail_link - let the database handle the default (NULL)
