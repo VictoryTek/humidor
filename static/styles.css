@@ -17,7 +17,7 @@
     --success-color: #22c55e;
     --error-color: #ef4444;
     --warning-color: #f59e0b;
-    --sidebar-width: 280px;
+    --sidebar-width: 240px;
 }
 
 /* Reset and Base Styles */
@@ -25,6 +25,10 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+}
+
+html {
+    font-size: 80%; /* Scale entire UI to 80% */
 }
 
 body {
@@ -54,9 +58,9 @@ body {
     display: flex;
     flex-direction: column;
     position: fixed;
-    height: calc(100vh - 80px); /* Adjust height to account for header */
+    height: calc(100vh - 80px);
     left: 0;
-    top: 80px; /* Start below the header */
+    top: 80px;
     z-index: 100;
     box-shadow: 4px 0 20px var(--shadow-color);
 }
@@ -85,7 +89,7 @@ body {
     color: var(--primary-dark);
     border: none;
     border-radius: 0.5rem;
-    font-size: 0.95rem;
+    font-size: 1.05rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -149,7 +153,7 @@ body {
 }
 
 .nav-section-title {
-    font-size: 0.75rem;
+    font-size: 0.95rem;
     font-weight: 600;
     color: var(--accent-gold);
     text-transform: uppercase;
@@ -168,7 +172,7 @@ body {
     color: var(--text-secondary);
     text-decoration: none;
     font-weight: 500;
-    font-size: 0.95rem;
+    font-size: 1.1rem;
     transition: all 0.2s ease;
     border-left: 3px solid transparent;
     border-radius: 0 0.5rem 0.5rem 0;
@@ -334,7 +338,7 @@ body {
     right: 0;
     z-index: 1000; /* Higher than sidebar */
     box-shadow: 0 1px 3px var(--shadow-color);
-    height: 80px; /* Fixed height for consistency */
+    height: 80px;
 }
 
 .header-left {
@@ -921,7 +925,7 @@ body {
     overflow-y: auto;
     background: var(--background-color);
     margin-left: var(--sidebar-width);
-    margin-top: 80px; /* Account for fixed header height */
+    margin-top: 80px;
 }
 
 .container {
@@ -1730,7 +1734,7 @@ body {
 
 .cigars-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); /* Reduced from 300px */
     gap: 1rem;
     margin-top: 1rem;
 }
@@ -1744,7 +1748,7 @@ body {
     transition: all 0.3s ease;
     cursor: pointer;
     position: relative;
-    min-height: 300px;
+    min-height: 280px;
 }
 
 .cigar-card:hover {
@@ -1756,7 +1760,7 @@ body {
 /* Image container at top of card */
 .cigar-card-image {
     width: 100%;
-    height: 220px;
+    height: 176px; /* Reduced from 220px (80% of original) */
     position: relative;
     overflow: hidden;
     background: linear-gradient(135deg, #2a241f 0%, #1e1a17 100%);
@@ -1802,11 +1806,13 @@ body {
     color: var(--text-primary);
     font-size: 1.125rem;
     font-weight: 600;
-    margin: 0 0 1rem 0;
+    margin: 0 0 0.5rem 0;
     line-height: 1.4;
-    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2; /* Limit to 2 lines */
+    -webkit-box-orient: vertical;
 }
 
 .cigar-card-humidor {
@@ -1831,11 +1837,8 @@ body {
     font-weight: 500;
 }
 
-/* Quantity counter on bottom right */
+/* Quantity counter below cigar name */
 .cigar-card-quantity {
-    position: absolute;
-    bottom: 1rem;
-    right: 1.25rem;
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -1844,6 +1847,9 @@ body {
     border-radius: 0.5rem;
     padding: 0.25rem 0.5rem;
     backdrop-filter: blur(8px);
+    width: fit-content;
+    margin-top: 0.75rem;
+    margin-left: auto; /* Right align */
 }
 
 .quantity-btn {
@@ -4051,7 +4057,7 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1.5rem;
+    padding: 0.75rem 1.5rem;
     background: var(--surface-color);
     border-top: 1px solid var(--border-color);
     gap: 1rem;
