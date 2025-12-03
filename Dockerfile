@@ -64,7 +64,9 @@ RUN touch src/main.rs && cargo build --release && strip target/release/humidor
 # Runtime stage - Alpine
 FROM alpine:3.21
 
-RUN apk add --no-cache \
+# Update all packages to get latest security patches including busybox fix
+RUN apk upgrade --no-cache && \
+    apk add --no-cache \
     ca-certificates \
     libgcc \
     curl \
