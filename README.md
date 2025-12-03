@@ -51,13 +51,13 @@ Access at: `http://localhost:9898` (or your server's IP)
 
 ```bash
 # Start services
-docker compose -f docker/docker-compose.yml up -d
+docker compose up -d
 
 # View logs
-docker compose -f docker/docker-compose.yml logs -f humidor
+docker compose logs -f humidor
 
 # Stop services
-docker compose -f docker/docker-compose.yml down
+docker compose down
 ```
 
 ### Docker Run (Manual)
@@ -84,6 +84,27 @@ services:
       - humidor_data:/app/data  # Auto-generated secrets stored here
     ports:
       - "9898:9898"
+    depends_on:
+      humidor_db:
+        condition: service_healthy
+
+  humidor_db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: humidor_db
+      POSTGRES_USER: humidor_user
+      POSTGRES_PASSWORD: humidor_pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U humidor_user -d humidor_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  humidor_data:
 ```
 
 **What's Automated:**

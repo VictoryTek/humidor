@@ -33,6 +33,7 @@ backups/
 Dockerfile
 docker-compose*.yml
 .dockerignore
+docker/
 
 # Environment files (should be set at runtime)
 .env

@@ -2,10 +2,10 @@
 # This file adds local build configuration, dev secrets, and testing tools for local development
 
 services:
-  web:
+  humidor:
     build:
-      context: ..
-      dockerfile: docker/Dockerfile
+      context: .
+      dockerfile: Dockerfile
     environment:
       JWT_SECRET: "dev-secret-12345678901234567890123456789012"
       RUST_LOG: debug

@@ -87,7 +87,7 @@ jobs:
         id: rust-check
         run: |
           # Extract Rust version from Dockerfile (e.g., "1.91" from "rust:1.91-alpine")
-          CURRENT_RUST=$(grep -m 1 'FROM rust:' docker/Dockerfile | sed -n 's/.*FROM rust:\([0-9.]*\).*/\1/p')
+          CURRENT_RUST=$(grep -m 1 'FROM rust:' Dockerfile | sed -n 's/.*FROM rust:\([0-9.]*\).*/\1/p')
           
           # Get latest stable Rust version from official channel
           LATEST_RUST=$(curl -s https://static.rust-lang.org/dist/channel-rust-stable.toml | grep -m 1 'version = ' | cut -d'"' -f2 | cut -d' ' -f1)
@@ -130,7 +130,7 @@ jobs:
               `- **Current**: ${current}\n` +
               `- **Latest**: ${latest}\n\n` +
               `**Steps to update:**\n` +
-              `1. Update \`docker/Dockerfile\` to use \`rust:${latest}-alpine\`\n` +
+              `1. Update \`Dockerfile\` to use \`rust:${latest}-alpine\`\n` +
               `2. Test the build locally\n` +
               `3. Run full test suite\n` +
               `4. Update CI/CD if needed\n\n` +
