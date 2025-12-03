@@ -227,6 +227,7 @@ pub async fn create_test_humidor(
 }
 
 /// Create a test cigar
+/// If humidor_id is None, creates a test user and humidor to ensure proper ownership
 #[allow(dead_code)]
 pub async fn create_test_cigar(
     pool: &Pool,
@@ -236,6 +237,17 @@ pub async fn create_test_cigar(
 ) -> Result<Uuid, Box<dyn std::error::Error>> {
     let client = pool.get().await?;
 
+    // Ensure we have a humidor_id (create user + humidor if needed)
+    let actual_humidor_id = match humidor_id {
+        Some(id) => id,
+        None => {
+            // Create a test user
+            let (user_id, _) = create_test_user(pool, "cigar_test_user", "password", false).await?;
+            // Create a humidor for this user
+            create_test_humidor(pool, user_id, "Test Humidor").await?
+        }
+    };
+
     let cigar_id = Uuid::new_v4();
 
     // Don't explicitly list retail_link - let the database handle the default (NULL)
@@ -243,7 +255,7 @@ pub async fn create_test_cigar(
         .execute(
             "INSERT INTO cigars (id, name, quantity, humidor_id, is_active, created_at, updated_at) 
              VALUES ($1, $2, $3, $4, true, NOW(), NOW())",
-            &[&cigar_id, &name, &quantity, &humidor_id],
+            &[&cigar_id, &name, &quantity, &actual_humidor_id],
         )
         .await?;
 
