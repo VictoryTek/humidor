@@ -2,8 +2,9 @@ name: humidor
 
 services:
   humidor:
-    image: ghcr.io/victorytek/humidor:latest
-    pull_policy: always
+    build:
+      context: .
+      dockerfile: Dockerfile
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-humidor_user}:${POSTGRES_PASSWORD:-humidor_pass}@humidor_db:5432/${POSTGRES_DB:-humidor_db}
       RUST_LOG: ${RUST_LOG:-info}

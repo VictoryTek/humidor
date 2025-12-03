@@ -171,10 +171,10 @@ The following environment variables can be configured (all have sensible default
 | `JWT_SECRET` | No | Auto-generated | Secret key for JWT token signing (auto-generated if not provided) |
 | `JWT_TOKEN_LIFETIME_HOURS` | No | `2` | JWT token lifetime in hours |
 | `BASE_URL` | No | `http://localhost:9898` | Base URL for the application (used in password reset emails) |
+| `JWT_TOKEN_LIFETIME_HOURS` | No | `2` | JWT token lifetime in hours |
+| `BASE_URL` | No | `http://localhost:9898` | Base URL for the application (used in password reset emails) |
 | `ALLOWED_ORIGINS` | No | `http://localhost:9898,http://127.0.0.1:9898` | Comma-separated list of allowed CORS origins |
 | `SMTP_HOST` | No | - | SMTP server hostname for sending emails (optional) |
-| `SMTP_PORT` | No | `587` | SMTP server port |
-| `SMTP_USER` | No | - | SMTP authentication username |
 | `SMTP_PASSWORD` | No | - | SMTP authentication password |
 | `SMTP_FROM_EMAIL` | No | - | Email address to send from |
 
