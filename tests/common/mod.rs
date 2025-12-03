@@ -229,19 +229,17 @@ pub async fn create_test_humidor(
 /// Get or create a default test humidor for cigar tests
 /// Uses a consistent user and humidor to avoid creation overhead
 #[allow(dead_code)]
-async fn get_or_create_default_humidor(
-    pool: &Pool,
-) -> Result<Uuid, Box<dyn std::error::Error>> {
+async fn get_or_create_default_humidor(pool: &Pool) -> Result<Uuid, Box<dyn std::error::Error>> {
     let client = pool.get().await?;
-    
+
     // Try to find existing default test user
     let user_row = client
         .query_opt(
             "SELECT id FROM users WHERE username = $1",
-            &[&"default_cigar_test_user"]
+            &[&"default_cigar_test_user"],
         )
         .await?;
-    
+
     let user_id = if let Some(row) = user_row {
         row.get(0)
     } else {
@@ -264,15 +262,15 @@ async fn get_or_create_default_humidor(
             .await?;
         new_user_id
     };
-    
+
     // Try to find existing default humidor
     let humidor_row = client
         .query_opt(
             "SELECT id FROM humidors WHERE user_id = $1 AND name = $2",
-            &[&user_id, &"Default Test Humidor"]
+            &[&user_id, &"Default Test Humidor"],
         )
         .await?;
-    
+
     let humidor_id = if let Some(row) = humidor_row {
         row.get(0)
     } else {
@@ -287,7 +285,7 @@ async fn get_or_create_default_humidor(
             .await?;
         new_humidor_id
     };
-    
+
     Ok(humidor_id)
 }
 
