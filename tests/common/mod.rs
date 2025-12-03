@@ -226,8 +226,73 @@ pub async fn create_test_humidor(
     Ok(row.get(0))
 }
 
+/// Get or create a default test humidor for cigar tests
+/// Uses a consistent user and humidor to avoid creation overhead
+#[allow(dead_code)]
+async fn get_or_create_default_humidor(
+    pool: &Pool,
+) -> Result<Uuid, Box<dyn std::error::Error>> {
+    let client = pool.get().await?;
+    
+    // Try to find existing default test user
+    let user_row = client
+        .query_opt(
+            "SELECT id FROM users WHERE username = $1",
+            &[&"default_cigar_test_user"]
+        )
+        .await?;
+    
+    let user_id = if let Some(row) = user_row {
+        row.get(0)
+    } else {
+        // Create default test user with fixed username (no UUID suffix for consistency)
+        let password_hash = bcrypt::hash("password", bcrypt::DEFAULT_COST)?;
+        let new_user_id = Uuid::new_v4();
+        client
+            .execute(
+                "INSERT INTO users (id, username, email, full_name, password_hash, is_admin, created_at, updated_at) 
+                 VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())",
+                &[
+                    &new_user_id,
+                    &"default_cigar_test_user",
+                    &"default_cigar_test@test.com",
+                    &"Default Test User",
+                    &password_hash,
+                    &false,
+                ],
+            )
+            .await?;
+        new_user_id
+    };
+    
+    // Try to find existing default humidor
+    let humidor_row = client
+        .query_opt(
+            "SELECT id FROM humidors WHERE user_id = $1 AND name = $2",
+            &[&user_id, &"Default Test Humidor"]
+        )
+        .await?;
+    
+    let humidor_id = if let Some(row) = humidor_row {
+        row.get(0)
+    } else {
+        // Create default humidor
+        let new_humidor_id = Uuid::new_v4();
+        client
+            .execute(
+                "INSERT INTO humidors (id, name, user_id, created_at, updated_at) 
+                 VALUES ($1, $2, $3, NOW(), NOW())",
+                &[&new_humidor_id, &"Default Test Humidor", &user_id],
+            )
+            .await?;
+        new_humidor_id
+    };
+    
+    Ok(humidor_id)
+}
+
 /// Create a test cigar
-/// If humidor_id is None, creates a test user and humidor to ensure proper ownership
+/// If humidor_id is None, uses a shared default test user and humidor to ensure proper ownership
 #[allow(dead_code)]
 pub async fn create_test_cigar(
     pool: &Pool,
@@ -237,15 +302,10 @@ pub async fn create_test_cigar(
 ) -> Result<Uuid, Box<dyn std::error::Error>> {
     let client = pool.get().await?;
 
-    // Ensure we have a humidor_id (create user + humidor if needed)
+    // Ensure we have a humidor_id (use default humidor if needed)
     let actual_humidor_id = match humidor_id {
         Some(id) => id,
-        None => {
-            // Create a test user
-            let (user_id, _) = create_test_user(pool, "cigar_test_user", "password", false).await?;
-            // Create a humidor for this user
-            create_test_humidor(pool, user_id, "Test Humidor").await?
-        }
+        None => get_or_create_default_humidor(pool).await?,
     };
 
     let cigar_id = Uuid::new_v4();
