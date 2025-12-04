@@ -163,56 +163,55 @@
 
                     <!-- Main Content (Hidden until humidors exist) -->
                     <div class="main-content-section" id="mainContentSection" style="display: none;">
-                        <!-- Page Header with Actions -->
+                        <!-- Page Header with Search and Actions -->
                         <div class="page-actions-header">
                             <div class="page-title">
                                 <h1>My Humidors</h1>
+                            </div>
+                            <!-- Search and Filter Section (moved here) -->
+                            <div class="cigar-search-section-inline">
+                                <div class="search-bar">
+                                    <input type="text" id="cigarSearchInput" placeholder="Search cigars..." class="search-input">
+                                    <button class="search-btn" id="cigarSearchBtn">
+                                        <span class="mdi mdi-magnify"></span>
+                                    </button>
+                                </div>
+                                <div class="search-filters">
+                                    <button class="filter-chip" id="filterBrandChip" data-active="false">
+                                        <span class="mdi mdi-tag-outline"></span>
+                                        <span>Brands</span>
+                                        <span class="filter-badge" id="brandBadge">0</span>
+                                    </button>
+                                    <button class="filter-chip" id="filterSizeChip" data-active="false">
+                                        <span class="mdi mdi-ruler"></span>
+                                        <span>Sizes</span>
+                                        <span class="filter-badge" id="sizeBadge">0</span>
+                                    </button>
+                                    <button class="filter-chip" id="filterOriginChip" data-active="false">
+                                        <span class="mdi mdi-map-marker-outline"></span>
+                                        <span>Origins</span>
+                                        <span class="filter-badge" id="originBadge">0</span>
+                                    </button>
+                                    <button class="filter-chip" id="filterStrengthChip" data-active="false">
+                                        <span class="mdi mdi-chart-line"></span>
+                                        <span>Strengths</span>
+                                        <span class="filter-badge" id="strengthBadge">0</span>
+                                    </button>
+                                    <button class="filter-chip" id="filterRingGaugeChip" data-active="false">
+                                        <span class="mdi mdi-circle-outline"></span>
+                                        <span>Ring Gauges</span>
+                                        <span class="filter-badge" id="ringGaugeBadge">0</span>
+                                    </button>
+                                    <button class="filter-chip clear-filters" id="clearFiltersBtn" style="display: none;">
+                                        <span class="mdi mdi-close-circle"></span>
+                                        <span>Clear Filters</span>
+                                    </button>
+                                </div>
                             </div>
                             <div class="header-actions">
                                 <button class="add-humidor-btn-primary" id="addHumidorBtnHeader">
                                     <span class="add-icon">+</span>
                                     <span>HUMIDOR</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Search and Filter Section -->
-                        <div class="cigar-search-section">
-                            <div class="search-bar">
-                                <input type="text" id="cigarSearchInput" placeholder="Search cigars..." class="search-input">
-                                <button class="search-btn" id="cigarSearchBtn">
-                                    <span class="mdi mdi-magnify"></span>
-                                </button>
-                            </div>
-                            <div class="search-filters">
-                                <button class="filter-chip" id="filterBrandChip" data-active="false">
-                                    <span class="mdi mdi-tag-outline"></span>
-                                    <span>Brands</span>
-                                    <span class="filter-badge" id="brandBadge">0</span>
-                                </button>
-                                <button class="filter-chip" id="filterSizeChip" data-active="false">
-                                    <span class="mdi mdi-ruler"></span>
-                                    <span>Sizes</span>
-                                    <span class="filter-badge" id="sizeBadge">0</span>
-                                </button>
-                                <button class="filter-chip" id="filterOriginChip" data-active="false">
-                                    <span class="mdi mdi-map-marker-outline"></span>
-                                    <span>Origins</span>
-                                    <span class="filter-badge" id="originBadge">0</span>
-                                </button>
-                                <button class="filter-chip" id="filterStrengthChip" data-active="false">
-                                    <span class="mdi mdi-chart-line"></span>
-                                    <span>Strengths</span>
-                                    <span class="filter-badge" id="strengthBadge">0</span>
-                                </button>
-                                <button class="filter-chip" id="filterRingGaugeChip" data-active="false">
-                                    <span class="mdi mdi-circle-outline"></span>
-                                    <span>Ring Gauges</span>
-                                    <span class="filter-badge" id="ringGaugeBadge">0</span>
-                                </button>
-                                <button class="filter-chip clear-filters" id="clearFiltersBtn" style="display: none;">
-                                    <span class="mdi mdi-close-circle"></span>
-                                    <span>Clear Filters</span>
                                 </button>
                             </div>
                         </div>
