@@ -24,7 +24,7 @@ pub async fn get_humidors(auth: AuthContext, pool: DbPool) -> Result<impl Reply,
 
     // Get humidors owned by user UNION with humidors shared with user
     let query = "
-        SELECT DISTINCT h.id, h.user_id, h.name, h.description, h.capacity, h.target_humidity, h.location, h.created_at, h.updated_at,
+        SELECT DISTINCT h.id, h.user_id, h.name, h.description, h.capacity, h.target_humidity, h.location, h.image_url, h.created_at, h.updated_at,
                CASE WHEN h.user_id = $1 THEN true ELSE false END as is_owner,
                COALESCE(hs.permission_level, 'full') as permission_level
         FROM humidors h
@@ -45,10 +45,11 @@ pub async fn get_humidors(auth: AuthContext, pool: DbPool) -> Result<impl Reply,
                     capacity: row.get(4),
                     target_humidity: row.get(5),
                     location: row.get(6),
-                    created_at: row.get(7),
-                    updated_at: row.get(8),
-                    is_owner: Some(row.get(9)),
-                    permission_level: Some(row.get(10)),
+                    image_url: row.get(7),
+                    created_at: row.get(8),
+                    updated_at: row.get(9),
+                    is_owner: Some(row.get(10)),
+                    permission_level: Some(row.get(11)),
                 })
                 .collect();
 
@@ -91,7 +92,7 @@ pub async fn get_humidor(
         Ok(true) => {
             // User has access, fetch the humidor
             let query = "
-                SELECT id, user_id, name, description, capacity, target_humidity, location, created_at, updated_at
+                SELECT id, user_id, name, description, capacity, target_humidity, location, image_url, created_at, updated_at
                 FROM humidors 
                 WHERE id = $1
             ";
@@ -106,8 +107,9 @@ pub async fn get_humidor(
                         capacity: row.get(4),
                         target_humidity: row.get(5),
                         location: row.get(6),
-                        created_at: row.get(7),
-                        updated_at: row.get(8),
+                        image_url: row.get(7),
+                        created_at: row.get(8),
+                        updated_at: row.get(9),
                         is_owner: None,
                         permission_level: None,
                     };
@@ -188,9 +190,9 @@ pub async fn create_humidor(
     let now = chrono::Utc::now();
 
     let query = "
-        INSERT INTO humidors (id, user_id, name, description, capacity, target_humidity, location, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        RETURNING id, user_id, name, description, capacity, target_humidity, location, created_at, updated_at
+        INSERT INTO humidors (id, user_id, name, description, capacity, target_humidity, location, image_url, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        RETURNING id, user_id, name, description, capacity, target_humidity, location, image_url, created_at, updated_at
     ";
 
     match db
@@ -204,6 +206,7 @@ pub async fn create_humidor(
                 &request.capacity,
                 &request.target_humidity,
                 &request.location,
+                &request.image_url,
                 &now,
                 &now,
             ],
@@ -219,8 +222,9 @@ pub async fn create_humidor(
                 capacity: row.get(4),
                 target_humidity: row.get(5),
                 location: row.get(6),
-                created_at: row.get(7),
-                updated_at: row.get(8),
+                image_url: row.get(7),
+                created_at: row.get(8),
+                updated_at: row.get(9),
                 is_owner: Some(true), // User creating is always owner
                 permission_level: Some("full".to_string()),
             };
@@ -274,9 +278,9 @@ pub async fn update_humidor(
 
     let query = "
         UPDATE humidors 
-        SET name = $3, description = $4, capacity = $5, target_humidity = $6, location = $7, updated_at = $8
+        SET name = $3, description = $4, capacity = $5, target_humidity = $6, location = $7, image_url = $8, updated_at = $9
         WHERE id = $1 AND user_id = $2
-        RETURNING id, user_id, name, description, capacity, target_humidity, location, created_at, updated_at
+        RETURNING id, user_id, name, description, capacity, target_humidity, location, image_url, created_at, updated_at
     ";
 
     match db
@@ -290,6 +294,7 @@ pub async fn update_humidor(
                 &request.capacity,
                 &request.target_humidity,
                 &request.location,
+                &request.image_url,
                 &now,
             ],
         )
@@ -304,8 +309,9 @@ pub async fn update_humidor(
                 capacity: row.get(4),
                 target_humidity: row.get(5),
                 location: row.get(6),
-                created_at: row.get(7),
-                updated_at: row.get(8),
+                image_url: row.get(7),
+                created_at: row.get(8),
+                updated_at: row.get(9),
                 is_owner: None, // Not needed for update response
                 permission_level: None,
             };

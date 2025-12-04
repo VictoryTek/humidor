@@ -14,6 +14,7 @@ pub struct Humidor {
     pub capacity: Option<i32>,
     pub target_humidity: Option<i32>,
     pub location: Option<String>,
+    pub image_url: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -29,6 +30,7 @@ pub struct CreateHumidorRequest {
     pub capacity: Option<i32>,
     pub target_humidity: Option<i32>,
     pub location: Option<String>,
+    pub image_url: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -38,6 +40,7 @@ pub struct UpdateHumidorRequest {
     pub capacity: Option<i32>,
     pub target_humidity: Option<i32>,
     pub location: Option<String>,
+    pub image_url: Option<String>,
 }
 
 impl Validate for CreateHumidorRequest {
@@ -72,6 +75,14 @@ impl Validate for CreateHumidorRequest {
             && !location.is_empty()
         {
             validate_length(location, "location", 1, 200)?;
+        }
+
+        if let Some(image_url) = &self.image_url
+            && !image_url.is_empty()
+        {
+            // Allow up to 20MB of base64 data (~26.7 million chars)
+            // Actual limit enforced by Warp body size (10MB JSON payload)
+            validate_length(image_url, "image_url", 1, 30_000_000)?;
         }
 
         Ok(())
@@ -112,6 +123,14 @@ impl Validate for UpdateHumidorRequest {
             && !location.is_empty()
         {
             validate_length(location, "location", 1, 200)?;
+        }
+
+        if let Some(image_url) = &self.image_url
+            && !image_url.is_empty()
+        {
+            // Allow up to 20MB of base64 data (~26.7 million chars)
+            // Actual limit enforced by Warp body size (10MB JSON payload)
+            validate_length(image_url, "image_url", 1, 30_000_000)?;
         }
 
         Ok(())

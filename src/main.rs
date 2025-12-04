@@ -636,7 +636,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!(
         addr = %format!("0.0.0.0:{}", port),
         port = port,
-        url = %format!("http://0.0.0.0:{}", port),
+        url = %format!("http://127.0.0.1:{}", port),
         "Server started successfully, listening for connections"
     );
 

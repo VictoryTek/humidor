@@ -38,9 +38,10 @@ pub fn with_uuid() -> impl Filter<Extract = (uuid::Uuid,), Error = warp::Rejecti
 }
 
 /// Helper function to parse JSON body with size limit
-/// Default limit: 1MB for JSON payloads (reasonable for API requests)
+/// Limit: 10MB for JSON payloads to accommodate base64-encoded images
+/// (5MB image becomes ~6.7MB when base64 encoded)
 pub fn json_body<T: Send + serde::de::DeserializeOwned>()
 -> impl Filter<Extract = (T,), Error = warp::Rejection> + Clone {
-    warp::body::content_length_limit(1024 * 1024) // 1MB
+    warp::body::content_length_limit(10 * 1024 * 1024) // 10MB
         .and(warp::body::json())
 }

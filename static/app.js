@@ -249,17 +249,24 @@ async function makeAuthenticatedRequest(url, options = {}) {
         throw new Error('No authentication token found');
     }
 
-    const defaultHeaders = {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+    // Build headers - don't set Content-Type if explicitly null (for FormData uploads)
+    const headers = {
+        'Authorization': `Bearer ${token}`,
+        ...(options.headers || {})
     };
+    
+    // Only add Content-Type if not explicitly excluded and not FormData
+    if (options.headers && options.headers['Content-Type'] === null) {
+        // Don't set Content-Type - let browser set it for multipart/form-data
+        delete headers['Content-Type'];
+    } else if (!options.headers || options.headers['Content-Type'] === undefined) {
+        // Default to JSON for regular requests
+        headers['Content-Type'] = 'application/json';
+    }
 
     const requestOptions = {
         ...options,
-        headers: {
-            ...defaultHeaders,
-            ...(options.headers || {})
-        }
+        headers
     };
 
     const response = await fetch(url, requestOptions);
@@ -270,6 +277,11 @@ async function makeAuthenticatedRequest(url, options = {}) {
         localStorage.removeItem('humidor_user');
         window.location.href = '/login.html';
         throw new Error('Authentication failed');
+    }
+    
+    if (response.status === 413) {
+        // Payload too large
+        throw new Error('PAYLOAD_TOO_LARGE');
     }
     
     return response;
@@ -3183,34 +3195,28 @@ async function saveHumidor() {
     const form = document.getElementById('humidorForm');
     const formData = new FormData(form);
     
-    // Check if there's an image file to upload
+    // Check if there's an image file to upload (same pattern as cigars)
     const imageFile = document.getElementById('humidorImageUpload').files[0];
-    const imageUrl = formData.get('image_url');
+    let imageUrl = formData.get('image_url') || null;
     
-    let finalImageUrl = imageUrl;
-    
-    // If a file is selected, upload it first
+    // If a file is selected, convert to base64 data URL
     if (imageFile) {
+        // Validate file size (5MB limit, same as cigars)
+        if (imageFile.size > 5 * 1024 * 1024) {
+            showToast('Image must be under 5MB', 'error');
+            return;
+        }
+        
         try {
-            const uploadFormData = new FormData();
-            uploadFormData.append('image', imageFile);
-            
-            const uploadResponse = await makeAuthenticatedRequest('/api/v1/images/upload', {
-                method: 'POST',
-                body: uploadFormData,
-                headers: {} // Let browser set Content-Type with boundary
+            imageUrl = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(imageFile);
             });
-            
-            if (uploadResponse.ok) {
-                const uploadResult = await uploadResponse.json();
-                finalImageUrl = uploadResult.url;
-            } else {
-                showToast('Failed to upload image', 'error');
-                return;
-            }
         } catch (error) {
-            console.error('Error uploading image:', error);
-            showToast('Failed to upload image', 'error');
+            console.error('Error reading image file:', error);
+            showToast('Failed to process image', 'error');
             return;
         }
     }
@@ -3221,7 +3227,7 @@ async function saveHumidor() {
         capacity: parseInt(formData.get('capacity')),
         location: formData.get('location') || null,
         description: formData.get('description') || null,
-        image_url: finalImageUrl || null
+        image_url: imageUrl
     };
 
     try {
@@ -3264,7 +3270,16 @@ async function saveHumidor() {
         }
     } catch (error) {
         console.error('Error saving humidor:', error);
-        showToast('Failed to save humidor', 'error');
+        
+        // Check for specific error types
+        if (error.message === 'PAYLOAD_TOO_LARGE') {
+            showToast('Image is too large. Please use a smaller image (under 5MB).', 'error');
+        } else if (error.message === 'Failed to fetch' || error.name === 'TypeError') {
+            // Network error or connection reset - likely payload size issue
+            showToast('Request failed - image may be too large. Try a smaller image.', 'error');
+        } else {
+            showToast('Failed to save humidor', 'error');
+        }
     }
 }
 

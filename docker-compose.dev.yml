@@ -15,6 +15,12 @@ services:
       SMTP_FROM_EMAIL: "noreply@humidor.local"
       SMTP_USER: ""
       SMTP_PASSWORD: ""
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:9898/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
   
   # Mailpit - Email testing interface
   # Access at http://localhost:8025 to see captured emails

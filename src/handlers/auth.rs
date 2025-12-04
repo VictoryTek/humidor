@@ -499,6 +499,7 @@ pub async fn create_humidor_for_setup(
                 capacity: row.get("capacity"),
                 target_humidity: row.get("target_humidity"),
                 location: row.get("location"),
+                image_url: None, // No image during setup
                 created_at: row.get("created_at"),
                 updated_at: row.get("updated_at"),
                 is_owner: Some(true), // User creating during setup is owner
