@@ -2432,41 +2432,63 @@ async function showHumidorDetail(humidorId) {
     // Load cigars for this specific humidor with pagination
     try {
         console.log('Loading cigars for humidor:', humidorId);
-        const response = await makeAuthenticatedRequest(
-            `/api/v1/cigars?humidor_id=${humidorId}&page=${currentCigarPage}&page_size=${cigarPageSize}`
-        );
         
-        if (response.ok) {
-            const responseData = await response.json();
-            cigars = responseData.cigars || [];
-            totalCigars = responseData.total || 0;
-            totalCigarPages = responseData.total_pages || 1;
-            
-            console.log('Loaded cigars:', cigars.length);
-            
-            // Render back button and humidor header
-            const backButtonHtml = humidors.length > 1 ? `
-                <div class="humidor-detail-nav">
-                    <button class="btn-back" onclick="navigateToHub()">
-                        <i class="mdi mdi-arrow-left"></i> Back to Humidors
-                    </button>
-                </div>
-            ` : '';
-            
-            // Render the humidor section
-            humidorsContainer.innerHTML = `
-                ${backButtonHtml}
-                ${renderSingleHumidorSection(humidor, cigars)}
-            `;
-            
-            // Update pagination controls
-            updatePaginationControls();
-            
-            // Update favorite icons for all displayed cigars
-            updateAllFavoriteIcons();
+        // Check if filters are active
+        const hasFilters = searchQuery || selectedBrands.length > 0 || selectedSizes.length > 0 || 
+                          selectedOrigins.length > 0 || selectedStrengths.length > 0 || 
+                          selectedRingGauges.length > 0;
+        
+        let cigarsToDisplay;
+        
+        if (hasFilters) {
+            // Use filtered cigars for this humidor
+            console.log('Using filtered cigars');
+            cigarsToDisplay = filteredCigars.filter(c => c.humidor_id === humidorId);
+            totalCigars = cigarsToDisplay.length;
+            totalCigarPages = 1; // No pagination when filtering
         } else {
-            throw new Error('Failed to load humidor details');
+            // Load fresh from API with pagination
+            const response = await makeAuthenticatedRequest(
+                `/api/v1/cigars?humidor_id=${humidorId}&page=${currentCigarPage}&page_size=${cigarPageSize}`
+            );
+            
+            if (response.ok) {
+                const responseData = await response.json();
+                cigars = responseData.cigars || [];
+                cigarsToDisplay = cigars;
+                totalCigars = responseData.total || 0;
+                totalCigarPages = responseData.total_pages || 1;
+            } else {
+                throw new Error('Failed to load humidor details');
+            }
         }
+        
+        console.log('Displaying cigars:', cigarsToDisplay.length);
+        
+        // Render back button and humidor header
+        const backButtonHtml = humidors.length > 1 ? `
+            <div class="humidor-detail-nav">
+                <button class="btn-back" onclick="navigateToHub()">
+                    <i class="mdi mdi-arrow-left"></i> Back to Humidors
+                </button>
+            </div>
+        ` : '';
+        
+        // Render the humidor section
+        humidorsContainer.innerHTML = `
+            ${backButtonHtml}
+            ${renderSingleHumidorSection(humidor, cigarsToDisplay)}
+        `;
+        
+        // Update pagination controls (hide if filtering)
+        if (hasFilters) {
+            paginationContainer.style.display = 'none';
+        } else {
+            updatePaginationControls();
+        }
+        
+        // Update favorite icons for all displayed cigars
+        updateAllFavoriteIcons();
     } catch (error) {
         console.error('Error loading humidor detail:', error);
         showToast('Failed to load humidor details', 'error');
@@ -2604,7 +2626,15 @@ function applySearchAndFilters() {
     }
     
     updateFilterBadges();
-    renderHumidorSections();
+    
+    // Render based on current view - stay in detail view if we're there, otherwise show hub
+    if (currentRoute.view === 'detail' && currentRoute.humidorId) {
+        // Re-render the same detail view with filtered cigars
+        showHumidorDetail(currentRoute.humidorId);
+    } else {
+        // Hub view - show all humidors with filtered cigars
+        renderHumidorSections();
+    }
 }
 
 function updateFilterBadges() {
@@ -2636,7 +2666,21 @@ function clearFilters() {
     selectedStrengths = [];
     selectedRingGauges = [];
     document.getElementById('cigarSearchInput').value = '';
-    applySearchAndFilters();
+    
+    // Clear filters and stay in current view
+    updateFilterBadges();
+    
+    if (currentRoute.view === 'detail' && currentRoute.humidorId) {
+        // Stay in detail view, just clear the filters
+        showHumidorDetail(currentRoute.humidorId);
+    } else {
+        // In hub view, clear filters and show hub (cards view if multiple humidors)
+        if (humidors.length > 1) {
+            showHumidorHub();
+        } else {
+            applySearchAndFilters();
+        }
+    }
 }
 
 // Filter Modal Functions
