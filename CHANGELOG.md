@@ -5,6 +5,24 @@ All notable changes to Humidor will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2025-12-05
+
+### Added
+- **Light/Dark Mode Theme Toggle**
+  - Theme switcher button in top-right header (next to user account)
+  - Light mode with soft warm parchment backgrounds
+  - Dark mode (default) with rich mahogany and gold accents
+  - Theme preference persisted to localStorage
+  - Smooth CSS transitions between themes
+  - Consistent dark styling for key UI elements across both themes
+  - Material Design Icons for theme toggle (moon/sun)
+
+### Changed
+- Moved release notes from root directory to `release_notes/` folder
+- Light mode uses same vibrant gold/copper accents as dark mode
+- All button text uses deep chocolate brown for optimal contrast
+- Navigation panel selection maintains dark theme styling in light mode
+
 ## [1.0.0] - 2025-01-12
 
 ### Added

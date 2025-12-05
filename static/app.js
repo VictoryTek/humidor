@@ -1,3 +1,39 @@
+// Theme Management
+function initializeTheme() {
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    applyTheme(savedTheme);
+    updateThemeIcon(savedTheme);
+}
+
+function applyTheme(theme) {
+    if (theme === 'light') {
+        document.documentElement.classList.add('light-mode');
+    } else {
+        document.documentElement.classList.remove('light-mode');
+    }
+    localStorage.setItem('theme', theme);
+}
+
+function toggleTheme() {
+    const currentTheme = document.documentElement.classList.contains('light-mode') ? 'light' : 'dark';
+    const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+    applyTheme(newTheme);
+    updateThemeIcon(newTheme);
+}
+
+function updateThemeIcon(theme) {
+    const themeIcon = document.querySelector('.theme-icon');
+    if (themeIcon) {
+        if (theme === 'light') {
+            themeIcon.classList.remove('mdi-weather-night');
+            themeIcon.classList.add('mdi-white-balance-sunny');
+        } else {
+            themeIcon.classList.remove('mdi-white-balance-sunny');
+            themeIcon.classList.add('mdi-weather-night');
+        }
+    }
+}
+
 // Application State
 let humidors = [];
 let cigars = [];
@@ -48,6 +84,14 @@ function initializeRouter() {
     
     // Handle initial route
     handleRouteChange();
+}
+
+// Theme Toggle Event Listener
+function setupThemeToggle() {
+    const themeToggle = document.getElementById('themeToggle');
+    if (themeToggle) {
+        themeToggle.addEventListener('click', toggleTheme);
+    }
 }
 
 function handleRouteChange() {
@@ -1635,6 +1679,10 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize user info display
     initializeUserDisplay();
+    
+    // Initialize theme
+    initializeTheme();
+    setupThemeToggle();
     
     // Initialize DOM elements
     elements = {

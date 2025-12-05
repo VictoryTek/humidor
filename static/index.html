@@ -113,6 +113,9 @@
                     </div>
                 </div>
                 <div class="header-right">
+                    <button class="theme-toggle" id="themeToggle" type="button" title="Toggle theme">
+                        <span class="theme-icon mdi mdi-weather-night"></span>
+                    </button>
                     <div class="user-info" id="userInfo" style="display: none;">
                         <button class="user-menu-trigger" id="userMenuTrigger" type="button">
                             <div class="user-avatar">
@@ -630,14 +633,18 @@
     <div class="modal" id="restoreConfirmModal">
         <div class="modal-content confirm-modal-content">
             <div class="modal-header">
-                <h2>⚠️ Confirm Backup Restore</h2>
+                <h2>
+                    <span class="mdi mdi-alert"></span>
+                    Confirm Backup Restore
+                </h2>
                 <button class="close-btn" id="closeRestoreModal">&times;</button>
             </div>
             <div class="modal-body">
-                <p class="warning-text">
-                    <strong>This action cannot be undone!</strong>
-                </p>
-                <p>
+                <div class="warning-text">
+                    <span class="mdi mdi-alert-circle"></span>
+                    This action cannot be undone!
+                </div>
+                <p style="margin-top: 1rem; color: var(--text-primary);">
                     Restoring this backup will:
                 </p>
                 <ul class="warning-list">
@@ -645,21 +652,25 @@
                     <li>Overwrite all cigars, humidors, and organizers</li>
                     <li>Replace all uploaded images</li>
                 </ul>
-                <p>
+                <p style="color: var(--text-secondary); font-style: italic;">
                     Make sure you have a recent backup before proceeding.
                 </p>
-                <p class="restore-filename">
+                <div class="restore-filename">
+                    <span class="mdi mdi-package-variant"></span>
                     Backup file: <strong id="restoreFilename"></strong>
-                </p>
+                </div>
                 <div class="checkbox-container">
                     <label>
                         <input type="checkbox" id="restoreConfirmCheckbox">
-                        I understand that this action is irreversible
+                        <span>I understand that this action is irreversible</span>
                     </label>
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" id="cancelRestoreBtn">Cancel</button>
+                <button class="btn btn-secondary" id="cancelRestoreBtn">
+                    <span class="mdi mdi-close"></span>
+                    Cancel
+                </button>
                 <button class="btn btn-danger" id="confirmRestoreBtn" disabled>
                     <span class="mdi mdi-database-import"></span>
                     Restore Backup
