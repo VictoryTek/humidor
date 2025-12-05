@@ -2957,9 +2957,11 @@ function openHumidorModal(humidor = null) {
     
     const modal = document.getElementById('humidorModal');
     const title = document.getElementById('humidorModalTitle');
+    const saveBtn = document.getElementById('saveHumidorBtn');
     const form = document.getElementById('humidorForm');
     
     title.textContent = isEditingHumidor ? 'Edit Humidor' : 'Add New Humidor';
+    saveBtn.textContent = isEditingHumidor ? 'Save Changes' : 'Create Humidor';
     
     if (isEditingHumidor) {
         // Populate form with humidor data
