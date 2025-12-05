@@ -235,7 +235,7 @@ async fn get_or_create_default_humidor(pool: &Pool) -> Result<Uuid, Box<dyn std:
     // Create default test user with ON CONFLICT to handle race conditions
     let password_hash = bcrypt::hash("password", bcrypt::DEFAULT_COST)?;
     let new_user_id = Uuid::new_v4();
-    
+
     // Use ON CONFLICT DO NOTHING to handle concurrent test execution
     client
         .execute(
@@ -252,7 +252,7 @@ async fn get_or_create_default_humidor(pool: &Pool) -> Result<Uuid, Box<dyn std:
             ],
         )
         .await?;
-    
+
     // Now fetch the user_id (either the one we just created or existing one)
     let user_row = client
         .query_one(
@@ -260,7 +260,7 @@ async fn get_or_create_default_humidor(pool: &Pool) -> Result<Uuid, Box<dyn std:
             &[&"default_cigar_test_user"],
         )
         .await?;
-    
+
     let user_id: Uuid = user_row.get(0);
 
     // Try to find existing default humidor first
@@ -270,7 +270,7 @@ async fn get_or_create_default_humidor(pool: &Pool) -> Result<Uuid, Box<dyn std:
             &[&user_id, &"Default Test Humidor"],
         )
         .await?;
-    
+
     let humidor_id = if let Some(row) = existing_humidor {
         row.get(0)
     } else {
@@ -285,7 +285,7 @@ async fn get_or_create_default_humidor(pool: &Pool) -> Result<Uuid, Box<dyn std:
             .await?;
         new_humidor_id
     };
-    
+
     Ok(humidor_id)
 }
 
