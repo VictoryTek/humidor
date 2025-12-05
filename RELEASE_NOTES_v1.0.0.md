@@ -88,10 +88,6 @@ This is the first stable release. Future updates will document breaking changes 
 
 This is the first stable release. No upgrades are necessary.
 
-## Contributors
-
-- Jordan Howell (@VictoryTek)
-
 ## License
 
 This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
