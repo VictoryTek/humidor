@@ -232,49 +232,49 @@ pub async fn create_test_humidor(
 async fn get_or_create_default_humidor(pool: &Pool) -> Result<Uuid, Box<dyn std::error::Error>> {
     let client = pool.get().await?;
 
-    // Try to find existing default test user
+    // Create default test user with ON CONFLICT to handle race conditions
+    let password_hash = bcrypt::hash("password", bcrypt::DEFAULT_COST)?;
+    let new_user_id = Uuid::new_v4();
+    
+    // Use ON CONFLICT DO NOTHING to handle concurrent test execution
+    client
+        .execute(
+            "INSERT INTO users (id, username, email, full_name, password_hash, is_admin, created_at, updated_at) 
+             VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+             ON CONFLICT (username) DO NOTHING",
+            &[
+                &new_user_id,
+                &"default_cigar_test_user",
+                &"default_cigar_test@test.com",
+                &"Default Test User",
+                &password_hash,
+                &false,
+            ],
+        )
+        .await?;
+    
+    // Now fetch the user_id (either the one we just created or existing one)
     let user_row = client
-        .query_opt(
+        .query_one(
             "SELECT id FROM users WHERE username = $1",
             &[&"default_cigar_test_user"],
         )
         .await?;
+    
+    let user_id: Uuid = user_row.get(0);
 
-    let user_id = if let Some(row) = user_row {
-        row.get(0)
-    } else {
-        // Create default test user with fixed username (no UUID suffix for consistency)
-        let password_hash = bcrypt::hash("password", bcrypt::DEFAULT_COST)?;
-        let new_user_id = Uuid::new_v4();
-        client
-            .execute(
-                "INSERT INTO users (id, username, email, full_name, password_hash, is_admin, created_at, updated_at) 
-                 VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())",
-                &[
-                    &new_user_id,
-                    &"default_cigar_test_user",
-                    &"default_cigar_test@test.com",
-                    &"Default Test User",
-                    &password_hash,
-                    &false,
-                ],
-            )
-            .await?;
-        new_user_id
-    };
-
-    // Try to find existing default humidor
-    let humidor_row = client
+    // Try to find existing default humidor first
+    let existing_humidor = client
         .query_opt(
             "SELECT id FROM humidors WHERE user_id = $1 AND name = $2",
             &[&user_id, &"Default Test Humidor"],
         )
         .await?;
-
-    let humidor_id = if let Some(row) = humidor_row {
+    
+    let humidor_id = if let Some(row) = existing_humidor {
         row.get(0)
     } else {
-        // Create default humidor
+        // Create default humidor if it doesn't exist
         let new_humidor_id = Uuid::new_v4();
         client
             .execute(
@@ -285,7 +285,7 @@ async fn get_or_create_default_humidor(pool: &Pool) -> Result<Uuid, Box<dyn std:
             .await?;
         new_humidor_id
     };
-
+    
     Ok(humidor_id)
 }
 
