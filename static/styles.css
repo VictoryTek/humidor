@@ -1,4 +1,4 @@
-/* Professional Cigar Lounge Theme Variables */
+/* Professional Cigar Lounge Theme Variables - Updated */
 :root {
     --primary-color: #331f15;         /* Accent color as requested */
     --primary-light: #4a2c1a;         /* Lighter mahogany */
@@ -18,6 +18,14 @@
     --error-color: #ef4444;
     --warning-color: #f59e0b;
     --sidebar-width: 240px;
+    
+    /* Stat card and humidor hub header colors */
+    --stat-card-bg: rgba(26, 15, 8, 0.9);
+    --stat-card-bg-hover: rgba(26, 15, 8, 0.95);
+    --stat-card-border: #4a3d32;
+    --stat-card-text-primary: #f4f1eb;
+    --stat-card-text-muted: #9a8c7e;
+    --hub-header-text-secondary: #d4c5b9;
 }
 
 /* Light Mode Theme Variables */
@@ -41,6 +49,14 @@
     --error-color: #dc2626;
     --warning-color: #d97706;
     --button-text-color: #1a0f08;     /* Force dark theme button text color */
+    
+    /* Stat card and humidor hub header colors - use dark theme values */
+    --stat-card-bg: rgba(26, 15, 8, 0.9);
+    --stat-card-bg-hover: rgba(26, 15, 8, 0.95);
+    --stat-card-border: #4a3d32;
+    --stat-card-text-primary: #f4f1eb;
+    --stat-card-text-muted: #9a8c7e;
+    --hub-header-text-secondary: #d4c5b9;
 }
 
 
@@ -1347,8 +1363,8 @@ body {
 }
 
 .stat-card {
-    background: rgba(26, 15, 8, 0.4);
-    border: 1px solid var(--border-color);
+    background: var(--stat-card-bg);
+    border: 1px solid var(--stat-card-border);
     padding: 1rem 1.25rem;
     border-radius: 0.75rem;
     text-align: center;
@@ -1359,26 +1375,26 @@ body {
 }
 
 .stat-card:hover {
-    background: rgba(26, 15, 8, 0.6);
+    background: var(--stat-card-bg-hover);
     border-color: var(--accent-copper);
 }
 
 .stat-icon {
     font-size: 1.5rem;
     color: var(--accent-copper);
-    opacity: 0.9;
+    opacity: 1;
 }
 
 .stat-value {
     font-size: 1.5rem;
     font-weight: 700;
-    color: var(--text-primary);
+    color: var(--stat-card-text-primary);
     line-height: 1;
 }
 
 .stat-label {
     font-size: 0.75rem;
-    color: var(--text-muted);
+    color: var(--stat-card-text-muted);
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -4462,13 +4478,13 @@ body {
     text-align: center;
     margin-bottom: 2rem;
     padding: 1rem 2rem;
-    background: linear-gradient(135deg, rgba(51, 31, 21, 0.6), rgba(42, 36, 31, 0.6));
+    background: linear-gradient(135deg, #331f15, #2a241f);
     border-radius: 12px;
-    border: 1px solid var(--border-color);
+    border: 1px solid #4a3d32;
 }
 
 .humidor-hub-header h2 {
-    color: var(--accent-gold);
+    color: #d4af37;
     font-size: 2.5rem;
     font-weight: 700;
     margin-bottom: 0.5rem;
@@ -4476,7 +4492,7 @@ body {
 }
 
 .humidor-hub-header p {
-    color: var(--text-secondary);
+    color: #d4c5b9;
     font-size: 1rem;
     margin: 0;
 }
@@ -4627,7 +4643,7 @@ body {
     gap: 1rem;
     margin-bottom: 0;
     padding: 0.5rem;
-    background: rgba(26, 15, 8, 0.3);
+    background: rgba(26, 15, 8, 0.9);
     border-radius: 6px;
     justify-content: center;
 }
@@ -4641,18 +4657,18 @@ body {
 
 .humidor-card-stats .stat i {
     font-size: 1.25rem;
-    color: var(--accent-copper);
+    color: #b87333;
 }
 
 .humidor-card-stats .stat-value {
     font-size: 1.125rem;
     font-weight: 700;
-    color: var(--text-primary);
+    color: #f4f1eb;
 }
 
 .humidor-card-stats .stat-label {
     font-size: 0.75rem;
-    color: var(--text-muted);
+    color: #9a8c7e;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
@@ -5853,54 +5869,25 @@ html.light-mode button.add-btn-sidebar:hover {
     color: #f4f1eb !important; /* Dark theme text-primary */
 }
 
-/* Stats cards (Home icon, Total Cigars, Cigar Types) - always dark theme */
-.light-mode .stat-card,
-.light-mode .humidor-stats .stat-card {
-    background: rgba(26, 15, 8, 0.9) !important;
-    border: 1px solid #4a3d32 !important; /* Dark theme border-color */
-}
-
-.light-mode .stat-card:hover,
-.light-mode .humidor-stats .stat-card:hover {
-    background: rgba(26, 15, 8, 0.95) !important;
-    border-color: #b87333 !important; /* Dark theme accent-copper */
-}
-
-.light-mode .stat-icon,
-.light-mode .humidor-stats .stat-icon {
-    color: #b87333 !important; /* Dark theme accent-copper */
-    opacity: 1 !important;
-}
-
-.light-mode .stat-value,
-.light-mode .humidor-stats .stat-value {
-    color: #f4f1eb !important; /* Dark theme text-primary */
-}
-
-.light-mode .stat-label,
-.light-mode .humidor-stats .stat-label {
-    color: #9a8c7e !important; /* Dark theme text-muted */
-}
-
 /* Humidor info card (Home icon card) - always dark theme */
 .light-mode .humidor-info-card {
-    background: rgba(26, 15, 8, 0.9) !important;
-    border: 1px solid #4a3d32 !important;
+    background: rgba(26, 15, 8, 0.9);
+    border: 1px solid #4a3d32;
 }
 
 .light-mode .humidor-info-card:hover {
-    background: rgba(26, 15, 8, 0.95) !important;
-    border-color: #b87333 !important;
+    background: rgba(26, 15, 8, 0.95);
+    border-color: #b87333;
 }
 
 .light-mode .humidor-info-card .humidor-title-section > i {
-    color: #b87333 !important;
+    color: #b87333;
 }
 
 .light-mode .humidor-info-card .humidor-name {
-    color: #f4f1eb !important;
+    color: #f4f1eb;
 }
 
 .light-mode .humidor-info-card .humidor-location {
-    color: #9a8c7e !important;
+    color: #9a8c7e;
 }
