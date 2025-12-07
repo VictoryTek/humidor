@@ -1,10 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
+        <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Account Settings - Humidor</title>
-    <link rel="icon" type="image/png" href="static/logo.png">
+    <title>Profile - Humidor</title>
+    
+    <!-- PWA Meta Tags -->
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#D4AF37">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Humidor">
+    
+    <!-- Icons -->
+    <link rel="icon" type="image/png" href="/static/logo.png">
+    <link rel="apple-touch-icon" href="/static/icons/icon-192x192.png">
     <link rel="shortcut icon" type="image/png" href="static/logo.png">
     <link rel="apple-touch-icon" href="static/logo.png">
     <link rel="stylesheet" href="/static/styles.css">
@@ -18,7 +29,10 @@
 </head>
 <body>
     <div id="app">
-        <aside class="sidebar">
+        <!-- Mobile menu backdrop -->
+        <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+        
+        <aside class="sidebar" id="sidebar">
             <nav class="sidebar-nav">
                 <div class="nav-section">
                     <h3 class="nav-section-title">Collections</h3>
@@ -110,6 +124,11 @@
         <main class="main-content">
             <header class="page-header">
                 <div class="header-left">
+                    <!-- Mobile menu toggle button -->
+                    <button class="mobile-menu-toggle" id="mobileMenuToggle" type="button" aria-label="Toggle menu">
+                        <span class="mobile-menu-icon mdi mdi-menu"></span>
+                    </button>
+                    
                     <div class="app-logo">
                         <img src="/static/logo.png" alt="" class="logo-icon">
                         <span class="logo-text">Humidor</span>

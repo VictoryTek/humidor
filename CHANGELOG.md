@@ -5,6 +5,46 @@ All notable changes to Humidor will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [1.2.0] - 2025-12-06
+
+### Added
+- **Progressive Web App (PWA) Support**
+  - Full PWA manifest with app metadata, icons, and display modes
+  - Service worker with versioned caching strategies (network-first for API, cache-first for static assets)
+  - Offline support with custom fallback page and auto-retry logic
+  - Install prompt with custom "Install App" button in header
+  - App update notifications with reload prompt
+  - 192x192 and 512x512 icon variants (standard and maskable)
+  - PWA meta tags for iOS and Android compatibility
+  - Standalone display mode for app-like experience
+  - Automatic hourly update checks for service worker
+  - Precaching of essential app assets on install
+  - Documentation: `docs/PWA_IMPLEMENTATION.md` and `docs/PWA_TESTING_GUIDE.md`
+  
+- **Mobile & Tablet Responsive Design**
+  - Hamburger menu for mobile/tablet navigation (≤1024px)
+  - Slide-out navigation drawer with backdrop overlay
+  - Collapsible filter section on mobile to save screen space
+  - Touch-friendly interface with 44px minimum touch targets
+  - Mobile menu auto-closes when opening modals or selecting navigation items
+
+### Changed
+- **Mobile Layouts**
+  - All grids (cigars, humidors, organizers) now single column on mobile
+  - Search bar and filters repositioned below page header on mobile
+  - Modals now near full-screen on mobile devices
+  - Header layout optimized: title and action button inline, search below
+  - Form inputs and buttons stack vertically on mobile
+  - Logo scales appropriately for smaller screens
+
+### Fixed
+- Eliminated horizontal scrolling on all screen sizes
+- Mobile menu button stays left-aligned with header title
+- Backdrop properly closes navigation menu in all scenarios
+- Filter badge updates correctly when filters are applied/cleared
+
 ## [1.1.0] - 2025-12-05
 
 ### Added

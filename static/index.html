@@ -4,9 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Humidor - Premium Cigar Collection Management</title>
-    <link rel="icon" type="image/png" href="static/logo.png">
-    <link rel="shortcut icon" type="image/png" href="static/logo.png">
-    <link rel="apple-touch-icon" href="static/logo.png">
+    
+    <!-- PWA Meta Tags -->
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#D4AF37">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Humidor">
+    <meta name="description" content="Premium cigar collection management system for tracking your humidor inventory">
+    
+    <!-- Icons -->
+    <link rel="icon" type="image/png" href="/static/logo.png">
+    <link rel="shortcut icon" type="image/png" href="/static/logo.png">
+    <link rel="apple-touch-icon" href="/static/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" sizes="192x192" href="/static/icons/icon-192x192.png">
+    <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512x512.png">
     <link rel="stylesheet" href="static/styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -18,7 +31,10 @@
 </head>
 <body>
     <div id="app">
-        <aside class="sidebar">
+        <!-- Mobile menu backdrop -->
+        <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+        
+        <aside class="sidebar" id="sidebar">
             <nav class="sidebar-nav">
                 <div class="nav-section">
                     <h3 class="nav-section-title">Collections</h3>
@@ -107,6 +123,11 @@
         <main class="main-content">
             <header class="page-header">
                 <div class="header-left">
+                    <!-- Mobile menu toggle button -->
+                    <button class="mobile-menu-toggle" id="mobileMenuToggle" type="button" aria-label="Toggle menu">
+                        <span class="mobile-menu-icon mdi mdi-menu"></span>
+                    </button>
+                    
                     <div class="app-logo">
                         <img src="/static/logo.png" alt="" class="logo-icon">
                         <span class="logo-text">Humidor</span>
@@ -171,6 +192,12 @@
                             <div class="page-title">
                                 <h1>My Humidors</h1>
                             </div>
+                            <div class="header-actions">
+                                <button class="add-humidor-btn-primary" id="addHumidorBtnHeader">
+                                    <span class="add-icon">+</span>
+                                    <span>HUMIDOR</span>
+                                </button>
+                            </div>
                             <!-- Search and Filter Section (moved here) -->
                             <div class="cigar-search-section-inline">
                                 <div class="search-bar">
@@ -179,43 +206,51 @@
                                         <span class="mdi mdi-magnify"></span>
                                     </button>
                                 </div>
-                                <div class="search-filters">
-                                    <button class="filter-chip" id="filterBrandChip" data-active="false">
-                                        <span class="mdi mdi-tag-outline"></span>
-                                        <span>Brands</span>
-                                        <span class="filter-badge" id="brandBadge">0</span>
-                                    </button>
-                                    <button class="filter-chip" id="filterSizeChip" data-active="false">
-                                        <span class="mdi mdi-ruler"></span>
-                                        <span>Sizes</span>
-                                        <span class="filter-badge" id="sizeBadge">0</span>
-                                    </button>
-                                    <button class="filter-chip" id="filterOriginChip" data-active="false">
-                                        <span class="mdi mdi-map-marker-outline"></span>
-                                        <span>Origins</span>
-                                        <span class="filter-badge" id="originBadge">0</span>
-                                    </button>
-                                    <button class="filter-chip" id="filterStrengthChip" data-active="false">
-                                        <span class="mdi mdi-chart-line"></span>
-                                        <span>Strengths</span>
-                                        <span class="filter-badge" id="strengthBadge">0</span>
-                                    </button>
-                                    <button class="filter-chip" id="filterRingGaugeChip" data-active="false">
-                                        <span class="mdi mdi-circle-outline"></span>
-                                        <span>Ring Gauges</span>
-                                        <span class="filter-badge" id="ringGaugeBadge">0</span>
-                                    </button>
-                                    <button class="filter-chip clear-filters" id="clearFiltersBtn" style="display: none;">
-                                        <span class="mdi mdi-close-circle"></span>
-                                        <span>Clear Filters</span>
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="header-actions">
-                                <button class="add-humidor-btn-primary" id="addHumidorBtnHeader">
-                                    <span class="add-icon">+</span>
-                                    <span>HUMIDOR</span>
+                                
+                                <!-- Mobile Filter Toggle Button -->
+                                <button class="mobile-filter-toggle" id="mobileFilterToggle">
+                                    <span>
+                                        <span class="mdi mdi-filter-variant"></span>
+                                        Filters
+                                        <span class="filter-toggle-badge" id="filterToggleBadge" style="display: none;">0</span>
+                                    </span>
+                                    <span class="mdi mdi-chevron-down"></span>
                                 </button>
+                                
+                                <!-- Filters Container (collapsible on mobile) -->
+                                <div class="search-filters-wrapper mobile-collapsed" id="searchFiltersWrapper">
+                                    <div class="search-filters">
+                                        <button class="filter-chip" id="filterBrandChip" data-active="false">
+                                            <span class="mdi mdi-tag-outline"></span>
+                                            <span>Brands</span>
+                                            <span class="filter-badge" id="brandBadge">0</span>
+                                        </button>
+                                        <button class="filter-chip" id="filterSizeChip" data-active="false">
+                                            <span class="mdi mdi-ruler"></span>
+                                            <span>Sizes</span>
+                                            <span class="filter-badge" id="sizeBadge">0</span>
+                                        </button>
+                                        <button class="filter-chip" id="filterOriginChip" data-active="false">
+                                            <span class="mdi mdi-map-marker-outline"></span>
+                                            <span>Origins</span>
+                                            <span class="filter-badge" id="originBadge">0</span>
+                                        </button>
+                                        <button class="filter-chip" id="filterStrengthChip" data-active="false">
+                                            <span class="mdi mdi-chart-line"></span>
+                                            <span>Strengths</span>
+                                            <span class="filter-badge" id="strengthBadge">0</span>
+                                        </button>
+                                        <button class="filter-chip" id="filterRingGaugeChip" data-active="false">
+                                            <span class="mdi mdi-circle-outline"></span>
+                                            <span>Ring Gauges</span>
+                                            <span class="filter-badge" id="ringGaugeBadge">0</span>
+                                        </button>
+                                        <button class="filter-chip clear-filters" id="clearFiltersBtn" style="display: none;">
+                                            <span class="mdi mdi-close-circle"></span>
+                                            <span>Clear Filters</span>
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 

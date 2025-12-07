@@ -34,6 +34,304 @@ function updateThemeIcon(theme) {
     }
 }
 
+// PWA Management
+let deferredPrompt;
+let swRegistration = null;
+
+// Register Service Worker
+async function registerServiceWorker() {
+    if (!('serviceWorker' in navigator)) {
+        console.log('[PWA] Service Workers not supported');
+        return;
+    }
+
+    try {
+        swRegistration = await navigator.serviceWorker.register('/static/sw.js', {
+            scope: '/'
+        });
+        
+        console.log('[PWA] Service Worker registered successfully:', swRegistration.scope);
+        
+        // Check for updates every hour
+        setInterval(() => {
+            swRegistration.update();
+        }, 60 * 60 * 1000);
+        
+        // Listen for updates
+        swRegistration.addEventListener('updatefound', () => {
+            const newWorker = swRegistration.installing;
+            console.log('[PWA] New service worker installing...');
+            
+            newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    // New version available
+                    console.log('[PWA] New version available!');
+                    showUpdateNotification();
+                }
+            });
+        });
+        
+    } catch (error) {
+        console.error('[PWA] Service Worker registration failed:', error);
+    }
+}
+
+// Show update notification
+function showUpdateNotification() {
+    const updateBanner = document.createElement('div');
+    updateBanner.className = 'pwa-update-banner';
+    updateBanner.innerHTML = `
+        <div class="pwa-update-content">
+            <span class="mdi mdi-refresh-circle"></span>
+            <span>A new version is available!</span>
+        </div>
+        <button class="pwa-update-button" onclick="updateApp()">Update Now</button>
+        <button class="pwa-dismiss-button" onclick="dismissUpdate(this)">×</button>
+    `;
+    document.body.appendChild(updateBanner);
+    
+    setTimeout(() => {
+        updateBanner.classList.add('show');
+    }, 100);
+}
+
+// Update the app
+function updateApp() {
+    if (swRegistration && swRegistration.waiting) {
+        swRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
+    }
+    window.location.reload();
+}
+
+// Dismiss update notification
+function dismissUpdate(button) {
+    const banner = button.closest('.pwa-update-banner');
+    banner.classList.remove('show');
+    setTimeout(() => {
+        banner.remove();
+    }, 300);
+}
+
+// Handle install prompt
+function setupInstallPrompt() {
+    window.addEventListener('beforeinstallprompt', (e) => {
+        console.log('[PWA] beforeinstallprompt event fired');
+        e.preventDefault();
+        deferredPrompt = e;
+        showInstallButton();
+    });
+    
+    window.addEventListener('appinstalled', () => {
+        console.log('[PWA] App installed successfully');
+        hideInstallButton();
+        showToast('Humidor installed successfully!', 'success');
+    });
+}
+
+// Show install button
+function showInstallButton() {
+    const installButton = document.createElement('button');
+    installButton.id = 'pwaInstallButton';
+    installButton.className = 'pwa-install-button';
+    installButton.innerHTML = `
+        <span class="mdi mdi-download"></span>
+        <span>Install App</span>
+    `;
+    installButton.addEventListener('click', installApp);
+    
+    // Add to header-right section
+    const headerRight = document.querySelector('.header-right');
+    if (headerRight) {
+        headerRight.insertBefore(installButton, headerRight.firstChild);
+    }
+}
+
+// Hide install button
+function hideInstallButton() {
+    const installButton = document.getElementById('pwaInstallButton');
+    if (installButton) {
+        installButton.remove();
+    }
+}
+
+// Install the app
+async function installApp() {
+    if (!deferredPrompt) {
+        console.log('[PWA] No deferred prompt available');
+        return;
+    }
+    
+    deferredPrompt.prompt();
+    
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log('[PWA] User choice:', outcome);
+    
+    if (outcome === 'accepted') {
+        console.log('[PWA] User accepted the install prompt');
+    } else {
+        console.log('[PWA] User dismissed the install prompt');
+    }
+    
+    deferredPrompt = null;
+    hideInstallButton();
+}
+
+// Mobile Menu Management
+function initializeMobileMenu() {
+    const mobileMenuToggle = document.getElementById('mobileMenuToggle');
+    const sidebar = document.getElementById('sidebar');
+    const backdrop = document.getElementById('sidebarBackdrop');
+    
+    if (!mobileMenuToggle || !sidebar || !backdrop) {
+        console.log('Mobile menu elements not found');
+        return;
+    }
+    
+    // Toggle sidebar on button click
+    mobileMenuToggle.addEventListener('click', () => {
+        toggleMobileMenu();
+    });
+    
+    // Close sidebar on backdrop click
+    backdrop.addEventListener('click', (e) => {
+        // Always close the mobile menu when backdrop is clicked
+        if (sidebar.classList.contains('open')) {
+            closeMobileMenu();
+        }
+    });
+    
+    // Close sidebar when navigation item is clicked
+    const navItems = sidebar.querySelectorAll('.nav-item');
+    navItems.forEach(item => {
+        item.addEventListener('click', () => {
+            // Small delay to allow navigation to complete
+            setTimeout(() => {
+                closeMobileMenu();
+            }, 100);
+        });
+    });
+    
+    // Close sidebar on window resize if going above mobile breakpoint
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+            if (window.innerWidth > 1024) {
+                closeMobileMenu();
+            }
+        }, 250);
+    });
+}
+
+function toggleMobileMenu() {
+    const sidebar = document.getElementById('sidebar');
+    const backdrop = document.getElementById('sidebarBackdrop');
+    
+    if (!sidebar || !backdrop) return;
+    
+    const isOpen = sidebar.classList.contains('open');
+    
+    if (isOpen) {
+        closeMobileMenu();
+    } else {
+        openMobileMenu();
+    }
+}
+
+function openMobileMenu() {
+    const sidebar = document.getElementById('sidebar');
+    const backdrop = document.getElementById('sidebarBackdrop');
+    
+    if (!sidebar || !backdrop) return;
+    
+    sidebar.classList.add('open');
+    backdrop.classList.add('show');
+    
+    // Prevent body scroll when menu is open
+    document.body.style.overflow = 'hidden';
+}
+
+function closeMobileMenu() {
+    const sidebar = document.getElementById('sidebar');
+    const backdrop = document.getElementById('sidebarBackdrop');
+    
+    if (!sidebar || !backdrop) return;
+    
+    sidebar.classList.remove('open');
+    backdrop.classList.remove('show');
+    
+    // Restore body scroll
+    document.body.style.overflow = '';
+}
+
+// Mobile Filter Toggle Management
+function initializeMobileFilterToggle() {
+    const filterToggle = document.getElementById('mobileFilterToggle');
+    const filtersWrapper = document.getElementById('searchFiltersWrapper');
+    
+    if (!filterToggle || !filtersWrapper) {
+        return;
+    }
+    
+    // Toggle filters on button click
+    filterToggle.addEventListener('click', () => {
+        const isExpanded = filtersWrapper.classList.contains('mobile-expanded');
+        
+        if (isExpanded) {
+            filtersWrapper.classList.remove('mobile-expanded');
+            filtersWrapper.classList.add('mobile-collapsed');
+            filterToggle.classList.remove('active');
+        } else {
+            filtersWrapper.classList.remove('mobile-collapsed');
+            filtersWrapper.classList.add('mobile-expanded');
+            filterToggle.classList.add('active');
+        }
+    });
+    
+    // Auto-collapse filters on window resize if going above mobile breakpoint
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+            if (window.innerWidth > 768) {
+                // On desktop, show filters by default (remove mobile classes)
+                filtersWrapper.classList.remove('mobile-collapsed', 'mobile-expanded');
+                filterToggle.classList.remove('active');
+            } else {
+                // On mobile, ensure collapsed state if not already set
+                if (!filtersWrapper.classList.contains('mobile-expanded')) {
+                    filtersWrapper.classList.add('mobile-collapsed');
+                }
+            }
+        }, 250);
+    });
+    
+    // Update filter toggle badge when filters change
+    updateFilterToggleBadge();
+}
+
+function updateFilterToggleBadge() {
+    const filterToggleBadge = document.getElementById('filterToggleBadge');
+    
+    if (!filterToggleBadge) return;
+    
+    // Count active filters
+    const activeFilters = [
+        selectedBrands.length,
+        selectedSizes.length,
+        selectedOrigins.length,
+        selectedStrengths.length,
+        selectedRingGauges.length
+    ].reduce((sum, count) => sum + count, 0);
+    
+    if (activeFilters > 0) {
+        filterToggleBadge.textContent = activeFilters;
+        filterToggleBadge.style.display = 'inline-flex';
+    } else {
+        filterToggleBadge.style.display = 'none';
+    }
+}
+
 // Application State
 let humidors = [];
 let cigars = [];
@@ -1684,6 +1982,10 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeTheme();
     setupThemeToggle();
     
+    // Initialize PWA
+    registerServiceWorker();
+    setupInstallPrompt();
+    
     // Initialize DOM elements
     elements = {
         welcomeSection: document.getElementById('welcomeSection'),
@@ -1717,24 +2019,48 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeNavigation();
     initializeRouter();
     
+    // Initialize mobile menu
+    initializeMobileMenu();
+    
+    // Initialize mobile filter toggle
+    initializeMobileFilterToggle();
+    
     // Event listeners for new interface
     if (elements.createFirstHumidorBtn) {
-        elements.createFirstHumidorBtn.addEventListener('click', () => openHumidorModal());
+        elements.createFirstHumidorBtn.addEventListener('click', () => {
+            closeMobileMenu();
+            openHumidorModal();
+        });
     }
     if (elements.addHumidorBtn) {
-        elements.addHumidorBtn.addEventListener('click', () => openHumidorModal());
+        elements.addHumidorBtn.addEventListener('click', () => {
+            closeMobileMenu();
+            openHumidorModal();
+        });
     }
     if (elements.addHumidorBtnSidebar) {
-        elements.addHumidorBtnSidebar.addEventListener('click', () => openHumidorModal());
+        elements.addHumidorBtnSidebar.addEventListener('click', () => {
+            closeMobileMenu();
+            openHumidorModal();
+        });
     }
     if (elements.addHumidorBtnHeader) {
-        elements.addHumidorBtnHeader.addEventListener('click', () => openHumidorModal());
+        elements.addHumidorBtnHeader.addEventListener('click', () => {
+            closeMobileMenu();
+            openHumidorModal();
+        });
     }
     if (elements.addCigarBtn) {
-        elements.addCigarBtn.addEventListener('click', () => openCigarModal());
+        elements.addCigarBtn.addEventListener('click', () => {
+            closeMobileMenu();
+            openCigarModal();
+        });
     }
     if (elements.addCigarBtnNav) {
-        elements.addCigarBtnNav.addEventListener('click', () => openCigarModal());
+        elements.addCigarBtnNav.addEventListener('click', () => {
+            closeMobileMenu();
+            openCigarModal();
+        });
     }
     
     // User dropdown menu toggle
@@ -2704,6 +3030,9 @@ function updateFilterBadges() {
                       selectedOrigins.length > 0 || selectedStrengths.length > 0 || 
                       selectedRingGauges.length > 0 || searchQuery;
     document.getElementById('clearFiltersBtn').style.display = hasFilters ? 'inline-flex' : 'none';
+    
+    // Update mobile filter toggle badge
+    updateFilterToggleBadge();
 }
 
 function clearFilters() {
