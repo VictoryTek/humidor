@@ -40,7 +40,7 @@ pub async fn get_wish_list(auth: AuthContext, pool: DbPool) -> Result<impl Reply
                 c.id as c_id, c.humidor_id, c.brand_id, c.name, c.size_id, c.strength_id,
                 c.origin_id, c.wrapper, c.binder, c.filler, c.price, c.purchase_date,
                 c.notes as c_notes, c.quantity, c.ring_gauge_id, c.length, c.image_url,
-                c.created_at as c_created_at, c.updated_at as c_updated_at, c.is_active
+                c.retail_link, c.created_at as c_created_at, c.updated_at as c_updated_at, c.is_active
          FROM wish_list w
          LEFT JOIN cigars c ON w.cigar_id = c.id
          WHERE w.user_id = $1
@@ -65,7 +65,7 @@ pub async fn get_wish_list(auth: AuthContext, pool: DbPool) -> Result<impl Reply
                 "notes": row.get::<_, Option<String>>(3),
                 "created_at": row.get::<_, chrono::DateTime<Utc>>(4),
                 "cigar": if cigar_exists.is_some() {
-                    let is_active: bool = row.get(24);
+                    let is_active: bool = row.get(25);
                     serde_json::json!({
                         "id": row.get::<_, Uuid>(5),
                         "humidor_id": row.get::<_, Option<Uuid>>(6),
@@ -84,8 +84,9 @@ pub async fn get_wish_list(auth: AuthContext, pool: DbPool) -> Result<impl Reply
                         "ring_gauge_id": row.get::<_, Option<Uuid>>(19),
                         "length": row.get::<_, Option<f64>>(20),
                         "image_url": row.get::<_, Option<String>>(21),
-                        "created_at": row.get::<_, chrono::DateTime<Utc>>(22),
-                        "updated_at": row.get::<_, chrono::DateTime<Utc>>(23),
+                        "retail_link": row.get::<_, Option<String>>(22),
+                        "created_at": row.get::<_, chrono::DateTime<Utc>>(23),
+                        "updated_at": row.get::<_, chrono::DateTime<Utc>>(24),
                         "out_of_stock": !is_active
                     })
                 } else {

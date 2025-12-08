@@ -3403,13 +3403,13 @@ function openReportCard(cigarId) {
     document.getElementById('reportCardNotes').textContent = cigar.notes || 'No notes available';
     
     // Set retail link
-    const retailLinkField = document.getElementById('reportCardRetailLinkField');
-    const retailLinkSpan = document.getElementById('reportCardRetailLink');
+    const retailLinkSection = document.getElementById('reportCardRetailLinkField');
+    const retailLinkContainer = document.getElementById('reportCardRetailLink');
     if (cigar.retail_link) {
-        retailLinkField.style.display = '';
-        retailLinkSpan.innerHTML = `<a href="${cigar.retail_link}" target="_blank" rel="noopener noreferrer">${cigar.retail_link}</a>`;
+        retailLinkSection.style.display = 'block';
+        retailLinkContainer.innerHTML = `<a href="${cigar.retail_link}" target="_blank" rel="noopener noreferrer">${cigar.retail_link}</a>`;
     } else {
-        retailLinkField.style.display = 'none';
+        retailLinkSection.style.display = 'none';
     }
     
     // Check if this cigar is in the wish list (cigars in wish list don't have humidor_id)
@@ -3515,6 +3515,7 @@ function openCigarModal(humidorId = null, cigar = null) {
         document.getElementById('cigarName').value = cigar.name || '';
         document.getElementById('cigarQuantity').value = cigar.quantity || 1;
         document.getElementById('cigarPrice').value = cigar.price || '';
+        document.getElementById('cigarRetailLink').value = cigar.retail_link || '';
         document.getElementById('cigarNotes').value = cigar.notes || '';
         document.getElementById('cigarImageUrl').value = cigar.image_url || '';
         
@@ -3819,6 +3820,7 @@ async function saveCigar() {
         quantity: parseInt(formData.get('quantity')) || 1,
         purchase_date: formData.get('purchase_date') ? new Date(formData.get('purchase_date')).toISOString() : null,
         price: formData.get('price') ? parseFloat(formData.get('price')) : null,
+        retail_link: formData.get('retail_link') || null,
         notes: formData.get('notes') || null,
         image_url: imageUrl
     };

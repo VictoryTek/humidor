@@ -4314,6 +4314,44 @@ body {
     font-size: 0.95rem;
 }
 
+.report-card-retail-link-section {
+    background: rgba(139, 105, 20, 0.15);
+    border: 1px solid rgba(212, 175, 55, 0.3);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-top: 1.5rem;
+}
+
+.report-card-retail-link-section label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: block;
+    margin-bottom: 0.75rem;
+}
+
+.retail-link-container {
+    overflow-x: auto;
+    white-space: nowrap;
+    padding: 0.5rem 0;
+}
+
+.retail-link-container a {
+    color: var(--gold);
+    text-decoration: none;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.875rem;
+    transition: color 0.2s ease;
+    word-break: break-all;
+}
+
+.retail-link-container a:hover {
+    color: var(--gold-hover);
+    text-decoration: underline;
+}
+
 .report-card-actions {
     display: flex;
     gap: 0.75rem;
