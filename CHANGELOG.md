@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Desktop layout: Search and filter bar now stays on same row as header and + HUMIDOR button on desktop resolutions (only moves to separate row on mobile ≤768px)
 - Hamburger menu positioning: Fixed menu button jumping above logo at 769px width, now stays properly aligned left of logo at all resolutions between tablet and desktop
 - Base header flexbox layout: Added proper flex display to `.header-left` to ensure consistent hamburger menu positioning across all screen sizes
+- Wish list cigar editing: Fixed "Failed to fetch" error when trying to edit cigars in wish list - verify_cigar_ownership now checks wish list ownership in addition to humidor ownership
 
 ## [1.2.0] - 2025-12-06
 

@@ -82,7 +82,7 @@ async fn verify_cigar_ownership(
         AppError::DatabaseError("Failed to connect to database".to_string())
     })?;
 
-    // Check if user owns the cigar
+    // Check if user owns the cigar through their humidor
     let check_query = "
         SELECT EXISTS(
             SELECT 1 FROM cigars c
@@ -105,19 +105,44 @@ async fn verify_cigar_ownership(
         }
     }
 
-    // Not owner, get the humidor_id and check if it's shared
+    // Check if cigar is in user's wish list (wish list cigars have NULL humidor_id)
+    let wish_list_query = "
+        SELECT EXISTS(
+            SELECT 1 FROM wish_list
+            WHERE cigar_id = $1 AND user_id = $2
+        )
+    ";
+    match db.query_one(wish_list_query, &[&cigar_id, &user_id]).await {
+        Ok(row) => {
+            let in_wish_list: bool = row.get(0);
+            if in_wish_list {
+                return Ok(()); // User can access their wish list cigars
+            }
+        }
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to check wish list");
+            return Err(AppError::DatabaseError(
+                "Failed to verify cigar access".to_string(),
+            ));
+        }
+    }
+
+    // Not owner or in wish list, get the humidor_id and check if it's shared
     let humidor_query = "SELECT humidor_id FROM cigars WHERE id = $1";
     match db.query_opt(humidor_query, &[&cigar_id]).await {
         Ok(Some(row)) => {
-            let humidor_id: Uuid = row.get(0);
-
-            // Check if humidor is shared with appropriate permissions
-            if require_edit {
-                if can_edit_humidor(pool, &user_id, &humidor_id).await? {
+            let humidor_id: Option<Uuid> = row.get(0);
+            
+            // If humidor_id is NULL, cigar doesn't belong to any humidor
+            if let Some(hum_id) = humidor_id {
+                // Check if humidor is shared with appropriate permissions
+                if require_edit {
+                    if can_edit_humidor(pool, &user_id, &hum_id).await? {
+                        return Ok(());
+                    }
+                } else if can_view_humidor(pool, &user_id, &hum_id).await? {
                     return Ok(());
                 }
-            } else if can_view_humidor(pool, &user_id, &humidor_id).await? {
-                return Ok(());
             }
         }
         Ok(None) => {
