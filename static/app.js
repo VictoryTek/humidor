@@ -3523,7 +3523,12 @@ function openCigarModal(humidorId = null, cigar = null) {
         }
         
         // Set organizer dropdowns using IDs
-        if (cigar.humidor_id) humidorSelect.value = cigar.humidor_id;
+        if (cigar.humidor_id) {
+            humidorSelect.value = cigar.humidor_id;
+        } else {
+            // If humidor_id is null, this is a wish list cigar
+            humidorSelect.value = 'WISH_LIST';
+        }
         if (cigar.brand_id) document.getElementById('cigarBrand').value = cigar.brand_id;
         if (cigar.size_id) document.getElementById('cigarSize').value = cigar.size_id;
         if (cigar.origin_id) document.getElementById('cigarOrigin').value = cigar.origin_id;
@@ -3902,12 +3907,14 @@ async function saveCigar() {
             document.getElementById('cigarImageUpload').value = '';
             
             // Reload data based on what's currently visible
-            if (isWishList) {
-                // Refresh wish list page if it's currently visible (same as favorites behavior)
-                const wishlistSection = document.getElementById('wishlistSection');
-                if (wishlistSection && wishlistSection.style.display !== 'none') {
-                    console.log('→ Wish list page is visible, reloading...');
-                    await loadWishList();
+            if (isWishList || (isEditingCigar && currentCigar && !currentCigar.humidor_id)) {
+                // Refresh wish list if we're working with a wish list cigar
+                console.log('→ Reloading wish list...');
+                await loadWishList();
+                // Also reload cigars if that view is visible
+                const cigarSection = document.getElementById('cigarManagementSection');
+                if (cigarSection && cigarSection.style.display !== 'none') {
+                    await loadCigars();
                 }
             } else {
                 // Reload humidors for regular cigars
