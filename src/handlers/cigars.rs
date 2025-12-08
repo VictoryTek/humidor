@@ -132,7 +132,7 @@ async fn verify_cigar_ownership(
     match db.query_opt(humidor_query, &[&cigar_id]).await {
         Ok(Some(row)) => {
             let humidor_id: Option<Uuid> = row.get(0);
-            
+
             // If humidor_id is NULL, cigar doesn't belong to any humidor
             if let Some(hum_id) = humidor_id {
                 // Check if humidor is shared with appropriate permissions
