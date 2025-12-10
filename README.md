@@ -8,7 +8,9 @@
 An application for managing your cigar collection. Built with Rust, PostgreSQL, and Docker. 
 This project was started because I am a homelabber and couldn't find anything to help me track what I have and what I want, so this started out to fill a personal need. Hopefully if I can make it work, it will be useful to other cigar enjoyers, who want to keep track of their humidor inventory.
 
-![Humidor Dashboard](static/screenshots/humidor.png)
+<div align="center">
+  <img src="static/screenshots/humidor.png" alt="Humidor Dashboard" width="800">
+</div>
 
 ## Features
 
