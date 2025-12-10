@@ -502,6 +502,14 @@ function getStrengthName(strengthId) {
     return strength.name;
 }
 
+function getStrengthLevel(strengthId) {
+    if (!strengthId) {
+        return null;
+    }
+    const strength = strengths.find(s => s.id === strengthId);
+    return strength ? strength.level : null;
+}
+
 function getRingGaugeName(ringGaugeId) {
     if (!ringGaugeId) {
         console.log('getRingGaugeName: ringGaugeId is null/undefined');
@@ -1460,13 +1468,11 @@ function createOrganizerCard(organizer, type) {
 
     const getStrengthMeter = (level) => {
         if (!level) return '';
-        const filled = '█';
-        const empty = '░';
-        let meter = '';
+        let bars = '';
         for (let i = 1; i <= 5; i++) {
-            meter += i <= level ? filled : empty;
+            bars += `<span class="strength-bar${i <= level ? ' filled' : ''}"></span>`;
         }
-        return `<span class="strength-meter" title="Level ${level}/5">${meter}</span>`;
+        return `<span class="strength-meter" title="Level ${level}/5">${bars}</span>`;
     };
 
     const getDisplayValue = (organizer, type) => {
@@ -3331,7 +3337,10 @@ function createCigarCard(cigar) {
             <div class="cigar-card-content">
                 <div class="cigar-card-brand">${brandName}</div>
                 <h3 class="cigar-card-name">${cigar.name}</h3>
-                ${quantityControls}
+                <div class="cigar-card-footer">
+                    ${getStrengthIndicatorHtml(cigar.strength_id)}
+                    ${quantityControls}
+                </div>
             </div>
         </div>
     `;
@@ -4355,7 +4364,21 @@ function createFavoriteCard(cigar) {
                     <i class="mdi mdi-home-variant"></i>
                     <span>${escapeHtml(humidorName)}</span>
                 </div>
+                ${getStrengthIndicatorHtml(cigar.strength_id)}
             </div>
+        </div>
+    `;
+}
+
+function getStrengthIndicatorHtml(strengthId) {
+    const strengthLevel = getStrengthLevel(strengthId);
+    if (!strengthLevel) return '';
+    
+    return `
+        <div class="strength-indicator" style="margin-top: 0.5rem;" title="Strength: ${strengthLevel}/5">
+            ${Array.from({length: 5}, (_, i) => 
+                `<span class="strength-dot ${i < strengthLevel ? 'active' : ''}"></span>`
+            ).join('')}
         </div>
     `;
 }
@@ -4442,6 +4465,7 @@ function createWishListCard(cigar) {
             <div class="cigar-card-content">
                 <div class="cigar-card-brand">${brandName}</div>
                 <h3 class="cigar-card-name">${cigar.name}</h3>
+                ${getStrengthIndicatorHtml(cigar.strength_id)}
             </div>
         </div>
     `;

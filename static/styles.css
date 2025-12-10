@@ -25,7 +25,19 @@
     --stat-card-border: #4a3d32;
     --stat-card-text-primary: #f4f1eb;
     --stat-card-text-muted: #9a8c7e;
+    --stat-card-icon-color: #b87333;
+    --hub-header-bg: linear-gradient(135deg, #331f15, #2a241f);
+    --hub-header-border: #4a3d32;
+    --hub-header-text-primary: #d4af37;
     --hub-header-text-secondary: #d4c5b9;
+    
+    /* Humidor action buttons (share, edit, delete) */
+    --action-btn-bg: rgba(51, 31, 21, 0.6);
+    --action-btn-border: #4a3d32;
+    --action-btn-text: #d4c5b9;
+    --action-btn-hover-bg: #d4af37;
+    --action-btn-hover-text: #1a0f08;
+    --action-btn-hover-border: #d4af37;
 }
 
 /* Light Mode Theme Variables */
@@ -56,7 +68,19 @@
     --stat-card-border: #4a3d32;
     --stat-card-text-primary: #f4f1eb;
     --stat-card-text-muted: #9a8c7e;
+    --stat-card-icon-color: #b87333;
+    --hub-header-bg: linear-gradient(135deg, #331f15, #2a241f);
+    --hub-header-border: #4a3d32;
+    --hub-header-text-primary: #d4af37;
     --hub-header-text-secondary: #d4c5b9;
+    
+    /* Humidor action buttons (share, edit, delete) - use dark theme values */
+    --action-btn-bg: rgba(51, 31, 21, 0.6);
+    --action-btn-border: #4a3d32;
+    --action-btn-text: #d4c5b9;
+    --action-btn-hover-bg: #d4af37;
+    --action-btn-hover-text: #1a0f08;
+    --action-btn-hover-border: #d4af37;
 }
 
 
@@ -1480,7 +1504,7 @@ body {
 
 .stat-icon {
     font-size: 1.5rem;
-    color: var(--accent-copper);
+    color: var(--stat-card-icon-color);
     opacity: 1;
 }
 
@@ -1860,14 +1884,25 @@ body {
 }
 
 .strength-meter {
-    font-family: monospace;
-    font-size: 1rem;
-    letter-spacing: 2px;
-    color: #dc3545;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
     background: rgba(220, 53, 69, 0.1);
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
-    font-weight: bold;
+    height: 1.5rem;
+}
+
+.strength-bar {
+    width: 8px;
+    height: 16px;
+    background: rgba(220, 53, 69, 0.2);
+    border-radius: 2px;
+    display: inline-block;
+}
+
+.strength-bar.filled {
+    background: #dc3545;
 }
 
 /* Empty State */
@@ -1991,7 +2026,9 @@ body {
     transition: all 0.3s ease;
     cursor: pointer;
     position: relative;
-    min-height: 280px;
+    display: flex;
+    flex-direction: column;
+    height: 100%; /* Fill grid cell height */
 }
 
 .cigar-card:hover {
@@ -2010,6 +2047,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-shrink: 0; /* Prevent image from shrinking */
 }
 
 .cigar-card-image img {
@@ -2034,6 +2072,9 @@ body {
 .cigar-card-content {
     padding: 1rem 1.25rem 1.25rem;
     position: relative;
+    display: flex;
+    flex-direction: column;
+    flex: 1; /* Take remaining space in card */
 }
 
 .cigar-card-brand {
@@ -2056,6 +2097,7 @@ body {
     display: -webkit-box;
     -webkit-line-clamp: 2; /* Limit to 2 lines */
     -webkit-box-orient: vertical;
+    flex-grow: 1; /* Allow name to take available space */
 }
 
 .cigar-card-humidor {
@@ -2080,7 +2122,43 @@ body {
     font-weight: 500;
 }
 
-/* Quantity counter below cigar name */
+/* Card footer with strength indicator and quantity controls */
+.cigar-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-top: auto;
+    width: 100%;
+}
+
+/* Strength indicator positioned at bottom-left */
+.strength-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    background: rgba(26, 15, 8, 0.6);
+    border-radius: 0.5rem;
+    width: fit-content;
+}
+
+.strength-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(212, 175, 55, 0.2);
+    border: 1px solid rgba(212, 175, 55, 0.3);
+    transition: all 0.2s ease;
+}
+
+.strength-dot.active {
+    background: var(--accent-gold);
+    border-color: var(--accent-gold);
+    box-shadow: 0 0 4px rgba(212, 175, 55, 0.5);
+}
+
+/* Quantity counter pinned to bottom right */
 .cigar-card-quantity {
     display: flex;
     align-items: center;
@@ -2091,8 +2169,6 @@ body {
     padding: 0.25rem 0.5rem;
     backdrop-filter: blur(8px);
     width: fit-content;
-    margin-top: 0.75rem;
-    margin-left: auto; /* Right align */
 }
 
 .quantity-btn {
@@ -2583,9 +2659,9 @@ body {
 }
 
 .humidor-actions .btn-icon {
-    background: rgba(51, 31, 21, 0.6);
-    border: 1px solid var(--border-color);
-    color: var(--text-secondary);
+    background: var(--action-btn-bg);
+    border: 1px solid var(--action-btn-border);
+    color: var(--action-btn-text);
     width: 36px;
     height: 36px;
     border-radius: 8px;
@@ -2597,9 +2673,9 @@ body {
 }
 
 .humidor-actions .btn-icon:hover {
-    background: var(--accent-gold);
-    color: var(--primary-dark);
-    border-color: var(--accent-gold);
+    background: var(--action-btn-hover-bg);
+    color: var(--action-btn-hover-text);
+    border-color: var(--action-btn-hover-border);
     transform: scale(1.1);
 }
 
@@ -2656,13 +2732,13 @@ body {
 
 .stat-label {
     font-size: 0.875rem;
-    color: var(--text-muted);
+    color: var(--stat-card-text-muted);
     font-weight: 500;
 }
 
 .stat-value {
     font-size: 0.875rem;
-    color: var(--text-primary);
+    color: var(--stat-card-text-primary);
     font-weight: 600;
 }
 
@@ -4189,7 +4265,7 @@ body {
     grid-template-columns: minmax(300px, 360px) 1fr;
     gap: 2rem;
     padding: 1.5rem 2.5rem 1.5rem 2rem;
-    overflow: hidden;
+    overflow: visible;
 }
 
 .report-card-image-section {
@@ -4212,6 +4288,8 @@ body {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
+    min-width: 0;
+    overflow: visible;
 }
 
 .report-card-header {
@@ -4316,6 +4394,8 @@ body {
     border-radius: 12px;
     padding: 1.5rem;
     margin-top: 1.5rem;
+    min-width: 0;
+    overflow: hidden;
 }
 
 .report-card-retail-link-section label {
@@ -4330,8 +4410,32 @@ body {
 
 .retail-link-container {
     overflow-x: auto;
+    overflow-y: hidden;
     white-space: nowrap;
     padding: 0.5rem 0;
+    max-width: 100%;
+    /* Add smooth scrolling and scrollbar styling */
+    scrollbar-width: thin;
+    scrollbar-color: var(--accent-gold) rgba(139, 105, 20, 0.15);
+    -webkit-overflow-scrolling: touch;
+}
+
+.retail-link-container::-webkit-scrollbar {
+    height: 6px;
+}
+
+.retail-link-container::-webkit-scrollbar-track {
+    background: rgba(139, 105, 20, 0.15);
+    border-radius: 3px;
+}
+
+.retail-link-container::-webkit-scrollbar-thumb {
+    background: var(--accent-gold);
+    border-radius: 3px;
+}
+
+.retail-link-container::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-gold-light);
 }
 
 .retail-link-container a {
@@ -4340,7 +4444,8 @@ body {
     font-family: 'Courier New', Courier, monospace;
     font-size: 0.875rem;
     transition: color 0.2s ease;
-    word-break: break-all;
+    /* Remove word-break to allow horizontal scrolling */
+    display: inline-block;
 }
 
 .retail-link-container a:hover {
@@ -5085,13 +5190,13 @@ body {
     text-align: center;
     margin-bottom: 2rem;
     padding: 1rem 2rem;
-    background: linear-gradient(135deg, #331f15, #2a241f);
+    background: var(--hub-header-bg);
     border-radius: 12px;
-    border: 1px solid #4a3d32;
+    border: 1px solid var(--hub-header-border);
 }
 
 .humidor-hub-header h2 {
-    color: #d4af37;
+    color: var(--hub-header-text-primary);
     font-size: 2.5rem;
     font-weight: 700;
     margin-bottom: 0.5rem;
@@ -5099,7 +5204,7 @@ body {
 }
 
 .humidor-hub-header p {
-    color: #d4c5b9;
+    color: var(--hub-header-text-secondary);
     font-size: 1rem;
     margin: 0;
 }

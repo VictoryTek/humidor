@@ -5,6 +5,33 @@ All notable changes to Humidor will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2025-12-10
+
+### Added
+- **Strength Indicators on Cigar Cards**
+  - Visual 1-5 dot scale displays cigar strength at bottom-left of cards
+  - Only appears when a strength organizer is selected during cigar creation
+  - Hover tooltip shows "Strength: X/5" for clarity
+  - Consistent across all views (main collection, favorites, wish list)
+  - Uses gold accent color matching app theme
+
+### Changed
+- **Organizer Cards Visual Improvements**
+  - Strength organizer cards now display level as visual bar indicators instead of text
+  - 5-bar visualization shows strength level more intuitively
+- **Cigar Card Layout Enhancements**
+  - Improved flexbox layout for better content distribution
+  - Card footer now properly contains strength indicator and quantity controls side-by-side
+  - Fixed card height consistency in grid layouts
+- **Report Card Modal**
+  - Improved overflow handling for long retail links
+  - Added horizontal scrollbar with custom styling for retail link section
+  - Better responsive behavior for modal content
+
+### Fixed
+- Fixed cigar card content area flex layout to prevent overflow issues
+- Improved retail link display in report card modal with proper scrolling
+
 ## [1.3.0] - 2025-12-09
 
 ### Added
