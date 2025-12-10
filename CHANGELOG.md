@@ -5,6 +5,88 @@ All notable changes to Humidor will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2025-12-09
+
+### Added
+- **Multiple Public Share Links**
+  - Create unlimited public share links for the same humidor
+  - Set different expiration dates for each link (30 days default, custom date, or never expires)
+  - Add optional labels to identify each share (e.g., "For John - December 2025")
+  - Customize what's included per link (favorites and wish list toggles)
+  - Delete individual links without affecting other shares
+  - Copy any link directly to clipboard with one click
+- New API endpoints for managing multiple shares:
+  - `GET /api/v1/humidors/:id/public-shares` - List all active shares
+  - `DELETE /api/v1/humidors/:id/public-shares/:token_id` - Delete specific share
+- Database migration V17 (automatic on startup)
+
+### Changed
+- Public share view now shows cleaner interface with only relevant sections
+- Navigation panel hides Settings and Organizers menus in shared view
+- Section title changes to "SHARED VIEW" for clarity
+- Improved authentication flow redirects to dashboard instead of setup wizard
+
+### Fixed
+- Expired/revoked share links no longer show incorrect navigation items
+- Removed "Create Account" button from expired share error page
+- Fixed public share error page layout issues
+- Fixed navigation visibility for expired public shares
+- Fixed setup wizard redirect loop for authenticated users
+- Fixed Organizers dropdown visibility in public share view
+
+## [1.2.1] - 2025-12-07
+
+### Fixed
+- **Desktop Layout**: Search/filter bar now stays inline with title and buttons on wide screens (was appearing on separate row)
+- **Hamburger Menu Alignment**: Fixed menu button jumping above logo at 769px screen width
+- **Wish List Editing**: Users can now successfully edit cigars in their wish list (was returning "Failed to fetch" error)
+
+### Changed
+- Updated `verify_cigar_ownership()` to check wish list ownership
+- Added explicit grid positioning to page header elements
+- Improved flexbox properties for header-left section
+- Service worker cache version updated to `humidor-v1.2.1`
+
+## [1.2.0] - 2025-12-06
+
+### Added
+- **Progressive Web App (PWA) Support**
+  - Installable application with custom "Install App" button
+  - Native install prompts on supported browsers
+  - Standalone app mode (no browser chrome)
+  - Home screen icons on mobile devices
+  - Desktop shortcuts on Windows/Mac/Linux
+- **Offline Functionality**
+  - Works completely offline after initial load
+  - Custom offline page with auto-retry logic
+  - Smart caching strategies for optimal performance
+  - Precached essential assets (HTML, CSS, JS, images)
+  - Cached API responses for offline viewing
+- **Service Worker**
+  - Versioned caching system (humidor-v1.2.0)
+  - Network-first strategy for API calls
+  - Cache-first strategy for static assets
+  - Automatic update detection with user notifications
+  - Hourly update checks for new versions
+- **App Manifest**
+  - App name: "Humidor - Premium Cigar Collection"
+  - Theme color: Gold (#D4AF37)
+  - 4 icon variants (192x192, 512x512, standard & maskable)
+  - Standalone display mode
+  - iOS and Android compatibility
+
+### Changed
+- **Mobile & Tablet Responsive Design**
+  - Hamburger menu for mobile/tablet (≤1024px)
+  - Slide-out navigation drawer with smooth animations
+  - Single column grids on mobile for all content
+  - Collapsible filter section to save screen space
+  - Filter toggle badge showing active filter count
+  - Near full-screen modals on mobile devices
+  - 44px minimum touch targets (iOS guidelines)
+  - Large, easy-to-tap buttons and controls
+  - Optimized form inputs for mobile keyboards
+
 ## [1.1.0] - 2025-12-05
 
 ### Added
@@ -101,5 +183,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release candidate with all v1.0.0 features for testing.
 
+[1.3.0]: https://github.com/VictoryTek/humidor/releases/tag/v1.3.0
+[1.2.1]: https://github.com/VictoryTek/humidor/releases/tag/v1.2.1
+[1.2.0]: https://github.com/VictoryTek/humidor/releases/tag/v1.2.0
+[1.1.0]: https://github.com/VictoryTek/humidor/releases/tag/v1.1.0
 [1.0.0]: https://github.com/VictoryTek/humidor/releases/tag/v1.0.0
 [1.0.0-rc.1]: https://github.com/VictoryTek/humidor/releases/tag/v1.0.0-rc.1
