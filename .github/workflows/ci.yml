@@ -157,6 +157,7 @@ jobs:
           context: .
           file: ./Dockerfile
           push: false
+          load: true
           tags: humidor:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -168,7 +169,6 @@ jobs:
 
       - name: Run Trivy vulnerability scan
         uses: aquasecurity/trivy-action@0.28.0
-        continue-on-error: true
         with:
           image-ref: humidor:${{ github.sha }}
           format: sarif
@@ -176,7 +176,7 @@ jobs:
 
       - name: Upload Trivy SARIF report
         uses: github/codeql-action/upload-sarif@v4
-        if: always()
+        if: always() && hashFiles('trivy-results.sarif') != ''
         continue-on-error: true
         with:
           sarif_file: trivy-results.sarif
