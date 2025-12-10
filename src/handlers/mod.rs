@@ -7,6 +7,7 @@ pub mod favorites;
 pub mod humidor_shares;
 pub mod humidors;
 pub mod origins;
+pub mod public_shares;
 pub mod ring_gauges;
 pub mod sizes;
 pub mod strengths;
@@ -37,6 +38,11 @@ pub use humidors::{
 
 pub use humidor_shares::{
     get_humidor_shares, get_shared_humidors, revoke_share, share_humidor, update_share_permission,
+};
+
+pub use public_shares::{
+    create_public_share, delete_public_share, get_public_humidor, get_public_share,
+    get_public_shares, revoke_public_share,
 };
 
 pub use favorites::{add_favorite, get_favorites, is_favorite, remove_favorite};

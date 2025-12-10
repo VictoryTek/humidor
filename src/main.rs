@@ -463,6 +463,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let humidor_routes = routes::create_humidor_routes(db_pool.clone()).boxed();
     let favorite_routes = routes::create_favorite_routes(db_pool.clone()).boxed();
     let backup_routes = routes::create_backup_routes(db_pool.clone()).boxed();
+    let public_share_routes = routes::create_public_share_routes(db_pool.clone()).boxed();
 
     // Combine all API routes
     let api = auth_routes
@@ -472,7 +473,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .or(organizer_routes)
         .or(humidor_routes)
         .or(favorite_routes)
-        .or(backup_routes);
+        .or(backup_routes)
+        .or(public_share_routes); // No auth required for public shares
 
     // Health check endpoint (no auth required)
     let health = warp::path("health")
@@ -507,6 +509,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let reset_password_page = warp::path("reset-password.html")
         .and(warp::get())
         .and_then(serve_reset_password);
+
+    // Public shared humidor page (no auth)
+    let shared_humidor_page = warp::path("shared")
+        .and(warp::path("humidors"))
+        .and(warp::path::param::<String>()) // token UUID
+        .and(warp::path::end())
+        .and(warp::get())
+        .and_then(serve_shared_humidor);
 
     // Configure CORS with smart defaults
     //
@@ -615,6 +625,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .or(login)
         .or(forgot_password_page)
         .or(reset_password_page)
+        .or(shared_humidor_page)
         .or(static_files)
         .or(api)
         .with(log_requests())
@@ -652,19 +663,23 @@ async fn serve_index() -> Result<impl Reply, warp::Rejection> {
             let setup_script = r#"
 <script>
 // Check if setup is needed and redirect to setup page
-fetch('/api/v1/setup/status')
-    .then(response => response.json())
-    .then(data => {
-        if (data.needs_setup) {
-            // Only redirect if we're not already on the setup page
-            if (!window.location.pathname.includes('setup.html')) {
-                window.location.href = '/setup.html';
+// Skip check if user is already authenticated
+const hasToken = localStorage.getItem('humidor_token');
+if (!hasToken) {
+    fetch('/api/v1/setup/status')
+        .then(response => response.json())
+        .then(data => {
+            if (data.needs_setup) {
+                // Only redirect if we're not already on the setup page
+                if (!window.location.pathname.includes('setup.html')) {
+                    window.location.href = '/setup.html';
+                }
             }
-        }
-    })
-    .catch(error => {
-        console.error('Failed to check setup status:', error);
-    });
+        })
+        .catch(error => {
+            console.error('Failed to check setup status:', error);
+        });
+}
 </script>
 "#;
 
@@ -684,16 +699,20 @@ fetch('/api/v1/setup/status')
     <h1>Humidor Inventory</h1>
     <p>Welcome to your cigar inventory system!</p>
     <script>
-    fetch('/api/v1/setup/status')
-        .then(response => response.json())
-        .then(data => {
-            if (data.needs_setup) {
-                window.location.href = '/setup.html';
-            }
-        })
-        .catch(error => {
-            console.error('Failed to check setup status:', error);
-        });
+    // Check if user is authenticated before setup redirect
+    const hasToken = localStorage.getItem('humidor_token');
+    if (!hasToken) {
+        fetch('/api/v1/setup/status')
+            .then(response => response.json())
+            .then(data => {
+                if (data.needs_setup) {
+                    window.location.href = '/setup.html';
+                }
+            })
+            .catch(error => {
+                console.error('Failed to check setup status:', error);
+            });
+    }
     </script>
 </body>
 </html>
@@ -742,6 +761,19 @@ async fn serve_reset_password() -> Result<impl Reply, warp::Rejection> {
         Err(_) => Ok(warp::reply::with_status(
             warp::reply::html("<h1>Reset Password Not Found</h1>".to_string()),
             warp::http::StatusCode::NOT_FOUND,
+        )
+        .into_response()),
+    }
+}
+
+async fn serve_shared_humidor(_token: String) -> Result<impl Reply, warp::Rejection> {
+    // Serve the main index.html for public shares
+    // The app.js will detect the /shared/humidors/:token URL and load public data
+    match tokio::fs::read_to_string("static/index.html").await {
+        Ok(content) => Ok(warp::reply::html(content).into_response()),
+        Err(_) => Ok(warp::reply::with_status(
+            warp::reply::html("<h1>Application Error</h1>".to_string()),
+            warp::http::StatusCode::INTERNAL_SERVER_ERROR,
         )
         .into_response()),
     }

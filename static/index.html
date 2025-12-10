@@ -20,13 +20,13 @@
     <link rel="apple-touch-icon" href="/static/icons/icon-192x192.png">
     <link rel="apple-touch-icon" sizes="192x192" href="/static/icons/icon-192x192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/static/icons/icon-512x512.png">
-    <link rel="stylesheet" href="static/styles.css">
+    <link rel="stylesheet" href="/static/styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="static/fonts/mdi-local.css">
+    <link rel="stylesheet" href="/static/fonts/mdi-local.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css" crossorigin="anonymous">
 </head>
 <body>
@@ -562,6 +562,33 @@
                     </div>
 
                     <div class="settings-container">
+                        <!-- About Section -->
+                        <div class="settings-section about-section">
+                            <h3 class="section-title">
+                                <span class="mdi mdi-information"></span>
+                                About Humidor
+                            </h3>
+                            <div class="about-content">
+                                <div class="about-item">
+                                    <span class="about-label">Version:</span>
+                                    <span class="about-value">1.2.1</span>
+                                </div>
+                                <div class="about-item">
+                                    <span class="about-label">Description:</span>
+                                    <span class="about-value">A comprehensive cigar inventory management system for tracking your collection, managing humidors, and organizing your cigars with detailed information.</span>
+                                </div>
+                                <div class="about-item">
+                                    <span class="about-label">GitHub:</span>
+                                    <span class="about-value">
+                                        <a href="https://github.com/VictoryTek/humidor" target="_blank" rel="noopener noreferrer" class="github-link">
+                                            <span class="mdi mdi-github"></span>
+                                            VictoryTek/humidor
+                                        </a>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- User Management Section (Admin Only) -->
                         <div class="settings-section user-management-section" id="userManagementSection" style="display: none;">
                             <h3 class="section-title">
@@ -1393,6 +1420,72 @@
                         <p class="text-muted">This humidor is not currently shared with anyone.</p>
                     </div>
                 </div>
+
+                <!-- Public Share Link Section -->
+                <div class="share-section">
+                    <h3 class="share-section-title">
+                        <span class="mdi mdi-link-variant"></span>
+                        Public Share Link
+                    </h3>
+                    <p class="section-description">
+                        Create a link that anyone can use to view this humidor without logging in (read-only).
+                    </p>
+                    
+                    <div id="publicShareContainer">
+                        <!-- When no active shares -->
+                        <div id="noPublicShare" class="public-share-empty">
+                            <div class="form-group">
+                                <label for="publicShareLabel">Label (optional):</label>
+                                <input type="text" id="publicShareLabel" placeholder="e.g., 'For John - December 2025'" maxlength="100" />
+                                <small class="form-help">Add a label to help identify this share</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="includeFavoritesCheckbox" />
+                                    <span>Include Favorites</span>
+                                </label>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="includeWishListCheckbox" />
+                                    <span>Include Wish List</span>
+                                </label>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="neverExpiresCheckbox" />
+                                    <span>Never expires (link active until manually deleted)</span>
+                                </label>
+                            </div>
+                            
+                            <div class="form-group" id="expiryDateGroup">
+                                <label for="publicShareExpiry">Expires after:</label>
+                                <input type="datetime-local" id="publicShareExpiry" />
+                                <small class="form-help">Default: 30 days from now</small>
+                            </div>
+                            
+                            <button class="btn btn-primary" id="createPublicShareBtn">
+                                <span class="mdi mdi-link-plus"></span>
+                                Create Public Link
+                            </button>
+                        </div>
+                        
+                        <!-- When shares exist -->
+                        <div id="activePublicShare" class="public-share-active" style="display: none;">
+                            <div id="publicSharesList" class="public-shares-list">
+                                <!-- Populated via JavaScript -->
+                            </div>
+                            
+                            <button class="btn btn-primary btn-sm" onclick="document.getElementById('noPublicShare').style.display='block'; document.getElementById('activePublicShare').style.display='none';">
+                                <span class="mdi mdi-link-plus"></span>
+                                Create Another Link
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -1400,6 +1493,6 @@
     <!-- Toast Notifications -->
     <div class="toast-container" id="toastContainer"></div>
 
-    <script src="static/app.js?version=20251113_003"></script>
+    <script src="/static/app.js?version=20251113_003"></script>
 </body>
 </html>

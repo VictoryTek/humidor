@@ -1583,11 +1583,7 @@ body {
 }
 
 /* Cigars Grid */
-.cigars-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 1.75rem;
-}
+/* Cigar grid removed - using definition at line 1982 */
 
 .cigar-card {
     background: var(--card-background);
@@ -4502,6 +4498,56 @@ body {
    BACKUP & RESTORE STYLES
    ============================================ */
 
+/* About Section Styles */
+.about-section {
+    background: var(--card-background);
+}
+
+.about-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.about-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.about-label {
+    font-weight: 600;
+    color: var(--accent-gold);
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.about-value {
+    color: var(--text-primary);
+    line-height: 1.6;
+    font-size: 1rem;
+}
+
+.github-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--accent-gold);
+    text-decoration: none;
+    transition: all 0.2s ease;
+    font-weight: 500;
+}
+
+.github-link:hover {
+    color: var(--accent-copper);
+    transform: translateX(3px);
+}
+
+.github-link .mdi {
+    font-size: 1.25rem;
+}
+
 .section-description {
     color: var(--text-secondary);
     line-height: 1.6;
@@ -6607,5 +6653,412 @@ html.light-mode button.add-btn-sidebar:hover {
     .pwa-update-button {
         padding: 0.4rem 0.75rem;
         font-size: 0.8125rem;
+    }
+}
+
+/* ============================================
+   PUBLIC SHARE STYLES
+   ============================================ */
+
+.public-share-empty,
+.public-share-active {
+    padding: 1rem;
+}
+
+.public-shares-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.public-share-item {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(212, 175, 55, 0.2);
+    border-radius: 0.75rem;
+    padding: 1rem;
+}
+
+.public-share-item .share-label {
+    font-weight: 600;
+    color: var(--accent-gold);
+    margin-bottom: 0.75rem;
+    font-size: 0.95rem;
+}
+
+.public-share-item .share-link-box {
+    margin-bottom: 0.75rem;
+}
+
+.public-share-item .share-info {
+    margin-bottom: 0.75rem;
+}
+
+.public-share-empty .form-group {
+    margin-bottom: 1rem;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    user-select: none;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--accent-gold);
+}
+
+#expiryDateGroup {
+    transition: all 0.3s ease;
+}
+
+.share-link-box {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.share-url-input {
+    flex: 1;
+    padding: 0.75rem;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(212, 175, 55, 0.3);
+    border-radius: 0.5rem;
+    color: var(--text-primary);
+    font-family: 'Courier New', monospace;
+    font-size: 0.875rem;
+}
+
+.share-link-box .btn-icon {
+    flex-shrink: 0;
+    padding: 0.75rem;
+    background: rgba(212, 175, 55, 0.1);
+    border: 1px solid rgba(212, 175, 55, 0.3);
+    border-radius: 0.5rem;
+    color: var(--accent-gold);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.share-link-box .btn-icon:hover {
+    background: var(--accent-gold);
+    color: var(--primary-dark);
+}
+
+.share-info {
+    background: rgba(212, 175, 55, 0.1);
+    border-left: 3px solid var(--accent-gold);
+    padding: 0.75rem 1rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+}
+
+.share-info-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-primary);
+}
+
+.share-info-item .mdi {
+    color: var(--accent-gold);
+    font-size: 1.25rem;
+}
+
+.warning-badge {
+    background: #ff6b6b;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-left: 0.5rem;
+}
+
+/* ============================================
+   PUBLIC VIEW PAGE STYLES
+   ============================================ */
+
+.public-view {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--primary-bg);
+}
+
+.public-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 2rem;
+    background: var(--card-background);
+    border-bottom: 2px solid rgba(212, 175, 55, 0.2);
+    box-shadow: 0 2px 8px var(--shadow-color);
+}
+
+.public-logo {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.public-logo .logo-img {
+    width: 48px;
+    height: 48px;
+}
+
+.public-logo h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--accent-gold);
+    margin: 0;
+}
+
+.public-content {
+    flex: 1;
+    max-width: 1400px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.loading-state,
+.error-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 50vh;
+    text-align: center;
+}
+
+.loading-state .mdi-spin {
+    font-size: 4rem;
+    color: var(--accent-gold);
+    margin-bottom: 1rem;
+}
+
+.error-state .mdi {
+    font-size: 5rem;
+    color: #ff6b6b;
+    margin-bottom: 1rem;
+}
+
+.error-state h2 {
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+.error-state p {
+    color: var(--text-secondary);
+    margin-bottom: 1.5rem;
+}
+
+.humidor-view .humidor-header {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+.humidor-view .humidor-header h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 2.5rem;
+    color: var(--accent-gold);
+    margin-bottom: 1rem;
+}
+
+.humidor-view .humidor-description {
+    color: var(--text-secondary);
+    font-size: 1.125rem;
+    line-height: 1.6;
+    margin-bottom: 1.5rem;
+    max-width: 800px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.humidor-meta-row {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    flex-wrap: wrap;
+}
+
+.humidor-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-secondary);
+    font-size: 1rem;
+}
+
+.humidor-meta .mdi {
+    color: var(--accent-gold);
+    font-size: 1.25rem;
+}
+
+/* Public view uses same grid sizing as main app */
+.public-view .cigars-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 1rem;
+}
+
+.public-cigar-card {
+    background: var(--card-background);
+    border: 1px solid rgba(212, 175, 55, 0.2);
+    border-radius: 12px;
+    padding: 1.5rem;
+    transition: all 0.3s ease;
+}
+
+.public-cigar-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px var(--shadow-color);
+    border-color: var(--accent-gold);
+}
+
+.cigar-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid rgba(212, 175, 55, 0.2);
+}
+
+.cigar-card-header h3 {
+    color: var(--accent-gold);
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0;
+    flex: 1;
+}
+
+.cigar-quantity {
+    background: var(--accent-gold);
+    color: var(--primary-dark);
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 0.875rem;
+    flex-shrink: 0;
+}
+
+.cigar-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.cigar-detail {
+    color: var(--text-primary);
+    font-size: 0.9375rem;
+}
+
+.cigar-detail strong {
+    color: var(--accent-copper);
+    font-weight: 600;
+}
+
+.cigar-notes {
+    background: rgba(212, 175, 55, 0.05);
+    border-left: 3px solid var(--accent-gold);
+    padding: 0.75rem 1rem;
+    margin: 1rem 0;
+    color: var(--text-secondary);
+    font-style: italic;
+    font-size: 0.9375rem;
+    line-height: 1.5;
+}
+
+.cigar-retail-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--accent-gold);
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.9375rem;
+    transition: all 0.2s ease;
+}
+
+.cigar-retail-link:hover {
+    color: var(--accent-copper);
+    transform: translateX(3px);
+}
+
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--text-secondary);
+}
+
+.empty-state .mdi {
+    font-size: 5rem;
+    color: rgba(212, 175, 55, 0.3);
+    margin-bottom: 1rem;
+}
+
+.empty-state p {
+    font-size: 1.125rem;
+    font-style: italic;
+}
+
+.public-footer {
+    background: var(--card-background);
+    border-top: 2px solid rgba(212, 175, 55, 0.2);
+    padding: 2rem;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.9375rem;
+    margin-top: auto;
+}
+
+/* Light mode public view overrides */
+.light-mode .public-header,
+.light-mode .public-footer {
+    background: rgba(243, 237, 228, 0.95);
+}
+
+.light-mode .public-cigar-card {
+    background: rgba(255, 255, 255, 0.8);
+}
+
+.light-mode .share-url-input {
+    background: rgba(255, 255, 255, 0.6);
+    border-color: rgba(212, 175, 55, 0.4);
+}
+
+/* Responsive public view */
+@media (max-width: 768px) {
+    .public-header {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+    }
+    
+    .public-logo h1 {
+        font-size: 1.5rem;
+    }
+    
+    .humidor-view .humidor-header h1 {
+        font-size: 2rem;
+    }
+    
+    .cigars-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .share-link-box {
+        flex-direction: column;
     }
 }

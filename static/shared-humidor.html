@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shared Humidor - Humidor</title>
+    <link rel="icon" type="image/png" href="/static/logo.png">
+    <link rel="shortcut icon" type="image/png" href="/static/logo.png">
+    <link rel="apple-touch-icon" href="/static/logo.png">
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/fonts/mdi-local.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <h3 class="nav-section-title">Shared View</h3>
+                    <a href="#" class="nav-item active" data-view="humidor">
+                        <div class="nav-content">
+                            <span class="nav-icon mdi mdi-treasure-chest-outline"></span>
+                            Humidor
+                        </div>
+                    </a>
+                    <a href="#" class="nav-item" id="favoritesNav" style="display: none;" data-view="favorites">
+                        <div class="nav-content">
+                            <span class="nav-icon mdi mdi-heart-outline"></span>
+                            Favorites
+                        </div>
+                    </a>
+                    <a href="#" class="nav-item" id="wishlistNav" style="display: none;" data-view="wishlist">
+                        <div class="nav-content">
+                            <span class="nav-icon mdi mdi-book-edit-outline"></span>
+                            Wish List
+                        </div>
+                    </a>
+                </div>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <p class="text-muted small">Public Read-Only View</p>
+                <a href="/login.html" class="btn btn-secondary btn-sm">
+                    <span class="mdi mdi-login"></span> Login to Your Account
+                </a>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="content">
+            <header class="page-header">
+                <div class="header-left">
+                    <button class="mobile-menu-toggle" id="menuToggle" type="button">
+                        <span class="mobile-menu-icon mdi mdi-menu"></span>
+                    </button>
+                    <div class="app-logo">
+                        <img src="/static/logo.png" alt="" class="logo-icon">
+                        <span class="logo-text">Humidor</span>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <button class="theme-toggle" id="themeToggle" type="button" title="Toggle theme">
+                        <span class="theme-icon mdi mdi-weather-night"></span>
+                    </button>
+                </div>
+            </header>
+
+            <div class="page-content">
+                <!-- Loading State -->
+                <div id="loadingState" class="loading-container">
+                    <div class="loading-spinner"></div>
+                    <p>Loading shared humidor...</p>
+                </div>
+
+                <!-- Error State -->
+                <div id="errorState" class="error-container" style="display: none;">
+                    <span class="mdi mdi-alert-circle error-icon"></span>
+                    <h2>Share Link Not Found</h2>
+                    <p>This link may have expired or been revoked.</p>
+                    <a href="/login.html" class="btn btn-primary">Go to Login</a>
+                </div>
+
+                <!-- Humidor Content -->
+                <div id="humidorContent" style="display: none;">
+                    <div class="humidor-section">
+                        <div class="humidor-header">
+                            <div class="humidor-info-card">
+                                <div class="humidor-title-section">
+                                    <i class="mdi mdi-home-variant"></i>
+                                    <div>
+                                        <h2 class="humidor-name" id="humidorName"></h2>
+                                        <p class="humidor-location" id="humidorDescription" style="display: none;"></p>
+                                        <span class="permission-badge" style="background: #3498db; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; margin-left: 8px;">SHARED - VIEW ONLY</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="humidorView"></div>
+                    </div>
+                </div>
+
+                <!-- Favorites Content -->
+                <div id="favoritesContent" style="display: none;">
+                    <div class="humidor-section">
+                        <div class="humidor-header">
+                            <div class="humidor-info-card">
+                                <div class="humidor-title-section">
+                                    <i class="mdi mdi-heart"></i>
+                                    <div>
+                                        <h2 class="humidor-name">Favorite Cigars</h2>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="favoritesView"></div>
+                    </div>
+                </div>
+
+                <!-- Wishlist Content -->
+                <div id="wishlistContent" style="display: none;">
+                    <div class="humidor-section">
+                        <div class="humidor-header">
+                            <div class="humidor-info-card">
+                                <div class="humidor-title-section">
+                                    <i class="mdi mdi-book-edit-outline"></i>
+                                    <div>
+                                        <h2 class="humidor-name">Wish List</h2>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="wishlistView"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cigar Details Modal -->
+    <div class="modal" id="reportCardModal">
+        <div class="modal-content report-card-content">
+            <div class="modal-header">
+                <h2>Cigar Details</h2>
+                <button class="close-btn" id="closeReportCardModal">&times;</button>
+            </div>
+            
+            <div class="report-card-body">
+                <div class="report-card-image-section">
+                    <img id="reportCardImage" src="" alt="Cigar image">
+                </div>
+                
+                <div class="report-card-details">
+                    <div class="report-card-header">
+                        <div>
+                            <h3 id="reportCardBrand" class="report-brand"></h3>
+                            <h2 id="reportCardName" class="report-name"></h2>
+                        </div>
+                    </div>
+                    
+                    <div class="report-card-info-box">
+                        <div class="report-card-grid">
+                            <div class="report-card-field">
+                                <label>ORIGIN:</label>
+                                <span id="reportCardOrigin"></span>
+                            </div>
+                            <div class="report-card-field">
+                                <label>WRAPPER:</label>
+                                <span id="reportCardWrapper"></span>
+                            </div>
+                            <div class="report-card-field">
+                                <label>STRENGTH:</label>
+                                <span id="reportCardStrength"></span>
+                            </div>
+                            <div class="report-card-field">
+                                <label>RING GAUGE:</label>
+                                <span id="reportCardRingGauge"></span>
+                            </div>
+                            <div class="report-card-field">
+                                <label>LENGTH:</label>
+                                <span id="reportCardLength"></span>
+                            </div>
+                            <div class="report-card-field">
+                                <label>QUANTITY:</label>
+                                <span id="reportCardQuantity"></span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="report-card-notes-section" id="reportCardNotesSection" style="display: none;">
+                        <label>NOTES</label>
+                        <p id="reportCardNotes" class="report-notes"></p>
+                    </div>
+                    
+                    <div class="report-card-retail-link-section" id="reportCardRetailLinkField" style="display: none;">
+                        <label>RETAIL LINK</label>
+                        <div class="retail-link-container">
+                            <a id="reportCardRetailLink" href="" target="_blank" rel="noopener noreferrer"></a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const pathParts = window.location.pathname.split('/');
+        const token = pathParts[pathParts.length - 1];
+        let sharedData = null;
+        let currentView = 'humidor';
+        let allCigars = {}; // Store cigars by ID for quick lookup
+
+        // Modal close handlers
+        document.getElementById('closeReportCardModal').addEventListener('click', closeReportCard);
+        document.addEventListener('click', (e) => {
+            if (e.target.id === 'reportCardModal') {
+                closeReportCard();
+            }
+        });
+
+        function openCigarDetails(cigarId) {
+            let cigar = allCigars[cigarId];
+            if (!cigar) {
+                console.error('Cigar not found:', cigarId);
+                return;
+            }
+
+            const modal = document.getElementById('reportCardModal');
+            
+            // Set image
+            const image = document.getElementById('reportCardImage');
+            image.src = cigar.image_url || '/static/cigar-placeholder.png';
+            
+            // Set brand and name
+            document.getElementById('reportCardBrand').textContent = cigar.brand || '-';
+            document.getElementById('reportCardName').textContent = cigar.name;
+            
+            // Set details
+            document.getElementById('reportCardOrigin').textContent = cigar.origin || '-';
+            document.getElementById('reportCardWrapper').textContent = cigar.wrapper || '-';
+            document.getElementById('reportCardStrength').textContent = cigar.strength || '-';
+            document.getElementById('reportCardRingGauge').textContent = cigar.ring_gauge || '-';
+            document.getElementById('reportCardLength').textContent = cigar.length_inches ? `${cigar.length_inches}"` : '-';
+            document.getElementById('reportCardQuantity').textContent = cigar.quantity || '-';
+            
+            // Set notes
+            const notesSection = document.getElementById('reportCardNotesSection');
+            const notesText = document.getElementById('reportCardNotes');
+            if (cigar.notes) {
+                notesText.textContent = cigar.notes;
+                notesSection.style.display = 'block';
+            } else {
+                notesSection.style.display = 'none';
+            }
+            
+            // Set retail link
+            const retailLinkSection = document.getElementById('reportCardRetailLinkField');
+            const retailLink = document.getElementById('reportCardRetailLink');
+            if (cigar.retail_link) {
+                retailLink.href = cigar.retail_link;
+                retailLink.textContent = cigar.retail_link;
+                retailLinkSection.style.display = 'block';
+            } else {
+                retailLinkSection.style.display = 'none';
+            }
+            
+            modal.classList.add('show');
+        }
+
+        function closeReportCard() {
+            const modal = document.getElementById('reportCardModal');
+            modal.classList.remove('show');
+        }
+
+        // Theme toggle
+        const themeToggle = document.getElementById('themeToggle');
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        if (savedTheme === 'light') {
+            document.body.classList.add('light-mode');
+            themeToggle.querySelector('.theme-icon').classList.replace('mdi-weather-night', 'mdi-weather-sunny');
+        }
+        themeToggle.addEventListener('click', () => {
+            document.body.classList.toggle('light-mode');
+            const isLight = document.body.classList.contains('light-mode');
+            localStorage.setItem('theme', isLight ? 'light' : 'dark');
+            themeToggle.querySelector('.theme-icon').classList.toggle('mdi-weather-night', !isLight);
+            themeToggle.querySelector('.theme-icon').classList.toggle('mdi-weather-sunny', isLight);
+        });
+
+        // Mobile menu toggle
+        document.getElementById('menuToggle').addEventListener('click', () => {
+            document.getElementById('sidebar').classList.toggle('active');
+        });
+
+        // Navigation
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                const view = item.dataset.view;
+                if (view) {
+                    switchView(view);
+                    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+                    item.classList.add('active');
+                    // Close mobile menu
+                    document.getElementById('sidebar').classList.remove('active');
+                }
+            });
+        });
+
+        function switchView(view) {
+            currentView = view;
+            document.getElementById('humidorContent').style.display = view === 'humidor' ? 'block' : 'none';
+            document.getElementById('favoritesContent').style.display = view === 'favorites' ? 'block' : 'none';
+            document.getElementById('wishlistContent').style.display = view === 'wishlist' ? 'block' : 'none';
+
+            if (view === 'favorites' && sharedData.favorites) {
+                renderCigars(sharedData.favorites, 'favoritesView');
+            } else if (view === 'wishlist' && sharedData.wish_list) {
+                renderCigars(sharedData.wish_list, 'wishlistView');
+            }
+        }
+
+        async function loadSharedHumidor() {
+            try {
+                const response = await fetch(`/api/v1/shared/humidors/${token}`);
+                
+                if (!response.ok) {
+                    showError();
+                    return;
+                }
+                
+                sharedData = await response.json();
+                displayHumidor(sharedData);
+            } catch (error) {
+                console.error('Failed to load humidor:', error);
+                showError();
+            }
+        }
+
+        function displayHumidor(data) {
+            console.log('Displaying humidor:', data);
+            console.log('Cigars array:', data.cigars);
+            console.log('Cigar count:', data.cigar_count);
+            
+            document.getElementById('loadingState').style.display = 'none';
+            document.getElementById('humidorContent').style.display = 'block';
+            
+            // Update page title
+            document.title = `${data.name} - Shared Humidor`;
+            
+            document.getElementById('humidorName').textContent = data.name;
+            
+            const descElem = document.getElementById('humidorDescription');
+            if (data.description) {
+                descElem.textContent = data.description;
+                descElem.style.display = 'block';
+            }
+
+            // Store cigars for quick lookup
+            data.cigars.forEach(cigar => {
+                allCigars[cigar.id] = cigar;
+            });
+            if (data.favorites) {
+                data.favorites.forEach(cigar => {
+                    allCigars[cigar.id] = cigar;
+                });
+            }
+            if (data.wish_list) {
+                data.wish_list.forEach(cigar => {
+                    allCigars[cigar.id] = cigar;
+                });
+            }
+
+            // Show/hide nav items based on what's included
+            if (data.favorites && data.favorites.length > 0) {
+                document.getElementById('favoritesNav').style.display = 'block';
+            }
+            if (data.wish_list && data.wish_list.length > 0) {
+                document.getElementById('wishlistNav').style.display = 'block';
+            }
+
+            renderCigars(data.cigars, 'humidorView');
+        }
+
+        function renderCigars(cigars, containerId) {
+            console.log('renderCigars called with:', containerId, 'cigars:', cigars);
+            const container = document.getElementById(containerId);
+            
+            if (!container) {
+                console.error('Container not found:', containerId);
+                return;
+            }
+            
+            if (!cigars || cigars.length === 0) {
+                container.innerHTML = '<div class="empty-state"><p>No cigars to display</p></div>';
+                return;
+            }
+
+            const htmlContent = '<div class="cigars-grid">' + cigars.map(cigar => `
+                <div class="cigar-card" data-cigar-id="${cigar.id}" onclick="openCigarDetails('${cigar.id}')" style="cursor: pointer;">
+                    <div class="cigar-card-image">
+                        ${cigar.image_url ? 
+                            `<img src="${escapeHtml(cigar.image_url)}" alt="${escapeHtml(cigar.name)}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                             <img src="/static/cigar-placeholder.png" alt="Cigar placeholder" style="display: none; width: 100%; height: 100%; object-fit: contain; padding: 2rem;">` :
+                            `<img src="/static/cigar-placeholder.png" alt="Cigar placeholder" style="width: 100%; height: 100%; object-fit: contain; padding: 2rem;">`
+                        }
+                    </div>
+                    <div class="cigar-card-content">
+                        ${cigar.brand ? `<div class="cigar-card-brand">${escapeHtml(cigar.brand)}</div>` : ''}
+                        <h3 class="cigar-card-name">${escapeHtml(cigar.name)}</h3>
+                        <div class="cigar-card-quantity">
+                            <span class="quantity-value">${cigar.quantity}</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('') + '</div>';
+            
+            console.log('Generated HTML length:', htmlContent.length);
+            console.log('First 500 chars:', htmlContent.substring(0, 500));
+            container.innerHTML = htmlContent;
+            console.log('Container after setting innerHTML:', container);
+        }
+
+        function showError() {
+            document.getElementById('loadingState').style.display = 'none';
+            document.getElementById('errorState').style.display = 'flex';
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Load on page load
+        loadSharedHumidor();
+    </script>
+</body>
+</html>

@@ -123,6 +123,66 @@ pub fn create_humidor_routes(
         .and(with_db(db_pool.clone()))
         .and_then(handlers::update_share_permission);
 
+    // Public share routes (authenticated)
+    let create_public_share = warp::path("api")
+        .and(warp::path("v1"))
+        .and(warp::path("humidors"))
+        .and(with_uuid())
+        .and(warp::path("public-share"))
+        .and(warp::path::end())
+        .and(warp::post())
+        .and(with_current_user(db_pool.clone()))
+        .and(json_body())
+        .and(with_db(db_pool.clone()))
+        .and_then(handlers::create_public_share);
+
+    // Get all public shares for a humidor
+    let get_public_shares = warp::path("api")
+        .and(warp::path("v1"))
+        .and(warp::path("humidors"))
+        .and(with_uuid())
+        .and(warp::path("public-shares"))
+        .and(warp::path::end())
+        .and(warp::get())
+        .and(with_current_user(db_pool.clone()))
+        .and(with_db(db_pool.clone()))
+        .and_then(handlers::get_public_shares);
+
+    // Delete a specific public share
+    let delete_public_share = warp::path("api")
+        .and(warp::path("v1"))
+        .and(warp::path("humidors"))
+        .and(with_uuid()) // humidor_id
+        .and(warp::path("public-shares"))
+        .and(with_uuid()) // token_id
+        .and(warp::path::end())
+        .and(warp::delete())
+        .and(with_current_user(db_pool.clone()))
+        .and(with_db(db_pool.clone()))
+        .and_then(handlers::delete_public_share);
+
+    let get_public_share = warp::path("api")
+        .and(warp::path("v1"))
+        .and(warp::path("humidors"))
+        .and(with_uuid())
+        .and(warp::path("public-share"))
+        .and(warp::path::end())
+        .and(warp::get())
+        .and(with_current_user(db_pool.clone()))
+        .and(with_db(db_pool.clone()))
+        .and_then(handlers::get_public_share);
+
+    let revoke_public_share = warp::path("api")
+        .and(warp::path("v1"))
+        .and(warp::path("humidors"))
+        .and(with_uuid())
+        .and(warp::path("public-share"))
+        .and(warp::path::end())
+        .and(warp::delete())
+        .and(with_current_user(db_pool.clone()))
+        .and(with_db(db_pool.clone()))
+        .and_then(handlers::revoke_public_share);
+
     // Must come before get_humidor (more specific route)
     get_humidors
         .or(get_shared_humidors) // More specific, should come early
@@ -131,6 +191,11 @@ pub fn create_humidor_routes(
         .or(share_humidor)
         .or(revoke_share)
         .or(update_share_permission)
+        .or(create_public_share)
+        .or(get_public_shares)
+        .or(delete_public_share)
+        .or(get_public_share)
+        .or(revoke_public_share)
         .or(create_humidor)
         .or(update_humidor)
         .or(delete_humidor)

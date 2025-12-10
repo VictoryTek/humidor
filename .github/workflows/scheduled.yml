@@ -105,16 +105,17 @@ jobs:
           echo "current=$CURRENT_RUST" >> $GITHUB_OUTPUT
           echo "latest=$LATEST_RUST" >> $GITHUB_OUTPUT
           
-          # Compare versions (strip patch version for comparison if needed)
-          CURRENT_MAJOR_MINOR=$(echo "$CURRENT_RUST" | cut -d. -f1,2)
-          LATEST_MAJOR_MINOR=$(echo "$LATEST_RUST" | cut -d. -f1,2)
+          # Only alert on MAJOR version changes (e.g., 1.x -> 2.x)
+          # Rust uses semantic versioning: MAJOR.MINOR.PATCH
+          CURRENT_MAJOR=$(echo "$CURRENT_RUST" | cut -d. -f1)
+          LATEST_MAJOR=$(echo "$LATEST_RUST" | cut -d. -f1)
           
-          if [ "$CURRENT_MAJOR_MINOR" != "$LATEST_MAJOR_MINOR" ]; then
+          if [ "$CURRENT_MAJOR" != "$LATEST_MAJOR" ]; then
             echo "update_available=true" >> $GITHUB_OUTPUT
-            echo "Update available: $CURRENT_MAJOR_MINOR -> $LATEST_MAJOR_MINOR"
+            echo "MAJOR version update available: $CURRENT_MAJOR.x -> $LATEST_MAJOR.x"
           else
             echo "update_available=false" >> $GITHUB_OUTPUT
-            echo "Already on latest major.minor version"
+            echo "Already on Rust $CURRENT_MAJOR.x (no major version change)"
           fi
 
       - name: Create issue if Rust update available

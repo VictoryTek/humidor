@@ -1969,7 +1969,16 @@ async function findOrCreateRingGauge(gaugeValue) {
 
 // Event Listeners
 document.addEventListener('DOMContentLoaded', function() {
-    // Check authentication first
+    // Check if this is a public share link
+    const isPublicShare = window.location.pathname.startsWith('/shared/humidors/');
+    
+    if (isPublicShare) {
+        // Handle public share view
+        initializePublicShareView();
+        return;
+    }
+    
+    // Check authentication first for regular app
     if (!checkAuth()) {
         window.location.href = '/login.html';
         return;
@@ -5421,6 +5430,9 @@ async function openShareHumidorModal(humidorId, humidorName) {
     // Load current shares and populate dropdown
     await loadCurrentShares(humidorId);
     
+    // Load public share status
+    await loadPublicShare(humidorId);
+    
     modal.style.display = 'flex';
 }
 
@@ -5600,11 +5612,256 @@ async function revokeShare(humidorId, userId) {
     }
 }
 
+// ========================================
+// PUBLIC SHARE FUNCTIONS
+// ========================================
+
+async function loadPublicShare(humidorId) {
+    try {
+        const response = await makeAuthenticatedRequest(
+            `/api/v1/humidors/${humidorId}/public-shares`,
+            { method: 'GET' }
+        );
+        
+        if (response.ok) {
+            const shares = await response.json();
+            if (shares && shares.length > 0) {
+                showActivePublicShares(shares);
+            } else {
+                showNoPublicShare();
+            }
+        } else {
+            console.error('Failed to load public shares');
+            showNoPublicShare();
+        }
+    } catch (error) {
+        console.error('Error loading public shares:', error);
+        showNoPublicShare();
+    }
+}
+
+function showNoPublicShare() {
+    document.getElementById('noPublicShare').style.display = 'block';
+    document.getElementById('activePublicShare').style.display = 'none';
+    
+    // Set default expiry to 30 days from now
+    const defaultExpiry = new Date();
+    defaultExpiry.setDate(defaultExpiry.getDate() + 30);
+    const expiryInput = document.getElementById('publicShareExpiry');
+    if (expiryInput) {
+        expiryInput.value = defaultExpiry.toISOString().slice(0, 16);
+    }
+    
+    // Clear label input
+    const labelInput = document.getElementById('publicShareLabel');
+    if (labelInput) {
+        labelInput.value = '';
+    }
+    
+    // Setup checkbox toggle
+    setupExpiryCheckbox();
+}
+
+function showActivePublicShares(shares) {
+    document.getElementById('noPublicShare').style.display = 'none';
+    document.getElementById('activePublicShare').style.display = 'block';
+    
+    const container = document.getElementById('publicSharesList');
+    if (!container) return;
+    
+    container.innerHTML = shares.map(share => {
+        const shareUrl = `${window.location.protocol}//${window.location.host}/shared/humidors/${share.token_id}`;
+        
+        let expiryInfo = '';
+        if (share.expires_at) {
+            const expiryDate = new Date(share.expires_at);
+            const now = new Date();
+            const daysUntilExpiry = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
+            
+            expiryInfo = `
+                <div class="share-info-item">
+                    <span class="mdi mdi-clock-outline"></span>
+                    Expires: <strong>${expiryDate.toLocaleString()}</strong>
+                    ${daysUntilExpiry <= 7 ? `<span class="warning-badge">${daysUntilExpiry} days left</span>` : ''}
+                </div>
+            `;
+        } else {
+            expiryInfo = `
+                <div class="share-info-item">
+                    <span class="mdi mdi-infinity"></span>
+                    <strong>Never expires</strong>
+                </div>
+            `;
+        }
+        
+        const includeInfo = `
+            <div class="share-info-item">
+                <span class="mdi mdi-heart${share.include_favorites ? '' : '-outline'}"></span>
+                Favorites: ${share.include_favorites ? 'Yes' : 'No'}
+            </div>
+            <div class="share-info-item">
+                <span class="mdi mdi-book${share.include_wish_list ? '' : '-outline'}"></span>
+                Wish List: ${share.include_wish_list ? 'Yes' : 'No'}
+            </div>
+        `;
+        
+        return `
+            <div class="public-share-item" data-token="${share.token_id}">
+                ${share.label ? `<div class="share-label">${escapeHtml(share.label)}</div>` : ''}
+                <div class="share-link-box">
+                    <input type="text" value="${shareUrl}" readonly class="share-url-input" />
+                    <button class="btn-icon" onclick="copyShareLink('${shareUrl}')" title="Copy Link">
+                        <span class="mdi mdi-content-copy"></span>
+                    </button>
+                </div>
+                <div class="share-info">
+                    ${expiryInfo}
+                    ${includeInfo}
+                </div>
+                <button class="btn btn-danger btn-sm" onclick="deletePublicShare('${share.token_id}')">
+                    <span class="mdi mdi-delete"></span>
+                    Delete
+                </button>
+            </div>
+        `;
+    }).join('');
+}
+
+window.copyShareLink = async function(url) {
+    try {
+        await navigator.clipboard.writeText(url);
+        showToast('Link copied to clipboard!', 'success');
+    } catch (error) {
+        showToast('Failed to copy link', 'error');
+    }
+}
+
+function setupExpiryCheckbox() {
+    const checkbox = document.getElementById('neverExpiresCheckbox');
+    const expiryGroup = document.getElementById('expiryDateGroup');
+    
+    if (!checkbox || !expiryGroup) return;
+    
+    // Remove existing listeners
+    const newCheckbox = checkbox.cloneNode(true);
+    checkbox.parentNode.replaceChild(newCheckbox, checkbox);
+    
+    newCheckbox.addEventListener('change', (e) => {
+        if (e.target.checked) {
+            expiryGroup.style.display = 'none';
+        } else {
+            expiryGroup.style.display = 'block';
+        }
+    });
+    
+    // Initialize state
+    expiryGroup.style.display = newCheckbox.checked ? 'none' : 'block';
+}
+
+async function createPublicShare() {
+    const humidorId = currentShareHumidorId;
+    const neverExpires = document.getElementById('neverExpiresCheckbox').checked;
+    const includeFavorites = document.getElementById('includeFavoritesCheckbox').checked;
+    const includeWishList = document.getElementById('includeWishListCheckbox').checked;
+    const expiryInput = document.getElementById('publicShareExpiry').value;
+    const labelInput = document.getElementById('publicShareLabel');
+    const label = labelInput ? labelInput.value.trim() : '';
+    
+    let requestBody = { 
+        never_expires: neverExpires,
+        include_favorites: includeFavorites,
+        include_wish_list: includeWishList,
+        label: label || null
+    };
+    
+    if (!neverExpires && expiryInput) {
+        requestBody.expires_at = new Date(expiryInput).toISOString();
+    }
+    
+    try {
+        const response = await makeAuthenticatedRequest(
+            `/api/v1/humidors/${humidorId}/public-share`,
+            {
+                method: 'POST',
+                body: JSON.stringify(requestBody)
+            }
+        );
+        
+        if (response.ok) {
+            showToast('Public share link created!', 'success');
+            await loadPublicShare(humidorId);
+        } else {
+            const error = await response.json();
+            showToast(error.message || 'Failed to create share link', 'error');
+        }
+    } catch (error) {
+        console.error('Failed to create public share:', error);
+        showToast('Failed to create share link', 'error');
+    }
+}
+
+async function deletePublicShare(tokenId) {
+    if (!confirm('Are you sure you want to delete this share link? This link will stop working immediately.')) {
+        return;
+    }
+    
+    const humidorId = currentShareHumidorId;
+    
+    try {
+        const response = await makeAuthenticatedRequest(
+            `/api/v1/humidors/${humidorId}/public-shares/${tokenId}`,
+            { method: 'DELETE' }
+        );
+        
+        if (response.ok) {
+            showToast('Share link deleted', 'success');
+            await loadPublicShare(humidorId);
+        } else {
+            const error = await response.json();
+            showToast(error.message || 'Failed to delete link', 'error');
+        }
+    } catch (error) {
+        console.error('Failed to delete public share:', error);
+        showToast('Failed to delete link', 'error');
+    }
+}
+
+window.deletePublicShare = deletePublicShare;
+
+async function revokeAllPublicShares() {
+    if (!confirm('Are you sure you want to revoke ALL public share links for this humidor? All links will stop working immediately.')) {
+        return;
+    }
+    
+    const humidorId = currentShareHumidorId;
+    
+    try {
+        const response = await makeAuthenticatedRequest(
+            `/api/v1/humidors/${humidorId}/public-share`,
+            { method: 'DELETE' }
+        );
+        
+        if (response.ok) {
+            showToast('All share links revoked', 'success');
+            await loadPublicShare(humidorId);
+        } else {
+            const error = await response.json();
+            showToast(error.message || 'Failed to revoke links', 'error');
+        }
+    } catch (error) {
+        console.error('Failed to revoke public shares:', error);
+        showToast('Failed to revoke links', 'error');
+    }
+}
+
 // Setup share modal event listeners
 function setupShareModalListeners() {
     const closeBtn = document.getElementById('shareHumidorClose');
     const addUserBtn = document.getElementById('shareAddUserBtn');
     const modal = document.getElementById('shareHumidorModal');
+    
+    // Public share create button
+    const createPublicBtn = document.getElementById('createPublicShareBtn');
     
     if (closeBtn) {
         closeBtn.addEventListener('click', closeShareHumidorModal);
@@ -5613,6 +5870,13 @@ function setupShareModalListeners() {
     if (addUserBtn) {
         addUserBtn.addEventListener('click', shareHumidor);
     }
+    
+    if (createPublicBtn) {
+        createPublicBtn.addEventListener('click', createPublicShare);
+    }
+    
+    // Setup expiry checkbox behavior
+    setupExpiryCheckbox();
     
     // Close modal when clicking outside
     if (modal) {
@@ -5638,6 +5902,406 @@ function openOriginModal() { openOrganizerModal('origin'); }
 function openStrengthModal() { openOrganizerModal('strength'); }
 function openRingGaugeModal() { openOrganizerModal('ringGauge'); }
 
+// Public Share View Functions
+async function initializePublicShareView() {
+    console.log('[Public Share] Initializing public share view');
+    
+    // Initialize theme
+    initializeTheme();
+    setupThemeToggle();
+    
+    // Hide authenticated-only elements
+    document.querySelectorAll('.auth-only, .user-info, .add-btn, .add-humidor-btn-primary, #addCigarBtnNav, #addHumidorBtnSidebar').forEach(el => {
+        el.style.display = 'none';
+    });
+    
+    // Show public share indicator
+    const sidebar = document.querySelector('.sidebar-footer');
+    if (sidebar) {
+        sidebar.innerHTML = `
+            <p class="text-muted small" style="text-align: center; padding: 1rem;">
+                <span class="mdi mdi-eye-outline"></span> Public Read-Only View
+            </p>
+            <a href="/login.html" class="btn btn-secondary btn-sm" style="width: 100%;">
+                <span class="mdi mdi-login"></span> Login to Your Account
+            </a>
+        `;
+    }
+    
+    // Extract token from URL
+    const pathParts = window.location.pathname.split('/');
+    const token = pathParts[pathParts.length - 1];
+    
+    try {
+        // Fetch public humidor data
+        const response = await fetch(`/api/v1/shared/humidors/${token}`);
+        
+        if (!response.ok) {
+            showPublicShareError();
+            return;
+        }
+        
+        const data = await response.json();
+        console.log('[Public Share] Loaded data:', data);
+        
+        // Store data globally for card rendering
+        window.publicShareData = data;
+        window.cigars = data.cigars || [];
+        window.favorites = data.favorites || [];
+        window.wishListCigars = data.wish_list || [];
+        
+        // Hide welcome section, show main content
+        const welcomeSection = document.getElementById('welcomeSection');
+        const mainContentSection = document.getElementById('mainContentSection');
+        if (welcomeSection) welcomeSection.style.display = 'none';
+        if (mainContentSection) mainContentSection.style.display = 'block';
+        
+        // Render the humidor with public data
+        renderPublicHumidor(data);
+        
+    } catch (error) {
+        console.error('[Public Share] Error loading:', error);
+        showPublicShareError();
+    }
+}
+
+function renderPublicHumidor(data) {
+    const container = document.getElementById('humidorsContainer');
+    if (!container) return;
+    
+    // Build humidor HTML using same structure as authenticated view
+    const humidorHTML = `
+        <div class="humidor-section" data-humidor-id="${data.id}">
+            <div class="humidor-header">
+                <div class="humidor-info-card">
+                    <div class="humidor-title-section">
+                        <i class="mdi mdi-home-variant"></i>
+                        <div>
+                            <h2 class="humidor-name">${escapeHtml(data.name)}</h2>
+                            ${data.description ? `<p class="humidor-location">${escapeHtml(data.description)}</p>` : ''}
+                            <span class="permission-badge" style="background: #3498db; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; margin-left: 8px;">SHARED - VIEW ONLY</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="humidor-stats">
+                    <div class="stat-card">
+                        <i class="mdi mdi-cigar stat-icon"></i>
+                        <div>
+                            <div class="stat-value">${data.cigars.reduce((sum, c) => sum + c.quantity, 0)}</div>
+                            <div class="stat-label">Total Cigars</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <i class="mdi mdi-format-list-bulleted stat-icon"></i>
+                        <div>
+                            <div class="stat-value">${data.cigar_count}</div>
+                            <div class="stat-label">Cigar Types</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            ${data.cigars.length > 0 ? `
+                <div class="cigars-grid">
+                    ${data.cigars.map(cigar => createPublicCigarCard(cigar)).join('')}
+                </div>
+            ` : `
+                <div class="empty-state">
+                    <i class="mdi mdi-cigar-off"></i>
+                    <p>No cigars in this humidor</p>
+                </div>
+            `}
+        </div>
+    `;
+    
+    container.innerHTML = humidorHTML;
+    
+    // Update navigation if favorites/wishlist are included
+    updatePublicNavigation(data);
+}
+
+function createPublicCigarCard(cigar) {
+    const imageHtml = cigar.image_url 
+        ? `<img src="${cigar.image_url}" alt="${escapeHtml(cigar.name)}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+           <img src="/static/cigar-placeholder.png" alt="Cigar placeholder" style="display: none; width: 100%; height: 100%; object-fit: contain; padding: 2rem;">` 
+        : `<img src="/static/cigar-placeholder.png" alt="Cigar placeholder" style="width: 100%; height: 100%; object-fit: contain; padding: 2rem;">`;
+    
+    return `
+        <div class="cigar-card" data-cigar-id="${cigar.id}" onclick="openPublicCigarDetails('${cigar.id}')" style="cursor: pointer;">
+            <div class="cigar-card-image">
+                ${imageHtml}
+            </div>
+            <div class="cigar-card-content">
+                ${cigar.brand ? `<div class="cigar-card-brand">${escapeHtml(cigar.brand)}</div>` : ''}
+                <h3 class="cigar-card-name">${escapeHtml(cigar.name)}</h3>
+                <div class="cigar-card-quantity">
+                    <span class="quantity-value">${cigar.quantity}</span>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function openPublicCigarDetails(cigarId) {
+    // Find cigar in all arrays
+    let cigar = window.cigars.find(c => c.id === cigarId) || 
+                window.favorites.find(c => c.id === cigarId) || 
+                window.wishListCigars.find(c => c.id === cigarId);
+    
+    if (!cigar) return;
+    
+    const modal = document.getElementById('reportCardModal');
+    if (!modal) return;
+    
+    // Populate modal
+    document.getElementById('reportCardImage').src = cigar.image_url || '/static/cigar-placeholder.png';
+    document.getElementById('reportCardBrand').textContent = cigar.brand || '-';
+    document.getElementById('reportCardName').textContent = cigar.name;
+    document.getElementById('reportCardOrigin').textContent = cigar.origin || '-';
+    document.getElementById('reportCardStrength').textContent = cigar.strength || '-';
+    document.getElementById('reportCardRingGauge').textContent = cigar.ring_gauge || '-';
+    
+    const lengthElem = document.getElementById('reportCardSize');
+    if (lengthElem) lengthElem.textContent = cigar.length_inches ? `${cigar.length_inches}"` : '-';
+    
+    document.getElementById('reportCardQuantity').textContent = cigar.quantity || '-';
+    document.getElementById('reportCardNotes').textContent = cigar.notes || 'No notes available';
+    
+    // Hide action buttons for public view
+    const actionsContainer = document.querySelector('.report-card-actions');
+    if (actionsContainer) actionsContainer.style.display = 'none';
+    
+    modal.classList.add('show');
+}
+
+function updatePublicNavigation(data) {
+    // Hide organizers dropdown section
+    const organizersToggle = document.getElementById('organizersToggle');
+    if (organizersToggle) {
+        const organizersSection = organizersToggle.closest('.nav-section');
+        if (organizersSection) {
+            organizersSection.style.display = 'none';
+        }
+    }
+    
+    // Hide admin section if exists
+    document.querySelectorAll('.nav-section').forEach(section => {
+        const title = section.querySelector('.nav-section-title');
+        if (title && title.textContent.includes('Admin')) {
+            section.style.display = 'none';
+        }
+    });
+    
+    // Hide settings button
+    const settingsButton = document.querySelector('.nav-item[data-page="settings"]');
+    if (settingsButton) {
+        settingsButton.style.display = 'none';
+    }
+    
+    // Update Collections section title
+    const collectionsTitle = document.querySelector('.nav-section-title');
+    if (collectionsTitle && collectionsTitle.textContent === 'Collections') {
+        collectionsTitle.textContent = 'SHARED VIEW';
+    }
+    
+    // Show/hide favorites nav item based on data
+    const favoritesNav = document.querySelector('.nav-item[data-page="favorites"]');
+    if (favoritesNav) {
+        if (data.favorites && data.favorites.length > 0) {
+            favoritesNav.style.display = 'flex';
+        } else {
+            favoritesNav.style.display = 'none';
+        }
+    }
+    
+    // Show/hide wishlist nav item based on data
+    const wishlistNav = document.querySelector('.nav-item[data-page="wishlist"]');
+    if (wishlistNav) {
+        if (data.wish_list && data.wish_list.length > 0) {
+            wishlistNav.style.display = 'flex';
+        } else {
+            wishlistNav.style.display = 'none';
+        }
+    }
+    
+    // Set up nav click handlers for public view
+    setupPublicNavigation(data);
+}
+
+function setupPublicNavigation(data) {
+    // Handle humidor nav click - show main humidor view
+    const humidorNav = document.querySelector('.nav-item[data-page="humidors"]');
+    if (humidorNav) {
+        humidorNav.addEventListener('click', (e) => {
+            e.preventDefault();
+            showPublicHumidorView(data);
+        });
+    }
+    
+    // Handle favorites nav click
+    const favoritesNav = document.querySelector('.nav-item[data-page="favorites"]');
+    if (favoritesNav && data.favorites && data.favorites.length > 0) {
+        favoritesNav.addEventListener('click', (e) => {
+            e.preventDefault();
+            showPublicFavoritesView(data);
+        });
+    }
+    
+    // Handle wishlist nav click
+    const wishlistNav = document.querySelector('.nav-item[data-page="wishlist"]');
+    if (wishlistNav && data.wish_list && data.wish_list.length > 0) {
+        wishlistNav.addEventListener('click', (e) => {
+            e.preventDefault();
+            showPublicWishlistView(data);
+        });
+    }
+    
+    // Set up modal close button
+    const closeButton = document.getElementById('closeReportCardModal');
+    if (closeButton) {
+        closeButton.addEventListener('click', () => {
+            const modal = document.getElementById('reportCardModal');
+            if (modal) modal.classList.remove('show');
+        });
+    }
+    
+    // Close modal on background click
+    const modal = document.getElementById('reportCardModal');
+    if (modal) {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.classList.remove('show');
+            }
+        });
+    }
+}
+
+function showPublicHumidorView(data) {
+    // Update nav active state
+    document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+    const humidorNav = document.querySelector('.nav-item[data-page="humidors"]');
+    if (humidorNav) humidorNav.classList.add('active');
+    
+    // Render humidor content
+    renderPublicHumidor(data);
+}
+
+function showPublicFavoritesView(data) {
+    // Update nav active state
+    document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+    const favoritesNav = document.querySelector('.nav-item[data-page="favorites"]');
+    if (favoritesNav) favoritesNav.classList.add('active');
+    
+    // Render favorites
+    const container = document.getElementById('humidorsContainer');
+    if (!container) return;
+    
+    const favoritesHTML = `
+        <div class="favorites-section">
+            <div class="section-header">
+                <h2><i class="mdi mdi-star"></i> Favorites</h2>
+                <p style="color: #999; margin-top: 0.5rem;">Shared favorites from this humidor</p>
+            </div>
+            ${data.favorites.length > 0 ? `
+                <div class="cigars-grid">
+                    ${data.favorites.map(cigar => createPublicCigarCard(cigar)).join('')}
+                </div>
+            ` : `
+                <div class="empty-state">
+                    <i class="mdi mdi-star-off"></i>
+                    <p>No favorites shared</p>
+                </div>
+            `}
+        </div>
+    `;
+    
+    container.innerHTML = favoritesHTML;
+}
+
+function showPublicWishlistView(data) {
+    // Update nav active state
+    document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+    const wishlistNav = document.querySelector('.nav-item[data-page="wishlist"]');
+    if (wishlistNav) wishlistNav.classList.add('active');
+    
+    // Render wishlist
+    const container = document.getElementById('humidorsContainer');
+    if (!container) return;
+    
+    const wishlistHTML = `
+        <div class="wishlist-section">
+            <div class="section-header">
+                <h2><i class="mdi mdi-playlist-star"></i> Wish List</h2>
+                <p style="color: #999; margin-top: 0.5rem;">Shared wish list from this humidor</p>
+            </div>
+            ${data.wish_list.length > 0 ? `
+                <div class="cigars-grid">
+                    ${data.wish_list.map(cigar => createPublicCigarCard(cigar)).join('')}
+                </div>
+            ` : `
+                <div class="empty-state">
+                    <i class="mdi mdi-playlist-remove"></i>
+                    <p>No wish list items shared</p>
+                </div>
+            `}
+        </div>
+    `;
+    
+    container.innerHTML = wishlistHTML;
+}
+
+function showPublicShareError() {
+    // Hide welcome section and show main content to display error
+    const welcomeSection = document.getElementById('welcomeSection');
+    const mainContentSection = document.getElementById('mainContentSection');
+    if (welcomeSection) welcomeSection.style.display = 'none';
+    if (mainContentSection) mainContentSection.style.display = 'block';
+    
+    // Hide all nav items since this is an invalid/expired share
+    const organizersToggle = document.getElementById('organizersToggle');
+    if (organizersToggle) {
+        const organizersSection = organizersToggle.closest('.nav-section');
+        if (organizersSection) {
+            organizersSection.style.display = 'none';
+        }
+    }
+    
+    // Hide settings, favorites, wishlist
+    const settingsButton = document.querySelector('.nav-item[data-page="settings"]');
+    if (settingsButton) settingsButton.style.display = 'none';
+    
+    const favoritesNav = document.querySelector('.nav-item[data-page="favorites"]');
+    if (favoritesNav) favoritesNav.style.display = 'none';
+    
+    const wishlistNav = document.querySelector('.nav-item[data-page="wishlist"]');
+    if (wishlistNav) wishlistNav.style.display = 'none';
+    
+    // Hide admin section if exists
+    document.querySelectorAll('.nav-section').forEach(section => {
+        const title = section.querySelector('.nav-section-title');
+        if (title && title.textContent.includes('Admin')) {
+            section.style.display = 'none';
+        }
+    });
+    
+    const container = document.getElementById('humidorsContainer');
+    if (container) {
+        container.innerHTML = `
+            <div class="error-container" style="text-align: center; padding: 4rem 2rem; max-width: 600px; margin: 0 auto;">
+                <span class="mdi mdi-link-off" style="font-size: 5rem; color: #e74c3c; opacity: 0.9;"></span>
+                <h2 style="color: var(--text-primary); margin-top: 1.5rem; margin-bottom: 1rem;">Share Link Unavailable</h2>
+                <p style="color: var(--text-secondary); font-size: 1.1rem; line-height: 1.6; margin-bottom: 2rem;">
+                    This share link has expired, been revoked, or is no longer valid. 
+                    Please contact the person who shared this link with you for a new one.
+                </p>
+                <a href="/login.html" class="btn btn-primary" style="min-width: 150px;">
+                    <span class="mdi mdi-login"></span>
+                    Login to Your Account
+                </a>
+            </div>
+        `;
+    }
+}
+
 // Export functions for global use
 window.openHumidorModal = openHumidorModal;
 window.openCigarModal = openCigarModal;
@@ -5647,9 +6311,11 @@ window.editCigar = editCigar;
 window.deleteCigar = deleteCigar;
 window.toggleFavorite = toggleFavorite;
 window.removeFavorite = removeFavorite;
+window.openPublicCigarDetails = openPublicCigarDetails;
 // Export user management functions for global use
 window.showCreateUserModal = showCreateUserModal;
 window.editUser = editUser;
+
 window.toggleUserActive = toggleUserActive;
 window.showDeleteUserDialog = showDeleteUserDialog;
 window.showPasswordResetDialog = showPasswordResetDialog;
