@@ -2170,7 +2170,6 @@ body {
     padding: 0.25rem 0.5rem;
     backdrop-filter: blur(8px);
     width: fit-content;
-    margin-left: auto; /* Always pin to right, even when strength indicator is absent */
 }
 
 .quantity-btn {
