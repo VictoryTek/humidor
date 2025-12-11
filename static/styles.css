@@ -2126,7 +2126,7 @@ body {
 .cigar-card-footer {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
     gap: 0.5rem;
     margin-top: auto;
     width: 100%;
@@ -2141,6 +2141,7 @@ body {
     background: rgba(26, 15, 8, 0.6);
     border-radius: 0.5rem;
     width: fit-content;
+    margin-right: auto; /* Push to left, quantity stays on right */
 }
 
 .strength-dot {
@@ -4879,7 +4880,9 @@ body {
     transition: all 0.2s ease;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 0.5rem;
+    text-align: center;
 }
 
 .btn-danger:hover:not(:disabled) {
@@ -4905,7 +4908,9 @@ body {
     transition: all 0.2s ease;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 0.5rem;
+    text-align: center;
 }
 
 .btn-secondary:hover {
