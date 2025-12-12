@@ -4,7 +4,8 @@ use crate::handlers::auth::seed_default_organizers;
 use crate::middleware::AuthContext;
 use crate::models::{
     AdminChangePasswordRequest, AdminCreateUserRequest, AdminToggleActiveRequest,
-    AdminUpdateUserRequest, UserListResponse, UserResponse,
+    AdminUpdateUserRequest, TransferOwnershipRequest, TransferOwnershipResponse, UserListResponse,
+    UserResponse,
 };
 use chrono::Utc;
 use serde_json::json;
@@ -609,4 +610,140 @@ pub async fn change_user_password(
             )))
         }
     }
+}
+
+/// Transfer ownership of all humidors and cigars from one user to another
+pub async fn transfer_ownership(
+    request: TransferOwnershipRequest,
+    auth: AuthContext,
+    pool: DbPool,
+) -> Result<impl Reply, warp::Rejection> {
+    // Validate that source and target users are different
+    if request.from_user_id == request.to_user_id {
+        return Err(warp::reject::custom(AppError::ValidationError(
+            "Source and target users must be different".to_string(),
+        )));
+    }
+
+    let mut db = pool.get().await.map_err(|e| {
+        tracing::error!(error = %e, "Failed to get database connection");
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
+    })?;
+
+    // Start transaction for atomic operation
+    let transaction = db.transaction().await.map_err(|e| {
+        tracing::error!(error = %e, "Failed to start transaction");
+        warp::reject::custom(AppError::DatabaseError(
+            "Failed to start transaction".to_string(),
+        ))
+    })?;
+
+    // Verify both users exist
+    let verify_users_query = "
+        SELECT id FROM users WHERE id = $1
+        UNION ALL
+        SELECT id FROM users WHERE id = $2
+    ";
+
+    let user_rows = transaction
+        .query(
+            verify_users_query,
+            &[&request.from_user_id, &request.to_user_id],
+        )
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "Failed to verify users");
+            warp::reject::custom(AppError::DatabaseError(
+                "Failed to verify users".to_string(),
+            ))
+        })?;
+
+    if user_rows.len() != 2 {
+        return Err(warp::reject::custom(AppError::NotFound(
+            "One or both users not found".to_string(),
+        )));
+    }
+
+    // Count cigars in humidors before transfer (for response)
+    let count_cigars_query = "
+        SELECT COUNT(*)
+        FROM cigars c
+        INNER JOIN humidors h ON c.humidor_id = h.id
+        WHERE h.user_id = $1
+    ";
+
+    let cigar_count_row = transaction
+        .query_one(count_cigars_query, &[&request.from_user_id])
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "Failed to count cigars");
+            warp::reject::custom(AppError::DatabaseError(
+                "Failed to count cigars".to_string(),
+            ))
+        })?;
+
+    let cigars_transferred: i64 = cigar_count_row.get(0);
+
+    // Transfer humidors (cigars automatically go with them via humidor_id FK)
+    let transfer_humidors_query = "
+        UPDATE humidors
+        SET user_id = $1, updated_at = NOW()
+        WHERE user_id = $2
+    ";
+
+    let humidors_transferred = transaction
+        .execute(
+            transfer_humidors_query,
+            &[&request.to_user_id, &request.from_user_id],
+        )
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "Failed to transfer humidors");
+            warp::reject::custom(AppError::DatabaseError(
+                "Failed to transfer humidors".to_string(),
+            ))
+        })?;
+
+    // Delete humidor shares where the from_user was sharing with others
+    // (these become irrelevant after ownership transfer)
+    let delete_shares_query = "
+        DELETE FROM humidor_shares
+        WHERE humidor_id IN (
+            SELECT id FROM humidors WHERE user_id = $1
+        )
+    ";
+
+    transaction
+        .execute(delete_shares_query, &[&request.to_user_id])
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "Failed to clean up humidor shares");
+            warp::reject::custom(AppError::DatabaseError(
+                "Failed to clean up humidor shares".to_string(),
+            ))
+        })?;
+
+    // Commit transaction
+    transaction.commit().await.map_err(|e| {
+        tracing::error!(error = %e, "Failed to commit transaction");
+        warp::reject::custom(AppError::DatabaseError(
+            "Failed to commit ownership transfer".to_string(),
+        ))
+    })?;
+
+    tracing::info!(
+        admin_id = %auth.user_id,
+        from_user_id = %request.from_user_id,
+        to_user_id = %request.to_user_id,
+        humidors_transferred = humidors_transferred,
+        cigars_transferred = cigars_transferred,
+        "Ownership transferred successfully"
+    );
+
+    Ok(warp::reply::json(&TransferOwnershipResponse {
+        humidors_transferred: humidors_transferred as i64,
+        cigars_transferred,
+    }))
 }

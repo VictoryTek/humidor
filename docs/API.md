@@ -930,6 +930,57 @@ Deactivate a user account (soft delete).
 }
 ```
 
+#### Transfer Ownership
+
+**POST** `/admin/transfer-ownership`
+
+Transfer all humidors and cigars from one user to another. This is useful before deleting a user to preserve their data.
+
+**Request Body**:
+```json
+{
+  "from_user_id": "uuid-of-source-user",
+  "to_user_id": "uuid-of-destination-user"
+}
+```
+
+**Response**: `200 OK`
+```json
+{
+  "humidors_transferred": 5,
+  "cigars_transferred": 127
+}
+```
+
+**What Gets Transferred**:
+- All humidors owned by source user
+- All cigars owned by source user
+- Updated timestamps on transferred items
+
+**What Gets Cleaned Up**:
+- Humidor shares (shares from source user's humidors are deleted)
+
+**Notes**:
+- Source and destination users must be different (422 error if same)
+- Both users must exist in the system (404 error if not found)
+- Operation is atomic (transaction-based)
+- Cannot be undone (except by another manual transfer)
+- Admin authentication required
+
+**Error Responses**:
+- `403 Forbidden`: Non-admin user attempted transfer
+- `404 Not Found`: One or both users do not exist
+- `422 Unprocessable Entity`: Source and destination users are the same
+- `500 Internal Server Error`: Database or transaction error
+
+**Example Workflow**:
+1. Admin decides to delete user "john_doe" but wants to preserve data
+2. Admin transfers all humidors/cigars from "john_doe" to "admin"
+3. System responds with count of transferred items
+4. Admin can now safely delete "john_doe" without data loss
+
+For detailed documentation, see [OWNERSHIP_TRANSFER.md](OWNERSHIP_TRANSFER.md).
+
 ---
 
 ## Rate Limiting

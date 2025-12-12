@@ -106,6 +106,18 @@ pub fn create_admin_routes(
         .and(with_db(db_pool.clone()))
         .and_then(admin::toggle_active);
 
+    // POST /api/v1/admin/transfer-ownership
+    let transfer_ownership = warp::path("api")
+        .and(warp::path("v1"))
+        .and(warp::path("admin"))
+        .and(warp::path("transfer-ownership"))
+        .and(warp::post())
+        .and(warp::path::end())
+        .and(json_body())
+        .and(with_admin(db_pool.clone()))
+        .and(with_db(db_pool.clone()))
+        .and_then(admin::transfer_ownership);
+
     list_users
         .or(create_user)
         .or(get_user)
@@ -113,5 +125,6 @@ pub fn create_admin_routes(
         .or(delete_user)
         .or(toggle_active)
         .or(change_password)
+        .or(transfer_ownership)
         .boxed()
 }
