@@ -19,7 +19,8 @@ pub use auth::{
     get_setup_status, login_user, reset_password, update_current_user,
 };
 pub use cigars::{
-    create_cigar, delete_cigar, get_cigar, get_cigars, scrape_cigar_url, update_cigar,
+    create_cigar, delete_cigar, get_cigar, get_cigars, get_random_cigar, scrape_cigar_url,
+    update_cigar,
 };
 
 pub use brands::{create_brand, delete_brand, get_brands, update_brand};

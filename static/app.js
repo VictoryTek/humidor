@@ -2106,6 +2106,25 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    // Recommend button event
+    const recommendBtn = document.getElementById('recommendCigarBtn');
+    if (recommendBtn) {
+        recommendBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            openRecommendModal();
+        });
+    }
+    
+    // Close recommendation modal on backdrop click
+    const recommendModal = document.getElementById('recommendModal');
+    if (recommendModal) {
+        recommendModal.addEventListener('click', function(e) {
+            if (e.target === recommendModal) {
+                closeRecommendModal();
+            }
+        });
+    }
+    
     // Humidor modal events
     if (elements.closeHumidorModal) {
         elements.closeHumidorModal.addEventListener('click', closeHumidorModal);
@@ -2810,8 +2829,13 @@ async function showHumidorDetail(humidorId) {
     const humidorsContainer = document.getElementById('humidorsContainer');
     const paginationContainer = document.getElementById('paginationContainer');
     
+    console.log('Setting display properties...');
+    console.log('welcomeSection:', welcomeSection);
+    console.log('mainContentSection:', mainContentSection);
     welcomeSection.style.display = 'none';
     mainContentSection.style.display = 'block';
+    console.log('mainContentSection display after setting:', mainContentSection.style.display);
+    console.log('mainContentSection computed display:', window.getComputedStyle(mainContentSection).display);
     
     // Show pagination on detail view
     if (paginationContainer) {
@@ -2864,10 +2888,15 @@ async function showHumidorDetail(humidorId) {
         ` : '';
         
         // Render the humidor section
-        humidorsContainer.innerHTML = `
+        const renderedContent = `
             ${backButtonHtml}
             ${renderSingleHumidorSection(humidor, cigarsToDisplay)}
         `;
+        console.log('Rendered content length:', renderedContent.length);
+        console.log('First 200 chars of rendered content:', renderedContent.substring(0, 200));
+        humidorsContainer.innerHTML = renderedContent;
+        console.log('humidorsContainer after render:', humidorsContainer);
+        console.log('humidorsContainer children count:', humidorsContainer.children.length);
         
         // Update pagination controls (hide if filtering)
         if (hasFilters) {
@@ -2945,11 +2974,6 @@ function renderSingleHumidorSection(humidor, humidorCigars) {
                 <div class="empty-state">
                     <i class="mdi mdi-cigar-off"></i>
                     <p>No cigars in this humidor yet</p>
-                    ${currentHumidorPermission !== 'view' ? `
-                        <button class="btn-primary" onclick="openCigarModal('${humidor.id}')">
-                            <i class="mdi mdi-plus"></i> Add First Cigar
-                        </button>
-                    ` : ''}
                 </div>
             `}
         </div>
@@ -4990,6 +5014,98 @@ function closePasswordResetModal() {
     passwordResetUserId = null;
 }
 
+// Show transfer ownership modal
+async function showTransferOwnershipModal() {
+    const modal = document.getElementById('transferOwnershipModal');
+    
+    // Load users for dropdowns
+    try {
+        const response = await makeAuthenticatedRequest('/api/v1/admin/users?per_page=1000');
+        
+        if (response && response.ok) {
+            const data = await response.json();
+            const fromSelect = document.getElementById('fromUserId');
+            const toSelect = document.getElementById('toUserId');
+            
+            // Clear existing options except the first
+            fromSelect.innerHTML = '<option value="">Select source user</option>';
+            toSelect.innerHTML = '<option value="">Select destination user</option>';
+            
+            // Add user options
+            data.users.forEach(user => {
+                const fromOption = document.createElement('option');
+                fromOption.value = user.id;
+                fromOption.textContent = `${user.username} (${user.full_name})`;
+                fromSelect.appendChild(fromOption);
+                
+                const toOption = document.createElement('option');
+                toOption.value = user.id;
+                toOption.textContent = `${user.username} (${user.full_name})`;
+                toSelect.appendChild(toOption);
+            });
+            
+            modal.classList.add('active');
+        } else {
+            showToast('Failed to load users', 'error');
+        }
+    } catch (error) {
+        console.error('Error loading users for transfer:', error);
+        showToast('Error loading users', 'error');
+    }
+}
+
+// Handle transfer ownership form submission
+async function handleTransferOwnershipSubmit(e) {
+    e.preventDefault();
+    
+    const fromUserId = document.getElementById('fromUserId').value;
+    const toUserId = document.getElementById('toUserId').value;
+    
+    if (!fromUserId || !toUserId) {
+        showToast('Please select both source and destination users', 'error');
+        return;
+    }
+    
+    if (fromUserId === toUserId) {
+        showToast('Source and destination users must be different', 'error');
+        return;
+    }
+    
+    const confirmBtn = document.getElementById('confirmTransferBtn');
+    const originalText = confirmBtn.innerHTML;
+    confirmBtn.disabled = true;
+    confirmBtn.innerHTML = '<span class="mdi mdi-loading mdi-spin"></span> Transferring...';
+    
+    try {
+        const response = await makeAuthenticatedRequest('/api/v1/admin/transfer-ownership', {
+            method: 'POST',
+            body: JSON.stringify({
+                from_user_id: fromUserId,
+                to_user_id: toUserId
+            })
+        });
+        
+        if (response && response.ok) {
+            const result = await response.json();
+            showToast(
+                `Successfully transferred ${result.humidors_transferred} humidor(s) and ${result.cigars_transferred} cigar(s)`,
+                'success'
+            );
+            document.getElementById('transferOwnershipModal').classList.remove('active');
+            document.getElementById('transferOwnershipForm').reset();
+        } else {
+            const error = await response.json();
+            showToast(error.message || 'Failed to transfer ownership', 'error');
+        }
+    } catch (error) {
+        console.error('Error transferring ownership:', error);
+        showToast('Error transferring ownership', 'error');
+    } finally {
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = originalText;
+    }
+}
+
 // User search with debounce
 let userSearchTimeout;
 function handleUserSearch(searchTerm) {
@@ -5278,6 +5394,12 @@ function initializeUserManagementHandlers() {
         createUserBtn.addEventListener('click', showCreateUserModal);
     }
     
+    // Transfer ownership button
+    const transferOwnershipBtn = document.getElementById('transferOwnershipBtn');
+    if (transferOwnershipBtn) {
+        transferOwnershipBtn.addEventListener('click', showTransferOwnershipModal);
+    }
+    
     // User search input
     const userSearchInput = document.getElementById('userSearchInput');
     if (userSearchInput) {
@@ -5339,6 +5461,21 @@ function initializeUserManagementHandlers() {
     });
     
     if (userPasswordForm) userPasswordForm.addEventListener('submit', handlePasswordResetSubmit);
+    
+    // Transfer ownership dialog handlers
+    const closeTransferModal = document.getElementById('closeTransferModal');
+    const cancelTransferBtn = document.getElementById('cancelTransferBtn');
+    const transferOwnershipForm = document.getElementById('transferOwnershipForm');
+    
+    if (closeTransferModal) closeTransferModal.addEventListener('click', () => {
+        document.getElementById('transferOwnershipModal').classList.remove('active');
+    });
+    
+    if (cancelTransferBtn) cancelTransferBtn.addEventListener('click', () => {
+        document.getElementById('transferOwnershipModal').classList.remove('active');
+    });
+    
+    if (transferOwnershipForm) transferOwnershipForm.addEventListener('submit', handleTransferOwnershipSubmit);
 }
 
 // Initialize backup event listeners
@@ -6348,3 +6485,270 @@ window.loadUsers = loadUsers;
 window.openShareHumidorModal = openShareHumidorModal;
 window.updateSharePermission = updateSharePermission;
 window.revokeShare = revokeShare;
+
+// ============================================================================
+// CIGAR RECOMMENDATION FEATURE
+// ============================================================================
+
+// Global variable to store current recommendation
+let currentRecommendation = null;
+
+/**
+ * Open recommendation modal and fetch a random cigar
+ */
+async function openRecommendModal() {
+    const modal = document.getElementById('recommendModal');
+    const modalBody = document.getElementById('recommendModalBody');
+    const modalActions = document.getElementById('recommendModalActions');
+    
+    // Show modal with loading state
+    modal.classList.add('active');
+    modalBody.innerHTML = `
+        <div style="text-align: center; padding: 3rem;">
+            <div class="spinner"></div>
+            <p style="margin-top: 1rem; color: var(--text-secondary);">
+                Finding the perfect cigar for you...
+            </p>
+        </div>
+    `;
+    modalActions.style.display = 'none';
+    
+    try {
+        await getRecommendation();
+    } catch (error) {
+        console.error('Error opening recommendation modal:', error);
+        showToast('Failed to get recommendation', 'error');
+        closeRecommendModal();
+    }
+}
+
+/**
+ * Fetch a cigar recommendation from the API
+ */
+async function getRecommendation() {
+    const modalBody = document.getElementById('recommendModalBody');
+    const modalActions = document.getElementById('recommendModalActions');
+    
+    try {
+        // Determine context - are we viewing a specific humidor?
+        let humidorId = null;
+        if (currentRoute.humidorId) {
+            humidorId = currentRoute.humidorId;
+        }
+        
+        const url = humidorId 
+            ? `/api/v1/cigars/recommend?humidor_id=${humidorId}`
+            : '/api/v1/cigars/recommend';
+        
+        const response = await makeAuthenticatedRequest(url);
+        
+        if (!response.ok) {
+            throw new Error('Failed to get recommendation');
+        }
+        
+        const data = await response.json();
+        currentRecommendation = data.cigar;
+        
+        if (data.cigar) {
+            // Display the recommended cigar
+            modalBody.innerHTML = renderRecommendedCigar(data.cigar, data.message);
+            modalActions.style.display = 'flex';
+        } else {
+            // No cigars available
+            modalBody.innerHTML = `
+                <div class="recommend-empty-state">
+                    <span class="mdi mdi-cigar-off"></span>
+                    <p>${escapeHtml(data.message)}</p>
+                    <p style="margin-top: 0.5rem; font-size: 0.9rem; color: var(--text-muted);">
+                        Add some cigars to your humidors to get recommendations!
+                    </p>
+                </div>
+            `;
+            modalActions.style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Error fetching recommendation:', error);
+        modalBody.innerHTML = `
+            <div class="recommend-empty-state">
+                <span class="mdi mdi-alert-circle-outline"></span>
+                <p>Failed to load recommendation</p>
+            </div>
+        `;
+        modalActions.style.display = 'none';
+        showToast('Failed to get recommendation', 'error');
+    }
+}
+
+/**
+ * Render the recommended cigar details
+ */
+function renderRecommendedCigar(cigar, message) {
+    // Access nested cigar properties
+    const cigarData = cigar.cigar || cigar;
+    
+    // Generate strength indicators
+    const strengthScore = cigar.cigar?.strength_score || cigar.strength_score || 0;
+    const strengthDots = Array.from({ length: 5 }, (_, i) => 
+        `<span class="recommend-strength-dot ${i < strengthScore ? 'filled' : ''}"></span>`
+    ).join('');
+    
+    return `
+        <div class="recommend-message">
+            ${escapeHtml(message)}
+        </div>
+        <div class="recommend-cigar-display">
+            <div class="recommend-cigar-name">${escapeHtml(cigarData.name)}</div>
+            <div class="recommend-cigar-brand">${escapeHtml(cigar.brand_name || 'Unknown Brand')}</div>
+            
+            <div class="recommend-cigar-details">
+                ${cigar.size_name ? `
+                    <div class="recommend-detail-item">
+                        <span class="recommend-detail-label">Size</span>
+                        <span class="recommend-detail-value">${escapeHtml(cigar.size_name)}</span>
+                    </div>
+                ` : ''}
+                
+                ${cigar.strength_name ? `
+                    <div class="recommend-detail-item">
+                        <span class="recommend-detail-label">Strength</span>
+                        <span class="recommend-detail-value">
+                            ${escapeHtml(cigar.strength_name)}
+                            <div class="recommend-strength-indicator">
+                                ${strengthDots}
+                            </div>
+                        </span>
+                    </div>
+                ` : ''}
+                
+                ${cigar.origin_name ? `
+                    <div class="recommend-detail-item">
+                        <span class="recommend-detail-label">Origin</span>
+                        <span class="recommend-detail-value">${escapeHtml(cigar.origin_name)}</span>
+                    </div>
+                ` : ''}
+                
+                ${cigarData.wrapper ? `
+                    <div class="recommend-detail-item">
+                        <span class="recommend-detail-label">Wrapper</span>
+                        <span class="recommend-detail-value">${escapeHtml(cigarData.wrapper)}</span>
+                    </div>
+                ` : ''}
+                
+                <div class="recommend-detail-item">
+                    <span class="recommend-detail-label">Quantity Available</span>
+                    <span class="recommend-detail-value">${cigarData.quantity}</span>
+                </div>
+            </div>
+            
+            ${cigarData.notes ? `
+                <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                    <span class="recommend-detail-label">Notes</span>
+                    <p style="margin-top: 0.5rem; color: var(--text-secondary); line-height: 1.6;">
+                        ${escapeHtml(cigarData.notes)}
+                    </p>
+                </div>
+            ` : ''}
+        </div>
+    `;
+}
+
+/**
+ * Get another recommendation (re-roll)
+ */
+async function getAnotherRecommendation() {
+    const modalBody = document.getElementById('recommendModalBody');
+    modalBody.innerHTML = `
+        <div style="text-align: center; padding: 3rem;">
+            <div class="spinner"></div>
+            <p style="margin-top: 1rem; color: var(--text-secondary);">
+                Finding another option...
+            </p>
+        </div>
+    `;
+    
+    await getRecommendation();
+}
+
+/**
+ * Accept the recommendation and decrement quantity
+ */
+async function acceptRecommendation() {
+    if (!currentRecommendation) {
+        showToast('No recommendation to accept', 'error');
+        return;
+    }
+    
+    try {
+        // Access nested cigar data
+        const cigarData = currentRecommendation.cigar || currentRecommendation;
+        const cigarId = cigarData.id;
+        const currentQuantity = cigarData.quantity;
+        
+        // Check if user has edit permission
+        if (currentHumidorPermission === 'view') {
+            showToast('You only have view permission for this humidor', 'error');
+            return;
+        }
+        
+        const newQuantity = currentQuantity - 1;
+        
+        // Update cigar quantity
+        const response = await makeAuthenticatedRequest(
+            `/api/v1/cigars/${cigarId}`,
+            {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    quantity: newQuantity
+                })
+            }
+        );
+        
+        if (!response.ok) {
+            throw new Error('Failed to update cigar quantity');
+        }
+        
+        showToast(`Enjoy your ${cigarData.name}! 🔥`, 'success');
+        closeRecommendModal();
+        
+        // Reload humidor to show updated quantity
+        if (humidors && humidors.length === 1) {
+            await showHumidorDetail(humidors[0].id);
+        } else if (currentRoute.humidorId) {
+            await showHumidorDetail(currentRoute.humidorId);
+        } else {
+            await loadHumidors();
+        }
+        
+    } catch (error) {
+        console.error('Error accepting recommendation:', error);
+        showToast('Failed to update cigar quantity', 'error');
+        closeRecommendModal();
+    }
+}
+
+/**
+ * Close the recommendation modal
+ */
+function closeRecommendModal() {
+    const modal = document.getElementById('recommendModal');
+    modal.classList.remove('active');
+    currentRecommendation = null;
+}
+
+/**
+ * Escape HTML to prevent XSS
+ */
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Export recommendation functions for global use
+window.openRecommendModal = openRecommendModal;
+window.getRecommendation = getRecommendation;
+window.getAnotherRecommendation = getAnotherRecommendation;
+window.acceptRecommendation = acceptRecommendation;
+window.closeRecommendModal = closeRecommendModal;

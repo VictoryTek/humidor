@@ -123,3 +123,13 @@ impl Validate for UpdateCigar {
         Ok(())
     }
 }
+
+#[derive(Debug, Serialize)]
+pub struct RecommendCigarResponse {
+    /// The recommended cigar (None if no cigars available)
+    pub cigar: Option<CigarWithNames>,
+    /// Total count of eligible cigars
+    pub eligible_count: i64,
+    /// Context message for the user
+    pub message: String,
+}

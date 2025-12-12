@@ -699,3 +699,192 @@ pub async fn scrape_cigar_url(
         }
     }
 }
+
+/// Get a random cigar recommendation
+/// GET /api/v1/cigars/recommend?humidor_id={optional}
+pub async fn get_random_cigar(
+    params: std::collections::HashMap<String, String>,
+    auth: AuthContext,
+    pool: DbPool,
+) -> Result<impl Reply, Rejection> {
+    use crate::models::{CigarWithNames, RecommendCigarResponse};
+    use warp::http::StatusCode;
+    use warp::reply;
+
+    let db = pool.get().await.map_err(|e| {
+        tracing::error!(error = %e, "Failed to get database connection");
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
+    })?;
+
+    let user_id = auth.user_id;
+
+    // Parse optional humidor_id filter
+    let humidor_id_filter = params
+        .get("humidor_id")
+        .and_then(|s| Uuid::parse_str(s).ok());
+
+    // If humidor_id provided, verify access
+    if let Some(hid) = humidor_id_filter {
+        verify_humidor_ownership(&pool, Some(hid), user_id, false)
+            .await
+            .map_err(warp::reject::custom)?;
+    }
+
+    // Build query to get random cigar
+    // IMPORTANT: Only select cigars with quantity > 0 and is_active = true
+    let query = if humidor_id_filter.is_some() {
+        // Single humidor
+        "SELECT c.id, c.humidor_id, c.name, b.name as brand_name, s.name as size_name,
+                st.name as strength_name, o.name as origin_name, c.wrapper, c.binder, c.filler,
+                c.quantity, c.notes, c.purchase_date, c.price as purchase_price, c.retail_link,
+                c.created_at, c.updated_at, c.is_active,
+                rg.gauge as ring_gauge, c.length, st.level as strength_score, c.image_url,
+                c.brand_id, c.size_id, c.strength_id, c.origin_id, c.ring_gauge_id
+         FROM cigars c
+         LEFT JOIN brands b ON c.brand_id = b.id
+         LEFT JOIN sizes s ON c.size_id = s.id
+         LEFT JOIN strengths st ON c.strength_id = st.id
+         LEFT JOIN origins o ON c.origin_id = o.id
+         LEFT JOIN ring_gauges rg ON c.ring_gauge_id = rg.id
+         INNER JOIN humidors h ON c.humidor_id = h.id
+         WHERE c.humidor_id = $1 
+           AND c.quantity > 0 
+           AND c.is_active = true
+         ORDER BY RANDOM()
+         LIMIT 1"
+    } else {
+        // All user's humidors + shared humidors
+        "SELECT c.id, c.humidor_id, c.name, b.name as brand_name, s.name as size_name,
+                st.name as strength_name, o.name as origin_name, c.wrapper, c.binder, c.filler,
+                c.quantity, c.notes, c.purchase_date, c.price as purchase_price, c.retail_link,
+                c.created_at, c.updated_at, c.is_active,
+                rg.gauge as ring_gauge, c.length, st.level as strength_score, c.image_url,
+                c.brand_id, c.size_id, c.strength_id, c.origin_id, c.ring_gauge_id
+         FROM cigars c
+         LEFT JOIN brands b ON c.brand_id = b.id
+         LEFT JOIN sizes s ON c.size_id = s.id
+         LEFT JOIN strengths st ON c.strength_id = st.id
+         LEFT JOIN origins o ON c.origin_id = o.id
+         LEFT JOIN ring_gauges rg ON c.ring_gauge_id = rg.id
+         INNER JOIN humidors h ON c.humidor_id = h.id
+         LEFT JOIN humidor_shares hs ON h.id = hs.humidor_id AND hs.shared_with_user_id = $1
+         WHERE (h.user_id = $1 OR hs.id IS NOT NULL)
+           AND c.quantity > 0 
+           AND c.is_active = true
+         ORDER BY RANDOM()
+         LIMIT 1"
+    };
+
+    // Also get total count of eligible cigars
+    let count_query = if humidor_id_filter.is_some() {
+        "SELECT COUNT(*) FROM cigars c
+         INNER JOIN humidors h ON c.humidor_id = h.id
+         WHERE c.humidor_id = $1 
+           AND c.quantity > 0 
+           AND c.is_active = true"
+    } else {
+        "SELECT COUNT(*) FROM cigars c
+         INNER JOIN humidors h ON c.humidor_id = h.id
+         LEFT JOIN humidor_shares hs ON h.id = hs.humidor_id AND hs.shared_with_user_id = $1
+         WHERE (h.user_id = $1 OR hs.id IS NOT NULL)
+           AND c.quantity > 0 
+           AND c.is_active = true"
+    };
+
+    // Execute queries
+    let count_result = if let Some(hid) = humidor_id_filter {
+        db.query_one(count_query, &[&hid]).await
+    } else {
+        db.query_one(count_query, &[&user_id]).await
+    };
+
+    let eligible_count: i64 = match count_result {
+        Ok(row) => row.get(0),
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to count eligible cigars");
+            return Err(warp::reject::custom(AppError::DatabaseError(
+                "Failed to count cigars".to_string(),
+            )));
+        }
+    };
+
+    // Execute random selection
+    let cigar_result = if let Some(hid) = humidor_id_filter {
+        db.query_opt(query, &[&hid]).await
+    } else {
+        db.query_opt(query, &[&user_id]).await
+    };
+
+    match cigar_result {
+        Ok(Some(row)) => {
+            // Extract cigar data from row with better error handling
+            let cigar = CigarWithNames {
+                cigar: Cigar {
+                    id: row.get("id"),
+                    humidor_id: row.get("humidor_id"),
+                    brand_id: row.get("brand_id"),
+                    name: row.get("name"),
+                    size_id: row.get("size_id"),
+                    strength_id: row.get("strength_id"),
+                    origin_id: row.get("origin_id"),
+                    wrapper: row.get("wrapper"),
+                    binder: row.get("binder"),
+                    filler: row.get("filler"),
+                    price: row.get("purchase_price"),
+                    purchase_date: row.get("purchase_date"),
+                    notes: row.get("notes"),
+                    quantity: row.get("quantity"),
+                    ring_gauge_id: row.get("ring_gauge_id"),
+                    length: row.get("length"),
+                    image_url: row.get("image_url"),
+                    retail_link: row.get("retail_link"),
+                    is_active: row.get("is_active"),
+                    created_at: row.get("created_at"),
+                    updated_at: row.get("updated_at"),
+                },
+                brand_name: row.get("brand_name"),
+                size_name: row.get("size_name"),
+                strength_name: row.get("strength_name"),
+                origin_name: row.get("origin_name"),
+                ring_gauge: row.get("ring_gauge"),
+            };
+
+            let message = if eligible_count > 1 {
+                format!(
+                    "How about this one? ({} other options available)",
+                    eligible_count - 1
+                )
+            } else {
+                "This is your only available cigar!".to_string()
+            };
+
+            Ok(reply::with_status(
+                reply::json(&RecommendCigarResponse {
+                    cigar: Some(cigar),
+                    eligible_count,
+                    message,
+                }),
+                StatusCode::OK,
+            ))
+        }
+        Ok(None) => {
+            // No cigars available
+            Ok(reply::with_status(
+                reply::json(&RecommendCigarResponse {
+                    cigar: None,
+                    eligible_count: 0,
+                    message: "No cigars available for recommendation".to_string(),
+                }),
+                StatusCode::OK,
+            ))
+        }
+        Err(e) => {
+            tracing::error!(error = ?e, "Failed to get random cigar - database query error");
+            Err(warp::reject::custom(AppError::DatabaseError(
+                "Failed to get recommendation".to_string(),
+            )))
+        }
+    }
+}

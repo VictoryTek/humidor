@@ -68,8 +68,20 @@ pub fn create_cigar_routes(
         .and(with_db(db_pool.clone()))
         .and_then(handlers::delete_cigar);
 
+    let recommend_cigar = warp::path("api")
+        .and(warp::path("v1"))
+        .and(warp::path("cigars"))
+        .and(warp::path("recommend"))
+        .and(warp::path::end())
+        .and(warp::get())
+        .and(warp::query::<std::collections::HashMap<String, String>>())
+        .and(with_current_user(db_pool.clone()))
+        .and(with_db(db_pool.clone()))
+        .and_then(handlers::get_random_cigar);
+
     scrape_cigar
         .or(create_cigar)
+        .or(recommend_cigar)
         .or(update_cigar)
         .or(delete_cigar)
         .or(get_cigar)

@@ -103,6 +103,18 @@ pub struct AdminToggleActiveRequest {
     pub is_active: bool,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct TransferOwnershipRequest {
+    pub from_user_id: Uuid,
+    pub to_user_id: Uuid,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TransferOwnershipResponse {
+    pub humidors_transferred: i64,
+    pub cigars_transferred: i64,
+}
+
 #[derive(Debug, Serialize)]
 pub struct UserListResponse {
     pub users: Vec<UserResponse>,

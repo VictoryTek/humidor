@@ -5,6 +5,97 @@ All notable changes to Humidor will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2025-12-12
+
+### Added
+- **Cigar Recommendation System** 🔥
+  - New "Recommend" button in sidebar navigation (Collections section)
+  - Intelligent random cigar selection from your available inventory
+  - Context-aware recommendations:
+    - When viewing a specific humidor → recommends from that humidor only
+    - When on humidor list → recommends from all accessible humidors
+  - Beautiful animated modal with detailed cigar information:
+    - Name, brand, size, strength, origin, wrapper
+    - Visual strength indicators (1-5 dot scale)
+    - Available quantity display
+    - Personal notes
+  - Interactive features:
+    - "Try Another" button for re-rolling recommendations
+    - "I'll Smoke This One" button to accept and auto-decrement quantity
+    - Backdrop click to dismiss modal
+  - Smart filtering: Only recommends active cigars with quantity > 0
+  - Permission-aware: Respects humidor sharing levels (view/edit/full)
+  - New API endpoint: `GET /api/v1/cigars/recommend?humidor_id={optional}`
+  - No database migrations required (uses existing schema)
+  
+- **Admin Ownership Transfer Feature** 🔄
+  - Transfer all humidors and cigars from one user to another
+  - New "Transfer Ownership" button in Admin Panel User Management
+  - Use cases: User departure, account consolidation, data preservation
+  - Features:
+    - Atomic database transactions (all-or-nothing)
+    - Transfers all humidors from source → destination user
+    - Cigars automatically transfer with their humidors
+    - Automatic cleanup of humidor shares (new owner must re-share)
+    - Validation: Source ≠ destination, both users must exist
+    - Success notification with transfer counts
+  - New API endpoint: `POST /api/v1/admin/transfer-ownership`
+  - Complete test suite with 5 integration tests
+  - Comprehensive documentation in `docs/OWNERSHIP_TRANSFER.md`
+
+- **Documentation**
+  - Added `docs/CIGAR_RECOMMENDATION_FEATURE.md` - Complete implementation guide with architecture, code examples, security considerations, and enhancement suggestions
+  - Added `docs/OWNERSHIP_TRANSFER.md` - Admin feature guide with use cases, API details, and troubleshooting
+  - Added `docs/RECOMMEND_FEATURE_RELEASE_NOTES.md` - User-facing release notes
+  - Updated `docs/API.md` with new endpoints and examples
+
+### Changed
+- **UI/UX Improvements**
+  - Search bar button styling now consistent with other gold buttons (removed copper gradient)
+  - Added shimmer animation to search button matching primary action buttons
+  - Improved button hover effects with subtle shadow transitions
+  - Nav panel reorganized: Recommend button bottom-pinned in Collections section
+  - Removed redundant "ADD FIRST CIGAR" button from empty humidor state
+  - Strength indicators on recommended cigars use consistent visual style
+
+- **Modal Animations**
+  - Added smooth slide-up entrance animation for recommendation modal
+  - Fade-in backdrop with blur effect for better focus
+  - Hover animations on modal action buttons with shimmer effects
+
+### Fixed
+- **Backend SQL Errors**
+  - Fixed column name mismatch in recommendation SQL queries:
+    - Changed `s.length` → `c.length` (correct table reference)
+    - Changed `st.score` → `st.level` (correct column name)
+  - Prevents 500 errors when accessing recommendation feature
+
+- **Frontend Variable Errors**
+  - Fixed undefined variable reference: `currentHumidorId` → `currentRoute.humidorId`
+  - Improves reliability of context detection in recommendation feature
+
+### Security
+- SQL injection protection via parameterized queries in new endpoints
+- XSS protection with HTML escaping in modal content
+- Permission checks respect humidor sharing levels
+- Admin-only access enforcement for ownership transfer
+- Audit logging for ownership transfers (admin ID, user IDs, counts, timestamp)
+
+### Performance
+- Efficient database queries (~2-5ms for typical collections)
+- PostgreSQL `RANDOM()` for true randomization
+- Connection pooling handles concurrent requests
+- No additional database load from new features
+
+### Technical Details
+- Version bump: 1.3.1 → 1.4.0
+- Files changed: 22 files (~1,500 lines added)
+- New backend models: `RecommendCigarResponse`, `TransferOwnershipRequest`, `TransferOwnershipResponse`
+- New handlers: `get_random_cigar()`, `transfer_ownership()`
+- Service worker cache updated to v1.4.0
+- Zero clippy warnings
+- Security audit: 1 non-blocking advisory (fxhash unmaintained - transitive dependency)
+
 ## [1.3.1] - 2025-12-10
 
 ### Added

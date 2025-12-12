@@ -100,6 +100,12 @@
                             </a>
                         </div>
                     </div>
+                    <a href="#" class="nav-item" id="recommendCigarBtn">
+                        <div class="nav-content">
+                            <span class="nav-icon mdi mdi-lightbulb-on-outline"></span>
+                            Recommend
+                        </div>
+                    </a>
                 </div>
                 
                 <!-- Settings at bottom -->
@@ -536,7 +542,7 @@
                             <div class="about-content">
                                 <div class="about-item">
                                     <span class="about-label">Version:</span>
-                                    <span class="about-value">1.3.1</span>
+                                    <span class="about-value">1.4.0</span>
                                 </div>
                                 <div class="about-item">
                                     <span class="about-label">Description:</span>
@@ -568,6 +574,10 @@
                                 <button class="btn btn-primary" id="createUserBtn">
                                     <span class="mdi mdi-account-plus"></span>
                                     Create User
+                                </button>
+                                <button class="btn btn-secondary" id="transferOwnershipBtn">
+                                    <span class="mdi mdi-swap-horizontal"></span>
+                                    Transfer Ownership
                                 </button>
                             </div>
 
@@ -852,6 +862,56 @@
                     <button type="submit" class="btn btn-primary">
                         <span class="mdi mdi-lock-reset"></span>
                         Reset Password
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Transfer Ownership Modal -->
+    <div class="modal" id="transferOwnershipModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Transfer Humidor Ownership</h2>
+                <button class="close-btn" id="closeTransferModal">&times;</button>
+            </div>
+            
+            <form id="transferOwnershipForm">
+                <div class="modal-body">
+                    <p class="form-help">Transfer all humidors and cigars from one user to another. This is useful before deleting a user to preserve their data.</p>
+                    
+                    <div class="form-group">
+                        <label for="fromUserId">Transfer From *</label>
+                        <select id="fromUserId" name="from_user_id" required>
+                            <option value="">Select source user</option>
+                        </select>
+                        <small class="form-help">All humidors and cigars will be transferred FROM this user</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="toUserId">Transfer To *</label>
+                        <select id="toUserId" name="to_user_id" required>
+                            <option value="">Select destination user</option>
+                        </select>
+                        <small class="form-help">All humidors and cigars will be transferred TO this user</small>
+                    </div>
+
+                    <div class="warning-box" style="background-color: var(--warning-bg); border-left: 4px solid var(--warning); padding: 1rem; margin: 1rem 0; border-radius: 4px;">
+                        <p style="margin: 0; color: var(--warning);"><strong>⚠️ Important:</strong></p>
+                        <ul style="margin: 0.5rem 0 0 1.5rem; color: var(--text-secondary);">
+                            <li>All humidors will change ownership</li>
+                            <li>All cigars will be reassigned</li>
+                            <li>Existing shares will be removed</li>
+                            <li>This action cannot be undone</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="cancelTransferBtn">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="confirmTransferBtn">
+                        <span class="mdi mdi-swap-horizontal"></span>
+                        Transfer Ownership
                     </button>
                 </div>
             </form>
@@ -1458,6 +1518,34 @@
     <!-- Toast Notifications -->
     <div class="toast-container" id="toastContainer"></div>
 
-    <script src="/static/app.js?version=20251113_003"></script>
+    <!-- Recommendation Modal -->
+    <div class="recommend-modal" id="recommendModal">
+        <div class="recommend-modal-content">
+            <div class="recommend-modal-header">
+                <h2>
+                    <span class="mdi mdi-lightbulb-on-outline"></span>
+                    Cigar Recommendation
+                </h2>
+                <button class="recommend-modal-close" onclick="closeRecommendModal()">
+                    <span class="mdi mdi-close"></span>
+                </button>
+            </div>
+            <div class="recommend-modal-body" id="recommendModalBody">
+                <!-- Content populated by JavaScript -->
+            </div>
+            <div class="recommend-modal-actions" id="recommendModalActions" style="display: none;">
+                <button class="recommend-reroll-btn" onclick="getAnotherRecommendation()">
+                    <span class="mdi mdi-refresh"></span>
+                    Try Another
+                </button>
+                <button class="recommend-accept-btn" onclick="acceptRecommendation()">
+                    <span class="mdi mdi-check-circle-outline"></span>
+                    I'll Smoke This One
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js?version=20251212_020"></script>
 </body>
 </html>
