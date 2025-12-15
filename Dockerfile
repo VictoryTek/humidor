@@ -64,7 +64,7 @@ RUN touch src/main.rs && cargo build --release && strip target/release/humidor
 # Runtime stage - Alpine
 FROM alpine:3.21
 
-# Update all packages to get latest security patches including busybox fix
+# Update all packages to get latest security patches including c-ares CVE-2025-62408
 RUN apk upgrade --no-cache && \
     apk add --no-cache \
     ca-certificates \

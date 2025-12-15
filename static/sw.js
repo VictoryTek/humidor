@@ -1,6 +1,6 @@
 // Humidor Service Worker
-// Version: 1.4.0
-const CACHE_VERSION = 'humidor-v1.4.0';
+// Version: 1.4.1
+const CACHE_VERSION = 'humidor-v1.4.1';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 const IMAGE_CACHE = `${CACHE_VERSION}-images`;
