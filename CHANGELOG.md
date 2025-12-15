@@ -5,6 +5,43 @@ All notable changes to Humidor will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2025-12-14
+
+### Added
+- **Cigar Transfer Between Humidors** 🔄
+  - Transfer cigars from one humidor to another with full quantity control
+  - New transfer button located under cigar image in detail report card
+  - Transfer modal with dropdown humidor selector and quantity input
+  - "Transfer All" option for convenience
+  - Permission-aware: Verifies edit access for both source and destination humidors
+  - New API endpoint: `POST /api/v1/cigars/:id/transfer`
+  - Automatic hub refresh after successful transfer operations
+  - Real-time validation prevents invalid transfers (insufficient quantity, same humidor, etc.)
+  - Transaction-safe backend implementation ensures data consistency
+
+### Fixed
+- **Hub Page Statistics Bug**
+  - Fixed incorrect cigar counts displaying as 0 when navigating between humidor detail views
+  - Root cause: Global cigars array was being completely overwritten with only current humidor's data
+  - Solution: Implemented intelligent array merging that preserves data for all humidors while updating current humidor
+  - Hub page now maintains accurate statistics regardless of navigation patterns
+- **Transfer Backend Type Handling**
+  - Fixed server crashes due to type deserialization errors
+  - Corrected nullable UUID field handling for all organizer columns (brand, size, strength, origin, wrapper, ring gauge)
+  - Fixed DateTime type usage for purchase_date field (timestamp with time zone)
+  - Resolved "error serializing parameter" errors during transfer operations
+- **Route Ordering**
+  - Fixed 404 errors on transfer endpoint by placing transfer route before generic UUID routes
+
+### Changed
+- **Frontend State Management**
+  - Enhanced `showHumidorDetail()` to maintain complete global cigar data across navigation
+  - Improved `performTransfer()` to trigger hub view refresh after successful operations
+- **Backend Architecture**
+  - Transfer endpoint properly handles partial transfers (creates new entry) and full transfers (updates/deletes source)
+  - Comprehensive ownership and permission verification using existing helper functions
+  - Proper handling of all nullable Option<Uuid> organizer fields
+
 ## [1.4.0] - 2025-12-12
 
 ### Added

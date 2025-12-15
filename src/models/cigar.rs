@@ -102,7 +102,7 @@ impl Validate for CreateCigar {
             validate_length(filler, "Filler", 1, 100)?;
         }
         if let Some(notes) = &self.notes {
-            validate_length(notes, "Notes", 0, 1000)?;
+            validate_length(notes, "Notes", 0, 1500)?;
         }
         // UUIDs don't need string length validation
 

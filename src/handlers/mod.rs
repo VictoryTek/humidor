@@ -20,7 +20,7 @@ pub use auth::{
 };
 pub use cigars::{
     create_cigar, delete_cigar, get_cigar, get_cigars, get_random_cigar, scrape_cigar_url,
-    update_cigar,
+    transfer_cigar, update_cigar,
 };
 
 pub use brands::{create_brand, delete_brand, get_brands, update_brand};

@@ -1336,7 +1336,12 @@
             
             <div class="report-card-body">
                 <div class="report-card-image-section">
-                    <img id="reportCardImage" src="" alt="Cigar image">
+                    <div>
+                        <img id="reportCardImage" src="" alt="Cigar image">
+                    </div>
+                    <button class="btn-transfer" id="reportCardTransferBtn" style="display: none;">
+                        🔄 Transfer to Another Humidor
+                    </button>
                 </div>
                 
                 <div class="report-card-details">
@@ -1398,6 +1403,50 @@
                         <button class="btn-secondary" id="reportCardEditBtn">✏️ EDIT</button>
                         <button class="btn-danger" id="reportCardDeleteBtn">🗑️ Delete</button>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Transfer Cigar Modal -->
+    <div class="modal" id="transferCigarModal" onclick="if(event.target === this) closeTransferModal();">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🔄 Transfer Cigar</h2>
+                <button type="button" class="close-btn" onclick="closeTransferModal();">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="transferCigarName">Cigar:</label>
+                    <input type="text" id="transferCigarName" readonly>
+                </div>
+
+                <div class="form-group">
+                    <label for="transferSourceHumidor">From Humidor:</label>
+                    <input type="text" id="transferSourceHumidor" readonly>
+                </div>
+
+                <div class="form-group">
+                    <label for="transferDestinationHumidor">To Humidor: *</label>
+                    <select id="transferDestinationHumidor" required>
+                        <option value="">-- Select destination humidor --</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="transferQuantity">Quantity: *</label>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <input type="number" id="transferQuantity" min="1" required style="flex: 1;">
+                        <span id="transferAvailable" style="color: var(--text-secondary); font-size: 0.875rem;"></span>
+                    </div>
+                    <button type="button" class="btn-secondary" id="transferAllBtn" onclick="if(currentTransferCigar) document.getElementById('transferQuantity').value = currentTransferCigar.quantity;" style="margin-top: 0.5rem; width: 100%;">
+                        Transfer All
+                    </button>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="closeTransferModal();">Cancel</button>
+                    <button type="button" class="btn-primary" onclick="performTransfer();">Transfer Cigar</button>
                 </div>
             </div>
         </div>

@@ -2145,6 +2145,64 @@ document.addEventListener('DOMContentLoaded', function() {
         closeReportCardBtn.addEventListener('click', closeReportCard);
     }
     
+    // Transfer modal events
+    const closeTransferBtn = document.getElementById('closeTransferModal');
+    if (closeTransferBtn) {
+        console.log('[TRANSFER] Close button found, attaching listener');
+        closeTransferBtn.addEventListener('click', (e) => {
+            console.log('[TRANSFER] Close button clicked');
+            e.preventDefault();
+            e.stopPropagation();
+            closeTransferModal();
+        });
+    } else {
+        console.warn('[TRANSFER] Close button NOT found');
+    }
+    const cancelTransferBtn = document.getElementById('cancelTransferBtn');
+    if (cancelTransferBtn) {
+        console.log('[TRANSFER] Cancel button found, attaching listener');
+        cancelTransferBtn.addEventListener('click', (e) => {
+            console.log('[TRANSFER] Cancel button clicked');
+            e.preventDefault();
+            e.stopPropagation();
+            closeTransferModal();
+        });
+    } else {
+        console.warn('[TRANSFER] Cancel button NOT found');
+    }
+    const confirmTransferBtn = document.getElementById('confirmTransferBtn');
+    if (confirmTransferBtn) {
+        console.log('[TRANSFER] Confirm button found, attaching listener');
+        confirmTransferBtn.addEventListener('click', (e) => {
+            console.log('[TRANSFER] Confirm button clicked');
+            e.preventDefault();
+            e.stopPropagation();
+            performTransfer();
+        });
+    } else {
+        console.warn('[TRANSFER] Confirm button NOT found');
+    }
+    const transferAllBtn = document.getElementById('transferAllBtn');
+    if (transferAllBtn) {
+        transferAllBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (currentTransferCigar) {
+                document.getElementById('transferQuantity').value = currentTransferCigar.quantity;
+            }
+        });
+    }
+    
+    // Transfer modal click outside to close
+    const transferModal = document.getElementById('transferCigarModal');
+    if (transferModal) {
+        transferModal.addEventListener('click', (e) => {
+            if (e.target === transferModal) {
+                closeTransferModal();
+            }
+        });
+    }
+    
     // Import URL modal events
     const importFromUrlBtn = document.getElementById('importFromUrlBtn');
     const closeImportUrlBtn = document.getElementById('closeImportUrlModal');
@@ -2347,6 +2405,8 @@ document.addEventListener('DOMContentLoaded', function() {
         if (event.key === 'Escape') {
             closeHumidorModal();
             closeCigarModal();
+            closeTransferModal();
+            closeReportCard();
             // Close all organizer modals
             organizerTypes.forEach(type => closeOrganizerModal(type));
         }
@@ -2867,8 +2927,12 @@ async function showHumidorDetail(humidorId) {
             
             if (response.ok) {
                 const responseData = await response.json();
-                cigars = responseData.cigars || [];
-                cigarsToDisplay = cigars;
+                cigarsToDisplay = responseData.cigars || [];
+                // Update the global cigars array with this humidor's cigars, but keep cigars from other humidors
+                // Remove old cigars for this humidor from global array
+                cigars = cigars.filter(c => c.humidor_id !== humidorId);
+                // Add the freshly loaded cigars for this humidor
+                cigars.push(...cigarsToDisplay);
                 totalCigars = responseData.total || 0;
                 totalCigarPages = responseData.total_pages || 1;
             } else {
@@ -3482,6 +3546,18 @@ function openReportCard(cigarId) {
         actionsContainer.insertBefore(moveBtn, editBtn);
     }
     
+    // Show/hide transfer button based on whether cigar is in a humidor
+    const transferBtn = document.getElementById('reportCardTransferBtn');
+    if (!isInWishList && humidors.length > 1) {
+        // Show transfer button only if cigar is in a humidor and there are other humidors to transfer to
+        transferBtn.style.display = 'block';
+        transferBtn.onclick = () => {
+            openTransferModal(cigar);
+        };
+    } else {
+        transferBtn.style.display = 'none';
+    }
+    
     editBtn.onclick = () => {
         closeReportCard();
         editCigar(cigarId);
@@ -3498,6 +3574,130 @@ function openReportCard(cigarId) {
 function closeReportCard() {
     const modal = document.getElementById('reportCardModal');
     modal.classList.remove('show');
+}
+
+// Transfer Modal Functions
+let currentTransferCigar = null;
+
+function openTransferModal(cigar) {
+    currentTransferCigar = cigar;
+    const modal = document.getElementById('transferCigarModal');
+    
+    // Set cigar name
+    document.getElementById('transferCigarName').value = `${cigar.brand_name || getBrandName(cigar.brand_id)} - ${cigar.name}`;
+    
+    // Set source humidor
+    const sourceHumidor = humidors.find(h => h.id === cigar.humidor_id);
+    document.getElementById('transferSourceHumidor').value = sourceHumidor ? sourceHumidor.name : '-';
+    
+    // Populate destination humidor dropdown (exclude current humidor)
+    const destinationSelect = document.getElementById('transferDestinationHumidor');
+    destinationSelect.innerHTML = '<option value="">-- Select destination humidor --</option>';
+    
+    humidors.forEach(humidor => {
+        if (humidor.id !== cigar.humidor_id) {
+            const option = document.createElement('option');
+            option.value = humidor.id;
+            option.textContent = humidor.name;
+            destinationSelect.appendChild(option);
+        }
+    });
+    
+    // Set quantity info
+    const quantityInput = document.getElementById('transferQuantity');
+    quantityInput.max = cigar.quantity;
+    quantityInput.value = 1;
+    document.getElementById('transferAvailable').textContent = `(Available: ${cigar.quantity})`;
+    
+    // Attach event handlers directly here to ensure they work
+    const closeBtn = document.getElementById('closeTransferModal');
+    const cancelBtn = document.getElementById('cancelTransferBtn');
+    const confirmBtn = document.getElementById('confirmTransferBtn');
+    const transferAllBtn = document.getElementById('transferAllBtn');
+    
+    if (closeBtn) {
+        closeBtn.onclick = (e) => {
+            e.preventDefault();
+            closeTransferModal();
+        };
+    }
+    
+    if (cancelBtn) {
+        cancelBtn.onclick = (e) => {
+            e.preventDefault();
+            closeTransferModal();
+        };
+    }
+    
+    if (confirmBtn) {
+        confirmBtn.onclick = (e) => {
+            e.preventDefault();
+            performTransfer();
+        };
+    }
+    
+    if (transferAllBtn) {
+        transferAllBtn.onclick = (e) => {
+            e.preventDefault();
+            if (currentTransferCigar) {
+                document.getElementById('transferQuantity').value = currentTransferCigar.quantity;
+            }
+        };
+    }
+    
+    modal.classList.add('show');
+}
+
+function closeTransferModal() {
+    const modal = document.getElementById('transferCigarModal');
+    if (modal) {
+        modal.classList.remove('show');
+    }
+    currentTransferCigar = null;
+}
+
+async function performTransfer() {
+    if (!currentTransferCigar) return;
+    
+    const destinationHumidorId = document.getElementById('transferDestinationHumidor').value;
+    const quantity = parseInt(document.getElementById('transferQuantity').value);
+    
+    if (!destinationHumidorId) {
+        showToast('Please select a destination humidor', 'error');
+        return;
+    }
+    
+    if (!quantity || quantity < 1 || quantity > currentTransferCigar.quantity) {
+        showToast(`Please enter a valid quantity (1-${currentTransferCigar.quantity})`, 'error');
+        return;
+    }
+    
+    try {
+        const response = await makeAuthenticatedRequest(`/api/v1/cigars/${currentTransferCigar.id}/transfer`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                destination_humidor_id: destinationHumidorId,
+                quantity: quantity
+            })
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to transfer cigar');
+        }
+        
+        showToast('Cigar transferred successfully!', 'success');
+        closeTransferModal();
+        closeReportCard();
+        await loadHumidors();
+        // Force re-render of the current view to update stats
+        showHumidorHub();
+        
+    } catch (error) {
+        console.error('Error transferring cigar:', error);
+        showToast(error.message || 'Failed to transfer cigar', 'error');
+    }
 }
 
 function openCigarModal(humidorId = null, cigar = null) {
@@ -3970,7 +4170,7 @@ async function saveCigar() {
         } else {
             const errorData = await response.json();
             console.error('✗ Failed to save cigar:', errorData);
-            showToast(errorData.error || 'Failed to save cigar', 'error');
+            showToast(errorData.message || errorData.error || 'Failed to save cigar', 'error');
         }
     } catch (error) {
         console.error('✗ Error saving cigar:', error);

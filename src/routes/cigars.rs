@@ -68,6 +68,18 @@ pub fn create_cigar_routes(
         .and(with_db(db_pool.clone()))
         .and_then(handlers::delete_cigar);
 
+    let transfer_cigar = warp::path("api")
+        .and(warp::path("v1"))
+        .and(warp::path("cigars"))
+        .and(with_uuid())
+        .and(warp::path("transfer"))
+        .and(warp::path::end())
+        .and(warp::post())
+        .and(json_body())
+        .and(with_current_user(db_pool.clone()))
+        .and(with_db(db_pool.clone()))
+        .and_then(handlers::transfer_cigar);
+
     let recommend_cigar = warp::path("api")
         .and(warp::path("v1"))
         .and(warp::path("cigars"))
@@ -79,9 +91,11 @@ pub fn create_cigar_routes(
         .and(with_db(db_pool.clone()))
         .and_then(handlers::get_random_cigar);
 
+    // Order matters! More specific routes (with additional path segments) must come first
     scrape_cigar
-        .or(create_cigar)
         .or(recommend_cigar)
+        .or(transfer_cigar) // Must come before update/delete/get that only have UUID
+        .or(create_cigar)
         .or(update_cigar)
         .or(delete_cigar)
         .or(get_cigar)

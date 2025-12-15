@@ -679,6 +679,198 @@ pub async fn delete_cigar(
 }
 
 #[derive(serde::Deserialize)]
+pub struct TransferCigarRequest {
+    destination_humidor_id: Uuid,
+    quantity: i32,
+}
+
+pub async fn transfer_cigar(
+    id: Uuid,
+    transfer_req: TransferCigarRequest,
+    auth: AuthContext,
+    pool: DbPool,
+) -> Result<impl Reply, Rejection> {
+    // Validate quantity
+    if transfer_req.quantity <= 0 {
+        return Err(warp::reject::custom(AppError::ValidationError(
+            "Quantity must be greater than 0".to_string(),
+        )));
+    }
+
+    let mut db = pool.get().await.map_err(|e| {
+        tracing::error!(error = %e, "Failed to get database connection");
+        warp::reject::custom(AppError::DatabaseError(
+            "Database connection failed".to_string(),
+        ))
+    })?;
+
+    // Start a transaction for atomicity
+    let transaction = db.transaction().await.map_err(|e| {
+        tracing::error!(error = %e, "Failed to start transaction");
+        warp::reject::custom(AppError::DatabaseError(
+            "Failed to start transaction".to_string(),
+        ))
+    })?;
+
+    // CRITICAL: Verify the source cigar belongs to the user or is shared with edit permission
+    verify_cigar_ownership(&pool, id, auth.user_id, true)
+        .await
+        .map_err(warp::reject::custom)?;
+
+    // Verify destination humidor belongs to user or is shared with edit permission
+    verify_humidor_ownership(
+        &pool,
+        Some(transfer_req.destination_humidor_id),
+        auth.user_id,
+        true,
+    )
+    .await
+    .map_err(warp::reject::custom)?;
+
+    // Get the source cigar (join with humidors to verify ownership)
+    let source_cigar_row = transaction
+        .query_one(
+            "SELECT c.id, c.humidor_id, c.brand_id, c.name, c.size_id, c.strength_id, c.origin_id, 
+                    c.wrapper, c.binder, c.filler, c.price, c.purchase_date, c.notes, c.quantity, 
+                    c.ring_gauge_id, c.length, c.image_url, c.retail_link, c.is_active, h.user_id
+             FROM cigars c
+             INNER JOIN humidors h ON c.humidor_id = h.id
+             WHERE c.id = $1 AND h.user_id = $2",
+            &[&id, &auth.user_id],
+        )
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "Failed to fetch source cigar");
+            warp::reject::custom(AppError::NotFound("Cigar not found".to_string()))
+        })?;
+
+    let source_humidor_id: Option<Uuid> = source_cigar_row.get(1);
+    let current_quantity: i32 = source_cigar_row.get(13);
+
+    // Verify quantity to transfer is valid
+    if transfer_req.quantity > current_quantity {
+        return Err(warp::reject::custom(AppError::ValidationError(format!(
+            "Cannot transfer {} cigars. Only {} available.",
+            transfer_req.quantity, current_quantity
+        ))));
+    }
+
+    // Prevent transferring to the same humidor
+    if source_humidor_id == Some(transfer_req.destination_humidor_id) {
+        return Err(warp::reject::custom(AppError::ValidationError(
+            "Cannot transfer to the same humidor".to_string(),
+        )));
+    }
+
+    let now = Utc::now();
+
+    // For now, skip checking for duplicates - just create a new cigar
+    // This can be enhanced later to merge duplicates
+    let existing_cigar: Option<tokio_postgres::Row> = None;
+
+    if let Some(existing_row) = existing_cigar {
+        // Cigar already exists in destination - just update quantity
+        let existing_id: Uuid = existing_row.get(0);
+        let existing_quantity: i32 = existing_row.get(1);
+        let new_quantity = existing_quantity + transfer_req.quantity;
+
+        transaction
+            .execute(
+                "UPDATE cigars SET quantity = $1, updated_at = $2 WHERE id = $3",
+                &[&new_quantity, &now, &existing_id],
+            )
+            .await
+            .map_err(|e| {
+                tracing::error!(error = %e, "Failed to update destination cigar quantity");
+                warp::reject::custom(AppError::DatabaseError(
+                    "Failed to update destination cigar".to_string(),
+                ))
+            })?;
+    } else {
+        // Create new cigar in destination humidor
+        transaction
+            .execute(
+                "INSERT INTO cigars (id, humidor_id, brand_id, name, size_id, strength_id, origin_id, 
+                                    wrapper, binder, filler, price, purchase_date, notes, quantity, 
+                                    ring_gauge_id, length, image_url, retail_link, is_active, created_at, updated_at)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)",
+                &[
+                    &Uuid::new_v4(),
+                    &transfer_req.destination_humidor_id,
+                    &source_cigar_row.get::<_, Option<Uuid>>(2),   // brand_id
+                    &source_cigar_row.get::<_, String>(3),         // name
+                    &source_cigar_row.get::<_, Option<Uuid>>(4),   // size_id
+                    &source_cigar_row.get::<_, Option<Uuid>>(5),   // strength_id
+                    &source_cigar_row.get::<_, Option<Uuid>>(6),   // origin_id
+                    &source_cigar_row.get::<_, Option<String>>(7), // wrapper
+                    &source_cigar_row.get::<_, Option<String>>(8), // binder
+                    &source_cigar_row.get::<_, Option<String>>(9), // filler
+                    &source_cigar_row.get::<_, Option<f64>>(10),   // price
+                    &source_cigar_row.get::<_, Option<chrono::DateTime<Utc>>>(11), // purchase_date
+                    &source_cigar_row.get::<_, Option<String>>(12), // notes
+                    &transfer_req.quantity,
+                    &source_cigar_row.get::<_, Option<Uuid>>(14),  // ring_gauge_id
+                    &source_cigar_row.get::<_, Option<f64>>(15),   // length
+                    &source_cigar_row.get::<_, Option<String>>(16), // image_url
+                    &source_cigar_row.get::<_, Option<String>>(17), // retail_link
+                    &true, // is_active
+                    &now,
+                    &now,
+                ],
+            )
+            .await
+            .map_err(|e| {
+                tracing::error!(error = %e, "Failed to create destination cigar");
+                warp::reject::custom(AppError::DatabaseError(
+                    "Failed to create destination cigar".to_string(),
+                ))
+            })?;
+    }
+
+    // Update or delete source cigar
+    let new_source_quantity = current_quantity - transfer_req.quantity;
+    if new_source_quantity == 0 {
+        // Delete the source cigar if quantity reaches 0
+        transaction
+            .execute("DELETE FROM cigars WHERE id = $1", &[&id])
+            .await
+            .map_err(|e| {
+                tracing::error!(error = %e, "Failed to delete source cigar");
+                warp::reject::custom(AppError::DatabaseError(
+                    "Failed to remove source cigar".to_string(),
+                ))
+            })?;
+    } else {
+        // Update source cigar quantity
+        transaction
+            .execute(
+                "UPDATE cigars SET quantity = $1, updated_at = $2 WHERE id = $3",
+                &[&new_source_quantity, &now, &id],
+            )
+            .await
+            .map_err(|e| {
+                tracing::error!(error = %e, "Failed to update source cigar quantity");
+                warp::reject::custom(AppError::DatabaseError(
+                    "Failed to update source cigar".to_string(),
+                ))
+            })?;
+    }
+
+    // Commit transaction
+    transaction.commit().await.map_err(|e| {
+        tracing::error!(error = %e, "Failed to commit transaction");
+        warp::reject::custom(AppError::DatabaseError(
+            "Failed to commit transfer".to_string(),
+        ))
+    })?;
+
+    Ok(warp::reply::json(&json!({
+        "message": "Cigar transferred successfully",
+        "transferred_quantity": transfer_req.quantity
+    })))
+}
+
+#[derive(serde::Deserialize)]
 pub struct ScrapeRequest {
     url: String,
 }
