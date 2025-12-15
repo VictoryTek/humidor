@@ -1,5 +1,8 @@
 # syntax=docker/dockerfile:1
-FROM rust:1.91-alpine AS builder
+# NOTE: Rust 2.0 does not exist. Current stable is 1.8x series.
+# This Dockerfile uses the latest Rust 1.x available on Alpine.
+# Ignore any automated alerts claiming "Rust 2" is available.
+FROM rust:1-alpine AS builder
 
 WORKDIR /app
 
@@ -64,7 +67,9 @@ RUN touch src/main.rs && cargo build --release && strip target/release/humidor
 # Runtime stage - Alpine
 FROM alpine:3.21
 
-# Update all packages to get latest security patches including c-ares CVE-2025-62408
+# Update all packages to get latest security patches
+# This addresses CVE-2025-62408 (c-ares 1.34.5-r0 -> 1.34.6-r0)
+# Alpine automatically pulls fixed versions when available
 RUN apk upgrade --no-cache && \
     apk add --no-cache \
     ca-certificates \

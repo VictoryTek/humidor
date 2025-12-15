@@ -86,39 +86,49 @@ jobs:
       - name: Check for newer Rust version
         id: rust-check
         run: |
-          # Extract Rust version from Dockerfile (e.g., "1.91" from "rust:1.91-alpine")
-          CURRENT_RUST=$(grep -m 1 'FROM rust:' Dockerfile | sed -n 's/.*FROM rust:\([0-9.]*\).*/\1/p')
+          # Extract Rust version from Dockerfile
+          # Supports both floating tags (rust:1-alpine) and pinned (rust:1.91-alpine)
+          DOCKERFILE_TAG=$(grep -m 1 'FROM rust:' Dockerfile | sed -n 's/.*FROM rust:\([^-]*\).*/\1/p')
           
           # Get latest stable Rust version from official channel
           LATEST_RUST=$(curl -s https://static.rust-lang.org/dist/channel-rust-stable.toml | grep -m 1 'version = ' | cut -d'"' -f2 | cut -d' ' -f1)
           
-          echo "Current Rust version: $CURRENT_RUST"
+          echo "Dockerfile tag: $DOCKERFILE_TAG"
           echo "Latest Rust version: $LATEST_RUST"
           
-          # Validate that we got valid version strings
-          if [ -z "$CURRENT_RUST" ] || [ -z "$LATEST_RUST" ]; then
+          # Validate versions
+          if [ -z "$DOCKERFILE_TAG" ] || [ -z "$LATEST_RUST" ]; then
             echo "Error: Could not determine Rust versions"
             echo "update_available=false" >> $GITHUB_OUTPUT
             exit 0
           fi
           
-          echo "current=$CURRENT_RUST" >> $GITHUB_OUTPUT
-          echo "latest=$LATEST_RUST" >> $GITHUB_OUTPUT
+          # Check if using floating tag (e.g., "1" instead of "1.91.0")
+          if [ "$DOCKERFILE_TAG" = "1" ]; then
+            echo "✓ Using floating tag rust:1-alpine (auto-updates to latest 1.x)"
+            echo "update_available=false" >> $GITHUB_OUTPUT
+            echo "current=1.x (floating)" >> $GITHUB_OUTPUT
+            echo "latest=$LATEST_RUST" >> $GITHUB_OUTPUT
+            exit 0
+          fi
           
-          # Only alert on MAJOR version changes (e.g., 1.x -> 2.x)
-          # Rust uses semantic versioning: MAJOR.MINOR.PATCH
-          CURRENT_MAJOR=$(echo "$CURRENT_RUST" | cut -d. -f1)
+          # For pinned versions, compare major versions only
+          CURRENT_MAJOR=$(echo "$DOCKERFILE_TAG" | cut -d. -f1)
           LATEST_MAJOR=$(echo "$LATEST_RUST" | cut -d. -f1)
           
-          if [ "$CURRENT_MAJOR" != "$LATEST_MAJOR" ]; then
+          echo "current=$DOCKERFILE_TAG" >> $GITHUB_OUTPUT
+          echo "latest=$LATEST_RUST" >> $GITHUB_OUTPUT
+          
+          # Only alert if Rust 2.x or higher exists (very unlikely scenario)
+          if [ "$CURRENT_MAJOR" != "$LATEST_MAJOR" ] && [ "$LATEST_MAJOR" -ge 2 ]; then
             echo "update_available=true" >> $GITHUB_OUTPUT
-            echo "MAJOR version update available: $CURRENT_MAJOR.x -> $LATEST_MAJOR.x"
+            echo "⚠️ BREAKING CHANGE: Rust $LATEST_MAJOR.x available (currently on $CURRENT_MAJOR.x)"
           else
             echo "update_available=false" >> $GITHUB_OUTPUT
-            echo "Already on Rust $CURRENT_MAJOR.x (no major version change)"
+            echo "✓ On Rust $CURRENT_MAJOR.x series (latest: $LATEST_RUST)"
           fi
 
-      - name: Create issue if Rust update available
+      - name: Create issue if MAJOR Rust version available
         if: steps.rust-check.outputs.update_available == 'true'
         uses: actions/github-script@v7
         with:
@@ -126,23 +136,27 @@ jobs:
             const current = '${{ steps.rust-check.outputs.current }}';
             const latest = '${{ steps.rust-check.outputs.latest }}';
             
-            const body = `## Rust Version Update Available\n\n` +
-              `A new stable version of Rust is available.\n\n` +
-              `- **Current**: ${current}\n` +
-              `- **Latest**: ${latest}\n\n` +
-              `**Steps to update:**\n` +
-              `1. Update \`Dockerfile\` to use \`rust:${latest}-alpine\`\n` +
-              `2. Test the build locally\n` +
-              `3. Run full test suite\n` +
-              `4. Update CI/CD if needed\n\n` +
-              `**Note**: Using Alpine base image, so update should reference \`-alpine\` suffix.\n`;
+            const body = `## 🚨 BREAKING: New Rust Major Version Available\n\n` +
+              `A new **major version** of Rust has been released. This is a significant change.\n\n` +
+              `- **Current**: Rust ${current}\n` +
+              `- **Latest**: Rust ${latest}\n\n` +
+              `⚠️ **IMPORTANT**: Major version upgrades may include breaking changes.\n\n` +
+              `**Required Actions:**\n` +
+              `1. Review the [Rust release notes](https://github.com/rust-lang/rust/releases)\n` +
+              `2. Update \`Dockerfile\` to use \`rust:${latest}-alpine\`\n` +
+              `3. Fix any deprecation warnings or breaking changes\n` +
+              `4. Run full test suite locally\n` +
+              `5. Update CI/CD configuration if needed\n` +
+              `6. Review \`docs/DEPENDENCY_UPDATES_PLAN.md\`\n\n` +
+              `**Note**: This workflow only alerts on MAJOR version changes (e.g., 1.x → 2.x). ` +
+              `Minor updates within the 1.x series are handled automatically by the \`rust:1-alpine\` tag.\n`;
             
             github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `Rust ${latest} Available (currently on ${current})`,
+              title: `🚨 Rust ${latest} (MAJOR VERSION) Available - Currently on ${current}`,
               body: body,
-              labels: ['dependencies', 'docker', 'maintenance']
+              labels: ['dependencies', 'docker', 'maintenance', 'breaking-change']
             });
 
   # Health check
