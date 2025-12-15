@@ -2711,9 +2711,7 @@ body {
     gap: 0.25rem;
 }
 
-.humidor-location::before {
-    content: '\F0341';
-    font-family: 'Material Design Icons';
+.humidor-location i {
     font-size: 0.875rem;
 }
 
@@ -5459,9 +5457,7 @@ body {
     gap: 0.25rem;
 }
 
-.humidor-location::before {
-    content: '\F0341';
-    font-family: 'Material Design Icons';
+.humidor-location i {
     font-size: 1rem;
 }
 

@@ -2837,7 +2837,7 @@ function showHumidorHub() {
                             <div class="humidor-card-content">
                                 <div class="humidor-card-header">
                                     <h3>${escapeHtml(humidor.name)}</h3>
-                                    ${humidor.location ? `<p class="humidor-location">${escapeHtml(humidor.location)}</p>` : ''}
+                                    ${humidor.location ? `<p class="humidor-location"><i class="mdi mdi-map-marker"></i>${escapeHtml(humidor.location)}</p>` : ''}
                                 </div>
                                 <div class="humidor-card-stats">
                                     <div class="stat">
