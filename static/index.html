@@ -878,14 +878,22 @@
             
             <form id="transferOwnershipForm">
                 <div class="modal-body">
-                    <p class="form-help">Transfer all humidors and cigars from one user to another. This is useful before deleting a user to preserve their data.</p>
+                    <p class="form-help">Transfer ownership of humidors and their cigars between users. You can transfer all humidors or select a specific one.</p>
                     
                     <div class="form-group">
                         <label for="fromUserId">Transfer From *</label>
                         <select id="fromUserId" name="from_user_id" required>
                             <option value="">Select source user</option>
                         </select>
-                        <small class="form-help">All humidors and cigars will be transferred FROM this user</small>
+                        <small class="form-help">Select the user who currently owns the humidor(s)</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="transferHumidorId">Humidor to Transfer</label>
+                        <select id="transferHumidorId" name="humidor_id">
+                            <option value="">All humidors from selected user</option>
+                        </select>
+                        <small class="form-help">Leave as "All humidors" to transfer everything, or select a specific humidor</small>
                     </div>
                     
                     <div class="form-group">
@@ -893,23 +901,23 @@
                         <select id="toUserId" name="to_user_id" required>
                             <option value="">Select destination user</option>
                         </select>
-                        <small class="form-help">All humidors and cigars will be transferred TO this user</small>
+                        <small class="form-help">Select the user who will receive ownership</small>
                     </div>
 
                     <div class="warning-box" style="background-color: var(--warning-bg); border-left: 4px solid var(--warning); padding: 1rem; margin: 1rem 0; border-radius: 4px;">
                         <p style="margin: 0; color: var(--warning);"><strong>⚠️ Important:</strong></p>
                         <ul style="margin: 0.5rem 0 0 1.5rem; color: var(--text-secondary);">
-                            <li>All humidors will change ownership</li>
-                            <li>All cigars will be reassigned</li>
-                            <li>Existing shares will be removed</li>
+                            <li>Selected humidor(s) will change ownership</li>
+                            <li>All cigars in transferred humidor(s) will be reassigned</li>
+                            <li>Existing shares for transferred humidor(s) will be removed</li>
                             <li>This action cannot be undone</li>
                         </ul>
                     </div>
                 </div>
                 
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" id="cancelTransferBtn">Cancel</button>
-                    <button type="submit" class="btn btn-primary" id="confirmTransferBtn">
+                    <button type="button" class="btn btn-secondary" id="cancelTransferOwnershipBtn">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="confirmTransferOwnershipBtn">
                         <span class="mdi mdi-swap-horizontal"></span>
                         Transfer Ownership
                     </button>

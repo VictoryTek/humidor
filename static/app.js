@@ -2158,30 +2158,7 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
         console.warn('[TRANSFER] Close button NOT found');
     }
-    const cancelTransferBtn = document.getElementById('cancelTransferBtn');
-    if (cancelTransferBtn) {
-        console.log('[TRANSFER] Cancel button found, attaching listener');
-        cancelTransferBtn.addEventListener('click', (e) => {
-            console.log('[TRANSFER] Cancel button clicked');
-            e.preventDefault();
-            e.stopPropagation();
-            closeTransferModal();
-        });
-    } else {
-        console.warn('[TRANSFER] Cancel button NOT found');
-    }
-    const confirmTransferBtn = document.getElementById('confirmTransferBtn');
-    if (confirmTransferBtn) {
-        console.log('[TRANSFER] Confirm button found, attaching listener');
-        confirmTransferBtn.addEventListener('click', (e) => {
-            console.log('[TRANSFER] Confirm button clicked');
-            e.preventDefault();
-            e.stopPropagation();
-            performTransfer();
-        });
-    } else {
-        console.warn('[TRANSFER] Confirm button NOT found');
-    }
+    // Note: Transfer cigar modal uses inline onclick handlers, not event listeners
     const transferAllBtn = document.getElementById('transferAllBtn');
     if (transferAllBtn) {
         transferAllBtn.addEventListener('click', (e) => {
@@ -5244,6 +5221,9 @@ async function showTransferOwnershipModal() {
                 toSelect.appendChild(toOption);
             });
             
+            // Set up event listener to load humidors when from user changes
+            fromSelect.addEventListener('change', loadHumidorsForTransfer);
+            
             modal.classList.add('active');
         } else {
             showToast('Failed to load users', 'error');
@@ -5254,12 +5234,60 @@ async function showTransferOwnershipModal() {
     }
 }
 
+// Load humidors for selected user in transfer modal
+async function loadHumidorsForTransfer() {
+    const fromUserId = document.getElementById('fromUserId').value;
+    const humidorSelect = document.getElementById('transferHumidorId');
+    
+    // Reset humidor dropdown
+    humidorSelect.innerHTML = '<option value="">All humidors from selected user</option>';
+    
+    if (!fromUserId) {
+        humidorSelect.disabled = true;
+        return;
+    }
+    
+    try {
+        // Fetch humidors for the selected user using admin endpoint
+        const response = await makeAuthenticatedRequest(`/api/v1/admin/users/${fromUserId}/humidors`);
+        
+        if (response && response.ok) {
+            const humidors = await response.json();
+            
+            if (humidors.length === 0) {
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = 'User has no humidors';
+                option.disabled = true;
+                humidorSelect.appendChild(option);
+                humidorSelect.disabled = true;
+            } else {
+                humidors.forEach(humidor => {
+                    const option = document.createElement('option');
+                    option.value = humidor.id;
+                    const cigarCount = humidor.cigar_count || 0;
+                    option.textContent = `${humidor.name} (${cigarCount} cigar${cigarCount !== 1 ? 's' : ''})`;
+                    humidorSelect.appendChild(option);
+                });
+                humidorSelect.disabled = false;
+            }
+        }
+    } catch (error) {
+        console.error('Error loading humidors:', error);
+        humidorSelect.disabled = true;
+    }
+}
+
 // Handle transfer ownership form submission
 async function handleTransferOwnershipSubmit(e) {
     e.preventDefault();
+    console.log('[OWNERSHIP TRANSFER] Form submitted');
     
     const fromUserId = document.getElementById('fromUserId').value;
     const toUserId = document.getElementById('toUserId').value;
+    const humidorId = document.getElementById('transferHumidorId').value;
+    
+    console.log('[OWNERSHIP TRANSFER] From:', fromUserId, 'To:', toUserId, 'Humidor:', humidorId);
     
     if (!fromUserId || !toUserId) {
         showToast('Please select both source and destination users', 'error');
@@ -5271,28 +5299,46 @@ async function handleTransferOwnershipSubmit(e) {
         return;
     }
     
-    const confirmBtn = document.getElementById('confirmTransferBtn');
+    const confirmBtn = document.getElementById('confirmTransferOwnershipBtn');
+    if (!confirmBtn) {
+        console.error('[OWNERSHIP TRANSFER] Confirm button not found!');
+        return;
+    }
+    
     const originalText = confirmBtn.innerHTML;
     confirmBtn.disabled = true;
     confirmBtn.innerHTML = '<span class="mdi mdi-loading mdi-spin"></span> Transferring...';
     
     try {
+        const requestBody = {
+            from_user_id: fromUserId,
+            to_user_id: toUserId
+        };
+        
+        // Only include humidor_id if a specific humidor is selected
+        if (humidorId) {
+            requestBody.humidor_id = humidorId;
+        }
+        
+        console.log('[OWNERSHIP TRANSFER] Sending request:', requestBody);
+        
         const response = await makeAuthenticatedRequest('/api/v1/admin/transfer-ownership', {
             method: 'POST',
-            body: JSON.stringify({
-                from_user_id: fromUserId,
-                to_user_id: toUserId
-            })
+            body: JSON.stringify(requestBody)
         });
         
         if (response && response.ok) {
             const result = await response.json();
+            const transferType = humidorId ? 'humidor' : `${result.humidors_transferred} humidor(s)`;
             showToast(
-                `Successfully transferred ${result.humidors_transferred} humidor(s) and ${result.cigars_transferred} cigar(s)`,
+                `Successfully transferred ${transferType} with ${result.cigars_transferred} cigar(s)`,
                 'success'
             );
             document.getElementById('transferOwnershipModal').classList.remove('active');
             document.getElementById('transferOwnershipForm').reset();
+            // Reset humidor dropdown
+            document.getElementById('transferHumidorId').innerHTML = '<option value="">All humidors from selected user</option>';
+            document.getElementById('transferHumidorId').disabled = true;
         } else {
             const error = await response.json();
             showToast(error.message || 'Failed to transfer ownership', 'error');
@@ -5663,15 +5709,15 @@ function initializeUserManagementHandlers() {
     if (userPasswordForm) userPasswordForm.addEventListener('submit', handlePasswordResetSubmit);
     
     // Transfer ownership dialog handlers
-    const closeTransferModal = document.getElementById('closeTransferModal');
-    const cancelTransferBtn = document.getElementById('cancelTransferBtn');
+    const closeTransferOwnershipModal = document.getElementById('closeTransferModal');
+    const cancelTransferOwnershipBtn = document.getElementById('cancelTransferOwnershipBtn');
     const transferOwnershipForm = document.getElementById('transferOwnershipForm');
     
-    if (closeTransferModal) closeTransferModal.addEventListener('click', () => {
+    if (closeTransferOwnershipModal) closeTransferOwnershipModal.addEventListener('click', () => {
         document.getElementById('transferOwnershipModal').classList.remove('active');
     });
     
-    if (cancelTransferBtn) cancelTransferBtn.addEventListener('click', () => {
+    if (cancelTransferOwnershipBtn) cancelTransferOwnershipBtn.addEventListener('click', () => {
         document.getElementById('transferOwnershipModal').classList.remove('active');
     });
     

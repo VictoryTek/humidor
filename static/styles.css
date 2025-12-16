@@ -4394,6 +4394,27 @@ body {
     border-top: 1px solid var(--border-color);
 }
 
+/* Transfer Ownership modal specific styles */
+#transferOwnershipModal .modal-body {
+    padding: 1.5rem;
+}
+
+#transferOwnershipModal .form-group {
+    margin-bottom: 1.25rem;
+}
+
+#transferOwnershipModal .form-help {
+    display: block;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-top: 0.5rem;
+    line-height: 1.5;
+}
+
+#transferOwnershipModal .warning-box {
+    margin: 1.5rem 0;
+}
+
 .report-card-details {
     display: flex;
     flex-direction: column;

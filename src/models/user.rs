@@ -107,6 +107,7 @@ pub struct AdminToggleActiveRequest {
 pub struct TransferOwnershipRequest {
     pub from_user_id: Uuid,
     pub to_user_id: Uuid,
+    pub humidor_id: Option<Uuid>, // If provided, only transfer this humidor
 }
 
 #[derive(Debug, Serialize)]

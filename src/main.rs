@@ -450,6 +450,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         format!("public, max-age={}", cache_max_age)
     };
 
+    // Service worker with special header to allow root scope
+    let sw_route = warp::path!("static" / "sw.js")
+        .and(warp::get())
+        .and(warp::fs::file("static/sw.js"))
+        .with(warp::reply::with::header("Service-Worker-Allowed", "/"))
+        .with(warp::reply::with::header("Cache-Control", cache_control.clone()));
+
     let static_files = warp::path("static")
         .and(warp::fs::dir("static"))
         .with(warp::reply::with::header("Cache-Control", cache_control));
@@ -626,6 +633,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .or(forgot_password_page)
         .or(reset_password_page)
         .or(shared_humidor_page)
+        .or(sw_route)  // Service worker route must come before static_files
         .or(static_files)
         .or(api)
         .with(log_requests())
@@ -635,7 +643,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map(|reply| warp::reply::with_header(reply, "X-Content-Type-Options", "nosniff"))
         .map(|reply| warp::reply::with_header(reply, "X-Frame-Options", "DENY"))
         .map(|reply| warp::reply::with_header(reply, "X-XSS-Protection", "1; mode=block"))
-        .map(|reply| warp::reply::with_header(reply, "Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; img-src 'self' data: https://*.cigarsinternational.com https://*.famous-smoke.com https://*.cigaraficionado.com; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; connect-src 'self' https://cdn.jsdelivr.net; frame-ancestors 'none'"))
+        .map(|reply| warp::reply::with_header(reply, "Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; connect-src 'self' https://cdn.jsdelivr.net; frame-ancestors 'none'"))
         .map(|reply| warp::reply::with_header(reply, "Referrer-Policy", "no-referrer-when-downgrade"))
         .map(|reply| warp::reply::with_header(reply, "Permissions-Policy", "geolocation=(), microphone=(), camera=()"));
 
