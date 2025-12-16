@@ -455,7 +455,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and(warp::get())
         .and(warp::fs::file("static/sw.js"))
         .with(warp::reply::with::header("Service-Worker-Allowed", "/"))
-        .with(warp::reply::with::header("Cache-Control", cache_control.clone()));
+        .with(warp::reply::with::header(
+            "Cache-Control",
+            cache_control.clone(),
+        ));
 
     let static_files = warp::path("static")
         .and(warp::fs::dir("static"))

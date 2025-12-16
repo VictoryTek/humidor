@@ -667,7 +667,7 @@ pub async fn transfer_ownership(
     }
 
     // Determine which humidors to transfer
-    let (count_cigars_query, transfer_humidors_query, delete_shares_query, query_params) = 
+    let (count_cigars_query, transfer_humidors_query, delete_shares_query, query_params) =
         if let Some(humidor_id) = request.humidor_id {
             // Transfer single humidor
             // Verify the humidor belongs to the from_user
@@ -681,7 +681,7 @@ pub async fn transfer_ownership(
                         "Failed to verify humidor ownership".to_string(),
                     ))
                 })?;
-            
+
             if verify_result.is_none() {
                 return Err(warp::reject::custom(AppError::NotFound(
                     "Humidor not found or does not belong to source user".to_string(),
@@ -692,7 +692,7 @@ pub async fn transfer_ownership(
                 "SELECT COUNT(*) FROM cigars WHERE humidor_id = $1",
                 "UPDATE humidors SET user_id = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3",
                 "DELETE FROM humidor_shares WHERE humidor_id = $1",
-                vec![humidor_id]
+                vec![humidor_id],
             )
         } else {
             // Transfer all humidors
@@ -700,7 +700,7 @@ pub async fn transfer_ownership(
                 "SELECT COUNT(*) FROM cigars c INNER JOIN humidors h ON c.humidor_id = h.id WHERE h.user_id = $1",
                 "UPDATE humidors SET user_id = $1, updated_at = NOW() WHERE user_id = $2",
                 "DELETE FROM humidor_shares WHERE humidor_id IN (SELECT id FROM humidors WHERE user_id = $1)",
-                vec![]
+                vec![],
             )
         };
 
@@ -766,14 +766,17 @@ pub async fn transfer_ownership(
     // Map organizer data for cigars being transferred
     // For each organizer type, create new records for target user if needed
     // and update cigar foreign keys to reference the new organizer IDs
-    
+
     // After humidors are transferred, they belong to to_user_id
     // We need to find cigars in those humidors and update their organizer references
     let humidor_filter = if let Some(humidor_id) = request.humidor_id {
         format!("humidor_id = '{}'", humidor_id)
     } else {
         // All humidors that were just transferred (now owned by to_user_id)
-        format!("humidor_id IN (SELECT id FROM humidors WHERE user_id = '{}')", request.to_user_id)
+        format!(
+            "humidor_id IN (SELECT id FROM humidors WHERE user_id = '{}')",
+            request.to_user_id
+        )
     };
 
     // Copy organizer data (brands)
@@ -789,15 +792,19 @@ pub async fn transfer_ownership(
     );
 
     let brands_inserted = transaction
-        .execute(&insert_brands_query, &[&request.to_user_id, &request.from_user_id])
+        .execute(
+            &insert_brands_query,
+            &[&request.to_user_id, &request.from_user_id],
+        )
         .await
         .map_err(|e| {
             tracing::error!(error = ?e, query = %insert_brands_query, "Failed to insert brands");
-            warp::reject::custom(AppError::DatabaseError(
-                format!("Failed to copy brands: {:?}", e)
-            ))
+            warp::reject::custom(AppError::DatabaseError(format!(
+                "Failed to copy brands: {:?}",
+                e
+            )))
         })?;
-    
+
     tracing::debug!(brands_inserted, "Brands inserted for target user");
 
     // Step 2: Update cigars to reference target user's brands
@@ -811,7 +818,10 @@ pub async fn transfer_ownership(
     );
 
     transaction
-        .execute(&update_brands_query, &[&request.to_user_id, &request.from_user_id])
+        .execute(
+            &update_brands_query,
+            &[&request.to_user_id, &request.from_user_id],
+        )
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "Failed to update brand references");
@@ -832,13 +842,17 @@ pub async fn transfer_ownership(
     );
 
     transaction
-        .execute(&insert_origins_query, &[&request.to_user_id, &request.from_user_id])
+        .execute(
+            &insert_origins_query,
+            &[&request.to_user_id, &request.from_user_id],
+        )
         .await
         .map_err(|e| {
             tracing::error!(error = ?e, query = %insert_origins_query, "Failed to insert origins");
-            warp::reject::custom(AppError::DatabaseError(
-                format!("Failed to copy origins: {:?}", e)
-            ))
+            warp::reject::custom(AppError::DatabaseError(format!(
+                "Failed to copy origins: {:?}",
+                e
+            )))
         })?;
 
     // Map origins - Step 2: Update cigar foreign keys
@@ -852,7 +866,10 @@ pub async fn transfer_ownership(
     );
 
     transaction
-        .execute(&update_origins_query, &[&request.to_user_id, &request.from_user_id])
+        .execute(
+            &update_origins_query,
+            &[&request.to_user_id, &request.from_user_id],
+        )
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "Failed to map origins");
@@ -893,7 +910,10 @@ pub async fn transfer_ownership(
     );
 
     transaction
-        .execute(&update_strengths_query, &[&request.to_user_id, &request.from_user_id])
+        .execute(
+            &update_strengths_query,
+            &[&request.to_user_id, &request.from_user_id],
+        )
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "Failed to map strengths");
@@ -914,13 +934,17 @@ pub async fn transfer_ownership(
     );
 
     transaction
-        .execute(&insert_sizes_query, &[&request.to_user_id, &request.from_user_id])
+        .execute(
+            &insert_sizes_query,
+            &[&request.to_user_id, &request.from_user_id],
+        )
         .await
         .map_err(|e| {
             tracing::error!(error = ?e, query = %insert_sizes_query, "Failed to insert sizes");
-            warp::reject::custom(AppError::DatabaseError(
-                format!("Failed to copy sizes: {:?}", e)
-            ))
+            warp::reject::custom(AppError::DatabaseError(format!(
+                "Failed to copy sizes: {:?}",
+                e
+            )))
         })?;
 
     // Map sizes - Step 2: Update cigar foreign keys
@@ -934,7 +958,10 @@ pub async fn transfer_ownership(
     );
 
     transaction
-        .execute(&update_sizes_query, &[&request.to_user_id, &request.from_user_id])
+        .execute(
+            &update_sizes_query,
+            &[&request.to_user_id, &request.from_user_id],
+        )
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "Failed to map sizes");
@@ -975,7 +1002,10 @@ pub async fn transfer_ownership(
     );
 
     transaction
-        .execute(&update_ring_gauges_query, &[&request.to_user_id, &request.from_user_id])
+        .execute(
+            &update_ring_gauges_query,
+            &[&request.to_user_id, &request.from_user_id],
+        )
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "Failed to map ring_gauges");
@@ -1027,9 +1057,7 @@ pub async fn get_user_humidors(
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "Failed to verify user");
-            warp::reject::custom(AppError::DatabaseError(
-                "Failed to verify user".to_string(),
-            ))
+            warp::reject::custom(AppError::DatabaseError("Failed to verify user".to_string()))
         })?;
 
     if user_exists.is_none() {
