@@ -5,6 +5,28 @@ All notable changes to Humidor will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2025-12-17
+
+### Added
+- **Styled Modals for User Input** 🎨
+  - Replaced browser-based `prompt()` dialogs with styled modals
+  - Replaced browser-based `confirm()` dialogs with styled modals
+  - All modals now match the app's design language
+  - Improved UX with consistent styling across all confirmation dialogs
+  - Restock button now uses styled input modal instead of browser prompt
+  - Delete confirmations now use styled modal instead of browser alert
+  - Proper padding and margins on all modal dialogs
+
+### Fixed
+- **Mobile Password Manager Support** 🔐
+  - Fixed login form autocomplete attribute for iOS password managers
+  - Changed `autocomplete="username"` to `autocomplete="email"` on login form
+  - Password managers (iCloud Keychain, 1Password, etc.) now work correctly on iOS PWA
+- **Cigar Sorting Order** 📊
+  - Fixed cigar sorting to display alphabetically by brand, then by name
+  - Active cigars displayed first (alphabetically), out-of-stock cigars at end (alphabetically)
+  - Sorting now consistent across all humidor views
+
 ## [1.4.2] - 2025-12-17
 
 ### Added

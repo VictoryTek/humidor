@@ -542,7 +542,7 @@
                             <div class="about-content">
                                 <div class="about-item">
                                     <span class="about-label">Version:</span>
-                                    <span class="about-value">1.4.2</span>
+                                    <span class="about-value">1.5.0</span>
                                 </div>
                                 <div class="about-item">
                                     <span class="about-label">Description:</span>
@@ -1599,6 +1599,43 @@
                     <span class="mdi mdi-check-circle-outline"></span>
                     I'll Smoke This One
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Generic Input Modal -->
+    <div class="modal" id="inputModal">
+        <div class="modal-content confirm-modal-content">
+            <div class="modal-header">
+                <h2 id="inputModalTitle">Input Required</h2>
+                <button class="close-btn" id="closeInputModal">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 2rem;">
+                <p id="inputModalMessage" style="margin-bottom: 1.5rem; color: var(--text-primary);"></p>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <input type="text" id="inputModalInput" class="form-control" style="width: 100%; padding: 0.75rem; font-size: 1rem;" />
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 1rem 2rem; gap: 1rem;">
+                <button class="btn btn-secondary" id="cancelInputBtn">Cancel</button>
+                <button class="btn btn-primary" id="confirmInputBtn">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Generic Confirmation Modal -->
+    <div class="modal" id="confirmModal">
+        <div class="modal-content confirm-modal-content">
+            <div class="modal-header">
+                <h2 id="confirmModalTitle">Confirm Action</h2>
+                <button class="close-btn" id="closeConfirmModal">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 2rem;">
+                <p id="confirmModalMessage" style="margin: 0; color: var(--text-primary); line-height: 1.6;"></p>
+            </div>
+            <div class="modal-footer" style="padding: 1rem 2rem; gap: 1rem;">
+                <button class="btn btn-secondary" id="cancelConfirmBtn">Cancel</button>
+                <button class="btn btn-primary" id="confirmConfirmBtn">OK</button>
             </div>
         </div>
     </div>

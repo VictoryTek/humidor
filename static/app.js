@@ -1,3 +1,93 @@
+// Generic Modal Helpers
+function showInputModal(title, message, defaultValue = '') {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('inputModal');
+        const titleEl = document.getElementById('inputModalTitle');
+        const messageEl = document.getElementById('inputModalMessage');
+        const input = document.getElementById('inputModalInput');
+        const confirmBtn = document.getElementById('confirmInputBtn');
+        const cancelBtn = document.getElementById('cancelInputBtn');
+        const closeBtn = document.getElementById('closeInputModal');
+        
+        titleEl.textContent = title;
+        messageEl.textContent = message;
+        input.value = defaultValue;
+        input.type = 'number';
+        input.min = '1';
+        
+        modal.classList.add('show');
+        setTimeout(() => input.focus(), 100);
+        
+        const handleConfirm = () => {
+            cleanup();
+            resolve(input.value);
+        };
+        
+        const handleCancel = () => {
+            cleanup();
+            resolve(null);
+        };
+        
+        const cleanup = () => {
+            modal.classList.remove('show');
+            confirmBtn.removeEventListener('click', handleConfirm);
+            cancelBtn.removeEventListener('click', handleCancel);
+            closeBtn.removeEventListener('click', handleCancel);
+            input.removeEventListener('keypress', handleKeyPress);
+        };
+        
+        const handleKeyPress = (e) => {
+            if (e.key === 'Enter') {
+                handleConfirm();
+            } else if (e.key === 'Escape') {
+                handleCancel();
+            }
+        };
+        
+        confirmBtn.addEventListener('click', handleConfirm);
+        cancelBtn.addEventListener('click', handleCancel);
+        closeBtn.addEventListener('click', handleCancel);
+        input.addEventListener('keypress', handleKeyPress);
+    });
+}
+
+function showConfirmModal(title, message) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('confirmModal');
+        const titleEl = document.getElementById('confirmModalTitle');
+        const messageEl = document.getElementById('confirmModalMessage');
+        const confirmBtn = document.getElementById('confirmConfirmBtn');
+        const cancelBtn = document.getElementById('cancelConfirmBtn');
+        const closeBtn = document.getElementById('closeConfirmModal');
+        
+        titleEl.textContent = title;
+        messageEl.textContent = message;
+        
+        modal.classList.add('show');
+        
+        const handleConfirm = () => {
+            cleanup();
+            resolve(true);
+        };
+        
+        const handleCancel = () => {
+            cleanup();
+            resolve(false);
+        };
+        
+        const cleanup = () => {
+            modal.classList.remove('show');
+            confirmBtn.removeEventListener('click', handleConfirm);
+            cancelBtn.removeEventListener('click', handleCancel);
+            closeBtn.removeEventListener('click', handleCancel);
+        };
+        
+        confirmBtn.addEventListener('click', handleConfirm);
+        cancelBtn.addEventListener('click', handleCancel);
+        closeBtn.addEventListener('click', handleCancel);
+    });
+}
+
 // Theme Management
 function initializeTheme() {
     const savedTheme = localStorage.getItem('theme') || 'dark';
@@ -1112,7 +1202,25 @@ function renderCigars() {
         elements.emptyState.style.display = 'none';
         elements.cigarsGrid.style.display = 'grid';
         
-        filteredCigars.forEach(cigar => {
+        // Sort cigars: active first (alphabetically), then out-of-stock (alphabetically)
+        const sortedCigars = [...filteredCigars].sort((a, b) => {
+            // First, sort by active status (active cigars first)
+            const activeA = a.is_active !== false; // Default true if undefined
+            const activeB = b.is_active !== false;
+            if (activeA && !activeB) return -1; // a is active, b is not -> a comes first
+            if (!activeA && activeB) return 1;   // a is not active, b is -> b comes first
+            
+            // Within same active status, sort by brand name alphabetically
+            const brandA = (a.brand_name || getBrandName(a.brand_id)).toLowerCase();
+            const brandB = (b.brand_name || getBrandName(b.brand_id)).toLowerCase();
+            if (brandA < brandB) return -1;
+            if (brandA > brandB) return 1;
+            
+            // If brands are the same, sort by cigar name
+            return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+        });
+        
+        sortedCigars.forEach(cigar => {
             const card = createCigarCard(cigar);
             elements.cigarsGrid.appendChild(card);
         });
@@ -1297,7 +1405,8 @@ async function deleteCigar(id) {
         return;
     }
     
-    if (!confirm('Are you sure you want to delete this cigar?')) {
+    const confirmed = await showConfirmModal('Delete Cigar', 'Are you sure you want to delete this cigar?');
+    if (!confirmed) {
         return;
     }
     
@@ -2674,7 +2783,8 @@ function editOrganizer(id, type) {
 }
 
 async function deleteOrganizer(id, type) {
-    if (!confirm('Are you sure you want to delete this item?')) return;
+    const confirmed = await showConfirmModal('Delete Item', 'Are you sure you want to delete this item?');
+    if (!confirmed) return;
     
     try {
         const apiMap = {
@@ -3967,7 +4077,8 @@ function updateHumidor(id, humidorData) {
 }
 
 async function deleteHumidor(id) {
-    if (!confirm('Are you sure you want to delete this humidor and all its cigars?')) return;
+    const confirmed = await showConfirmModal('Delete Humidor', 'Are you sure you want to delete this humidor and all its cigars?');
+    if (!confirmed) return;
     
     try {
         const response = await makeAuthenticatedRequest(`/api/v1/humidors/${id}`, {
@@ -4186,7 +4297,8 @@ function updateCigar(id, cigarData) {
 }
 
 async function deleteCigar(id) {
-    if (!confirm('Are you sure you want to permanently delete this cigar from your humidor? It will remain in favorites if favorited.')) return;
+    const confirmed = await showConfirmModal('Delete Cigar', 'Are you sure you want to permanently delete this cigar from your humidor? It will remain in favorites if favorited.');
+    if (!confirmed) return;
     
     try {
         const response = await makeAuthenticatedRequest(`/api/v1/cigars/${id}`, {
@@ -4213,7 +4325,7 @@ async function restockCigar(id) {
         return;
     }
     
-    const quantity = prompt('Enter the quantity to restock:', '1');
+    const quantity = await showInputModal('Restock Cigar', 'Enter the quantity to restock:', '1');
     
     if (quantity === null) return; // User cancelled
     
@@ -4588,7 +4700,8 @@ function getStrengthIndicatorHtml(strengthId) {
 }
 
 async function removeFavorite(cigarId) {
-    if (!confirm('Remove this from your favorites?')) return;
+    const confirmed = await showConfirmModal('Remove Favorite', 'Remove this from your favorites?');
+    if (!confirmed) return;
     
     try {
         await FavoritesAPI.removeFavorite(cigarId);
@@ -4793,7 +4906,8 @@ function showHumidorSelectionModal(humidors) {
 async function deleteWishListCigar(cigarId, event) {
     event?.stopPropagation();
     
-    if (!confirm('Are you sure you want to remove this cigar from your wish list?')) {
+    const confirmed = await showConfirmModal('Remove from Wish List', 'Are you sure you want to remove this cigar from your wish list?');
+    if (!confirmed) {
         return;
     }
     
@@ -5082,7 +5196,8 @@ async function toggleUserActive(userId) {
     const newStatus = !user.is_active;
     const action = newStatus ? 'activate' : 'deactivate';
     
-    if (!confirm(`Are you sure you want to ${action} this user?`)) {
+    const confirmed = await showConfirmModal('Confirm Action', `Are you sure you want to ${action} this user?`);
+    if (!confirmed) {
         return;
     }
     
@@ -6013,7 +6128,8 @@ async function updateSharePermission(humidorId, userId, newPermission) {
 }
 
 async function revokeShare(humidorId, userId) {
-    if (!confirm('Are you sure you want to revoke access for this user?')) {
+    const confirmed = await showConfirmModal('Revoke Access', 'Are you sure you want to revoke access for this user?');
+    if (!confirmed) {
         return;
     }
     
@@ -6223,7 +6339,8 @@ async function createPublicShare() {
 }
 
 async function deletePublicShare(tokenId) {
-    if (!confirm('Are you sure you want to delete this share link? This link will stop working immediately.')) {
+    const confirmed = await showConfirmModal('Delete Share Link', 'Are you sure you want to delete this share link? This link will stop working immediately.');
+    if (!confirmed) {
         return;
     }
     
@@ -6251,7 +6368,8 @@ async function deletePublicShare(tokenId) {
 window.deletePublicShare = deletePublicShare;
 
 async function revokeAllPublicShares() {
-    if (!confirm('Are you sure you want to revoke ALL public share links for this humidor? All links will stop working immediately.')) {
+    const confirmed = await showConfirmModal('Revoke All Links', 'Are you sure you want to revoke ALL public share links for this humidor? All links will stop working immediately.');
+    if (!confirmed) {
         return;
     }
     
