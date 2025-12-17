@@ -5,6 +5,29 @@ All notable changes to Humidor will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.2] - 2025-12-17
+
+### Added
+- **Wish List Transfer Enhancements** 📦
+  - Quantity input field in "Move to Humidor" modal
+  - Auto-populated purchase date (today) when moving cigars from wish list to humidor
+  - Field disabling: Quantity and purchase date fields now gray out when "Wish List" is selected
+  - Improved modal styling with better padding and margins
+  - Updated move button with treasure chest icon for better visual clarity
+
+### Fixed
+- **Wish List to Humidor Transfer Bug**
+  - Fixed 400/405 error preventing cigars from being moved from wish list to humidor
+  - Root cause: Backend expected RFC3339 datetime format but frontend sent date-only string
+  - Solution: Changed `purchase_date` to use full ISO datetime (`toISOString()`) instead of date-only format
+  - Transfer now correctly updates cigar with quantity, purchase date, and humidor assignment
+
+### Changed
+- **UX Improvements**
+  - Enhanced "Move to Humidor" workflow with clearer visual feedback
+  - Improved form field behavior to prevent invalid data entry
+  - Better modal layout for wish list operations
+
 ## [1.4.1] - 2025-12-14
 
 ### Added

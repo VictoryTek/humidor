@@ -522,6 +522,15 @@ pub async fn update_cigar(
     auth: AuthContext,
     pool: DbPool,
 ) -> Result<impl Reply, Rejection> {
+    // Debug log the request
+    tracing::info!(
+        "update_cigar request: id={}, humidor_id={:?}, quantity={:?}, purchase_date={:?}",
+        id,
+        update_cigar.humidor_id,
+        update_cigar.quantity,
+        update_cigar.purchase_date
+    );
+
     // Validate input
     update_cigar.validate().map_err(warp::reject::custom)?;
 

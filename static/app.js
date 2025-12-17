@@ -2280,8 +2280,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     if (cigarHumidorSelect) {
         cigarHumidorSelect.addEventListener('change', (e) => {
-            const selectedOption = e.target.options[e.target.selectedIndex];
-            const isWishList = selectedOption.text === 'Wish List';
+            const isWishList = e.target.value === 'WISH_LIST';
             
             if (isWishList) {
                 // Disable and clear quantity and purchase date for wish list
@@ -2291,9 +2290,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 cigarPurchaseDateInput.disabled = true;
                 cigarPurchaseDateInput.value = '';
                 
-                // Add visual indicator
-                cigarQuantityInput.parentElement.style.opacity = '0.5';
-                cigarPurchaseDateInput.parentElement.style.opacity = '0.5';
+                // Add visual indicator with lighter styling
+                cigarQuantityInput.parentElement.style.opacity = '0.6';
+                cigarQuantityInput.parentElement.style.pointerEvents = 'none';
+                cigarPurchaseDateInput.parentElement.style.opacity = '0.6';
+                cigarPurchaseDateInput.parentElement.style.pointerEvents = 'none';
             } else {
                 // Enable for regular humidors
                 cigarQuantityInput.disabled = false;
@@ -2303,7 +2304,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // Remove visual indicator
                 cigarQuantityInput.parentElement.style.opacity = '1';
+                cigarQuantityInput.parentElement.style.pointerEvents = 'auto';
                 cigarPurchaseDateInput.parentElement.style.opacity = '1';
+                cigarPurchaseDateInput.parentElement.style.pointerEvents = 'auto';
             }
         });
     }
@@ -3514,7 +3517,7 @@ function openReportCard(cigarId) {
         const moveBtn = document.createElement('button');
         moveBtn.id = 'reportCardMoveBtn';
         moveBtn.className = 'btn-primary';
-        moveBtn.innerHTML = '📦 MOVE TO HUMIDOR';
+        moveBtn.innerHTML = '<span class="mdi mdi-treasure-chest-outline"></span> MOVE TO HUMIDOR';
         moveBtn.onclick = async () => {
             closeReportCard();
             await moveCigarToHumidor(cigarId);
@@ -4693,30 +4696,37 @@ async function moveCigarToHumidor(cigarId, event) {
         }
         
         // Show selection modal
-        const humidorId = await showHumidorSelectionModal(allHumidors);
+        const result = await showHumidorSelectionModal(allHumidors);
         
-        if (!humidorId) return; // User cancelled
+        if (!result) return; // User cancelled
         
-        // First, remove from wish list
+        const { humidorId, quantity } = result;
+        
+        // Set purchase date to today (RFC3339 format with timezone)
+        const today = new Date().toISOString();
+        
+        // First, update the cigar's humidor_id, quantity, and purchase date (while still in wish list for permission check)
+        const updateResponse = await makeAuthenticatedRequest(`/api/v1/cigars/${cigarId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                humidor_id: humidorId,
+                quantity: quantity,
+                purchase_date: today
+            })
+        });
+        
+        if (!updateResponse.ok) {
+            throw new Error('Failed to update cigar');
+        }
+        
+        // Then, remove from wish list
         const removeResponse = await makeAuthenticatedRequest(`/api/v1/wish_list/${cigarId}`, {
             method: 'DELETE'
         });
         
         if (!removeResponse.ok) {
             console.warn('Failed to remove from wish list, continuing anyway');
-        }
-        
-        // Then update the cigar's humidor_id
-        const updateResponse = await makeAuthenticatedRequest(`/api/v1/cigars/${cigarId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                humidor_id: humidorId
-            })
-        });
-        
-        if (!updateResponse.ok) {
-            throw new Error('Failed to update cigar');
         }
         
         showToast('Cigar moved to humidor successfully!');
@@ -4737,22 +4747,26 @@ function showHumidorSelectionModal(humidors) {
         const modal = document.createElement('div');
         modal.className = 'modal show';
         modal.innerHTML = `
-            <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-content" style="max-width: 500px;">
                 <div class="modal-header">
-                    <h2>Select Humidor</h2>
+                    <h2>Move to Humidor</h2>
                     <button class="close-btn" onclick="this.closest('.modal').remove(); event.stopPropagation();">&times;</button>
                 </div>
-                <div class="modal-body">
-                    <div class="form-group">
-                        <label>Choose a humidor:</label>
-                        <select id="humidorSelect" class="form-control">
+                <div class="modal-body" style="padding: 0 2rem 2rem 2rem;">
+                    <div class="form-group" style="margin-bottom: 1.5rem;">
+                        <label for="humidorSelect" style="display: block; margin-bottom: 0.5rem; color: var(--text-primary); font-weight: 500;">Choose a humidor</label>
+                        <select id="humidorSelect" class="form-control" style="width: 100%; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid var(--border-color); background: var(--background-secondary); color: var(--text-primary);">
                             ${humidors.map(h => `<option value="${h.id}">${h.name}</option>`).join('')}
                         </select>
                     </div>
+                    <div class="form-group" style="margin-bottom: 1.5rem;">
+                        <label for="moveQuantity" style="display: block; margin-bottom: 0.5rem; color: var(--text-primary); font-weight: 500;">How many did you buy?</label>
+                        <input type="number" id="moveQuantity" class="form-control" min="1" value="1" required style="width: 100%; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid var(--border-color); background: var(--background-secondary); color: var(--text-primary);">
+                    </div>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn-secondary" onclick="this.closest('.modal').remove();">Cancel</button>
-                    <button class="btn-primary" id="confirmMoveBtn">Move</button>
+                    <button class="btn btn-secondary" onclick="this.closest('.modal').remove();">Cancel</button>
+                    <button class="btn btn-primary" id="confirmMoveBtn">Move to Humidor</button>
                 </div>
             </div>
         `;
@@ -4761,8 +4775,9 @@ function showHumidorSelectionModal(humidors) {
         
         document.getElementById('confirmMoveBtn').addEventListener('click', () => {
             const selectedId = document.getElementById('humidorSelect').value;
+            const quantity = parseInt(document.getElementById('moveQuantity').value) || 1;
             modal.remove();
-            resolve(selectedId);
+            resolve({ humidorId: selectedId, quantity });
         });
         
         modal.querySelector('.close-btn').addEventListener('click', () => {

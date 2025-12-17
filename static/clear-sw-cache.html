@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clear Service Worker Cache</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #ffffff;
+        }
+        .container {
+            background: #2a2a2a;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #D4AF37;
+            margin-top: 0;
+        }
+        button {
+            background: #D4AF37;
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #B89030;
+        }
+        .success {
+            color: #27ae60;
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(39, 174, 96, 0.1);
+            border-radius: 6px;
+            display: none;
+        }
+        .info {
+            color: #3498db;
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(52, 152, 219, 0.1);
+            border-radius: 6px;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧹 Clear Service Worker Cache</h1>
+        
+        <div class="info">
+            <strong>Why clear the cache?</strong><br>
+            Service workers cache responses including HTTP headers. After updating the CSP, you need to clear the cache to see the changes.
+        </div>
+
+        <div class="status" id="status">
+            Checking service worker status...
+        </div>
+
+        <button onclick="clearEverything()">🗑️ Clear Everything</button>
+        <button onclick="unregisterSW()">❌ Unregister Service Worker</button>
+        <button onclick="reloadApp()">🔄 Reload App</button>
+
+        <div class="success" id="success"></div>
+    </div>
+
+    <script>
+        // Check service worker status
+        async function checkStatus() {
+            const statusDiv = document.getElementById('status');
+            
+            if ('serviceWorker' in navigator) {
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                if (registrations.length > 0) {
+                    statusDiv.innerHTML = `
+                        ✅ Service Worker is active<br>
+                        <small>Scope: ${registrations[0].scope}</small><br>
+                        <small>State: ${registrations[0].active?.state || 'unknown'}</small>
+                    `;
+                } else {
+                    statusDiv.innerHTML = '✅ No service worker registered';
+                }
+            } else {
+                statusDiv.innerHTML = '⚠️ Service Worker not supported';
+            }
+        }
+
+        // Clear everything
+        async function clearEverything() {
+            const successDiv = document.getElementById('success');
+            
+            try {
+                let swCount = 0;
+                let cacheCount = 0;
+                
+                // Unregister service worker
+                if ('serviceWorker' in navigator) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    for (let registration of registrations) {
+                        await registration.unregister();
+                        swCount++;
+                    }
+                }
+
+                // Clear all caches
+                if ('caches' in window) {
+                    const cacheNames = await caches.keys();
+                    await Promise.all(cacheNames.map(name => caches.delete(name)));
+                    cacheCount = cacheNames.length;
+                }
+
+                // Clear localStorage
+                localStorage.clear();
+                
+                // Clear sessionStorage
+                sessionStorage.clear();
+
+                successDiv.style.display = 'block';
+                successDiv.innerHTML = `
+                    ✅ <strong>Success!</strong><br>
+                    - Service workers unregistered: ${swCount}<br>
+                    - Caches cleared: ${cacheCount}<br>
+                    - Local storage cleared<br>
+                    <br>
+                    <strong>Redirecting to login...</strong>
+                `;
+                
+                await checkStatus();
+                
+                // Auto-reload after 2 seconds
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 2000);
+                
+            } catch (error) {
+                successDiv.style.display = 'block';
+                successDiv.style.color = '#e74c3c';
+                successDiv.style.background = 'rgba(231, 76, 60, 0.1)';
+                successDiv.innerHTML = `❌ Error: ${error.message}`;
+            }
+        }
+
+        // Unregister service worker only
+        async function unregisterSW() {
+            const successDiv = document.getElementById('success');
+            
+            try {
+                if ('serviceWorker' in navigator) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    let count = 0;
+                    for (let registration of registrations) {
+                        await registration.unregister();
+                        count++;
+                    }
+                    
+                    successDiv.style.display = 'block';
+                    successDiv.innerHTML = `✅ Unregistered ${count} service worker(s)`;
+                    await checkStatus();
+                } else {
+                    successDiv.style.display = 'block';
+                    successDiv.innerHTML = '⚠️ Service Worker not supported in this browser';
+                }
+            } catch (error) {
+                successDiv.style.display = 'block';
+                successDiv.style.color = '#e74c3c';
+                successDiv.style.background = 'rgba(231, 76, 60, 0.1)';
+                successDiv.innerHTML = `❌ Error: ${error.message}`;
+            }
+        }
+
+        // Reload app
+        function reloadApp() {
+            window.location.href = '/';
+        }
+
+        // Check status on load
+        checkStatus();
+    </script>
+</body>
+</html>
