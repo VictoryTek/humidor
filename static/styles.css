@@ -5116,6 +5116,12 @@ body {
     right: 0;
     z-index: 50;
     box-shadow: 0 -4px 20px var(--shadow-color);
+    transition: transform 0.3s ease-in-out;
+    transform: translateY(0);
+}
+
+.pagination-container.hidden {
+    transform: translateY(100%);
 }
 
 .pagination-info {

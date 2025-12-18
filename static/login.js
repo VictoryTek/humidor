@@ -2,8 +2,8 @@
 document.addEventListener('DOMContentLoaded', function() {
     const loginForm = document.getElementById('loginForm');
     const loginBtn = document.getElementById('loginBtn');
-    const usernameField = document.getElementById('loginUsername');
-    const passwordField = document.getElementById('loginPassword');
+    const usernameField = document.getElementById('email');
+    const passwordField = document.getElementById('password');
     const toastContainer = document.getElementById('toastContainer');
 
     // Check if user is already logged in

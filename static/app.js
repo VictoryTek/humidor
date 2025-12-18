@@ -2420,6 +2420,45 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    // Mobile pagination auto-hide on scroll
+    let lastScrollTop = 0;
+    let scrollTimeout = null;
+    const paginationContainer = document.getElementById('paginationContainer');
+    
+    if (paginationContainer && window.innerWidth <= 768) {
+        window.addEventListener('scroll', () => {
+            // Clear existing timeout
+            if (scrollTimeout) {
+                clearTimeout(scrollTimeout);
+            }
+            
+            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            
+            // Show pagination when scrolling up or at top
+            if (scrollTop <= 100 || scrollTop < lastScrollTop) {
+                paginationContainer.classList.remove('hidden');
+            } 
+            // Hide when scrolling down
+            else if (scrollTop > lastScrollTop && scrollTop > 100) {
+                paginationContainer.classList.add('hidden');
+            }
+            
+            lastScrollTop = scrollTop <= 0 ? 0 : scrollTop;
+            
+            // Always show pagination after user stops scrolling
+            scrollTimeout = setTimeout(() => {
+                paginationContainer.classList.remove('hidden');
+            }, 1000);
+        }, { passive: true });
+        
+        // Re-check on window resize
+        window.addEventListener('resize', () => {
+            if (window.innerWidth > 768) {
+                paginationContainer.classList.remove('hidden');
+            }
+        });
+    }
+    
     // Cigar modal events
     if (elements.closeCigarModal) {
         elements.closeCigarModal.addEventListener('click', closeCigarModal);
@@ -3032,6 +3071,24 @@ async function showHumidorDetail(humidorId) {
         
         console.log('Displaying cigars:', cigarsToDisplay.length);
         
+        // Sort cigars: active first (alphabetically), then out-of-stock (alphabetically)
+        const sortedCigars = [...cigarsToDisplay].sort((a, b) => {
+            // First, sort by active status (active cigars first)
+            const activeA = a.is_active !== false; // Default true if undefined
+            const activeB = b.is_active !== false;
+            if (activeA && !activeB) return -1; // a is active, b is not -> a comes first
+            if (!activeA && activeB) return 1;   // a is not active, b is -> b comes first
+            
+            // Within same active status, sort by brand name alphabetically
+            const brandA = (a.brand_name || getBrandName(a.brand_id)).toLowerCase();
+            const brandB = (b.brand_name || getBrandName(b.brand_id)).toLowerCase();
+            if (brandA < brandB) return -1;
+            if (brandA > brandB) return 1;
+            
+            // If brands are the same, sort by cigar name
+            return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+        });
+        
         // Render back button and humidor header
         const backButtonHtml = humidors.length > 1 ? `
             <div class="humidor-detail-nav">
@@ -3044,7 +3101,7 @@ async function showHumidorDetail(humidorId) {
         // Render the humidor section
         const renderedContent = `
             ${backButtonHtml}
-            ${renderSingleHumidorSection(humidor, cigarsToDisplay)}
+            ${renderSingleHumidorSection(humidor, sortedCigars)}
         `;
         console.log('Rendered content length:', renderedContent.length);
         console.log('First 200 chars of rendered content:', renderedContent.substring(0, 200));
@@ -3403,11 +3460,18 @@ function renderHumidorSections() {
             console.log(`  Comparing cigar.humidor_id="${cigar.humidor_id}" (${typeof cigar.humidor_id}) with humidor.id="${humidor.id}" (${typeof humidor.id}) = ${matches}`);
             return matches;
         }).sort((a, b) => {
-            // Sort by brand name alphabetically
-            const brandA = getBrandName(a.brand_id).toLowerCase();
-            const brandB = getBrandName(b.brand_id).toLowerCase();
+            // First, sort by active status (active cigars first)
+            const activeA = a.is_active !== false; // Default true if undefined
+            const activeB = b.is_active !== false;
+            if (activeA && !activeB) return -1; // a is active, b is not -> a comes first
+            if (!activeA && activeB) return 1;   // a is not active, b is -> b comes first
+            
+            // Within same active status, sort by brand name alphabetically
+            const brandA = (a.brand_name || getBrandName(a.brand_id)).toLowerCase();
+            const brandB = (b.brand_name || getBrandName(b.brand_id)).toLowerCase();
             if (brandA < brandB) return -1;
             if (brandA > brandB) return 1;
+            
             // If brands are the same, sort by cigar name
             return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
         });
