@@ -925,7 +925,7 @@ pub async fn get_random_cigar(
     let humidor_id_filter = params
         .get("humidor_id")
         .and_then(|s| Uuid::parse_str(s).ok());
-    
+
     // Parse optional preference parameters
     let preference_type = params.get("preference_type").map(|s| s.as_str());
     let preference_value = params.get("preference_value").cloned();
@@ -953,7 +953,7 @@ pub async fn get_random_cigar(
         }
         _ => String::new(),
     };
-    
+
     let query = if humidor_id_filter.is_some() {
         // Single humidor
         format!(
