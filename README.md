@@ -2,7 +2,7 @@
   <img src="static/logo.png" alt="Humidor Logo" width="150" height="150">
   <h1>Humidor</h1>
   <p><em>Cigar Inventory Management System</em></p>
-  <p><strong>Version 1.5.0</strong></p>
+  <p><strong>Version 1.5.1</strong></p>
 </div>
 
 An application for managing your cigar collection. Built with Rust, PostgreSQL, and Docker. 
