@@ -1583,7 +1583,7 @@
                     <span class="mdi mdi-lightbulb-on-outline"></span>
                     Cigar Recommendation
                 </h2>
-                <button class="recommend-modal-close" onclick="closeRecommendModal()">
+                <button type="button" class="recommend-modal-close" id="closeRecommendModal">
                     <span class="mdi mdi-close"></span>
                 </button>
             </div>
@@ -1591,11 +1591,11 @@
                 <!-- Content populated by JavaScript -->
             </div>
             <div class="recommend-modal-actions" id="recommendModalActions" style="display: none;">
-                <button class="recommend-reroll-btn" onclick="getAnotherRecommendation()">
+                <button type="button" class="recommend-reroll-btn" id="recommendRerollBtn">
                     <span class="mdi mdi-refresh"></span>
                     Try Another
                 </button>
-                <button class="recommend-accept-btn" onclick="acceptRecommendation()">
+                <button type="button" class="recommend-accept-btn" id="recommendAcceptBtn">
                     <span class="mdi mdi-check-circle-outline"></span>
                     I'll Smoke This One
                 </button>

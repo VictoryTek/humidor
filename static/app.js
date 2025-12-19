@@ -2220,12 +2220,26 @@ document.addEventListener('DOMContentLoaded', function() {
     if (recommendBtn) {
         recommendBtn.addEventListener('click', function(e) {
             e.preventDefault();
+            e.stopPropagation();
             openRecommendModal();
         });
     }
     
-    // Close recommendation modal on backdrop click
+    // Recommendation modal events
+    const closeRecommendModalBtn = document.getElementById('closeRecommendModal');
+    const recommendRerollBtn = document.getElementById('recommendRerollBtn');
+    const recommendAcceptBtn = document.getElementById('recommendAcceptBtn');
     const recommendModal = document.getElementById('recommendModal');
+    
+    if (closeRecommendModalBtn) {
+        closeRecommendModalBtn.addEventListener('click', closeRecommendModal);
+    }
+    if (recommendRerollBtn) {
+        recommendRerollBtn.addEventListener('click', getAnotherRecommendation);
+    }
+    if (recommendAcceptBtn) {
+        recommendAcceptBtn.addEventListener('click', acceptRecommendation);
+    }
     if (recommendModal) {
         recommendModal.addEventListener('click', function(e) {
             if (e.target === recommendModal) {
@@ -2701,8 +2715,13 @@ function initializeNavigation() {
                 return; // Let the browser handle it
             }
             
-            e.preventDefault();
+            // Skip items without data-page attribute (like recommend button)
             const page = item.getAttribute('data-page');
+            if (!page) {
+                return; // Let the item's own handler deal with it
+            }
+            
+            e.preventDefault();
             navigateToPage(page);
         });
     });
@@ -4447,8 +4466,9 @@ async function updateCigarQuantity(cigarId, currentQuantity, change) {
             });
             
             if (response && response.ok) {
+                // Update the cigar card in the DOM immediately
+                updateCigarCardInDOM(cigarId, { quantity: 0, is_active: false });
                 showToast('Cigar marked as out of stock (quantity: 0)', 'info');
-                await loadHumidors();
             } else {
                 throw new Error('Failed to mark cigar as out of stock');
             }
@@ -4470,8 +4490,8 @@ async function updateCigarQuantity(cigarId, currentQuantity, change) {
         
         if (response && response.ok) {
             console.log(`✓ Updated quantity for cigar ${cigarId} to ${newQuantity}`);
-            // Reload humidors to refresh the display
-            await loadHumidors();
+            // Update the cigar card in the DOM immediately
+            updateCigarCardInDOM(cigarId, { quantity: newQuantity, is_active: true });
             showToast(`Quantity updated to ${newQuantity}`, 'success');
         } else {
             throw new Error('Failed to update quantity');
@@ -4688,7 +4708,18 @@ async function loadFavorites() {
                 favorite_id: fav.id  // Keep favorite ID for removal
             }));
             
-            favoritesGrid.innerHTML = favoritesCigars.map(cigar => createFavoriteCard(cigar)).join('');
+            // Sort: active cigars first (alphabetically by brand then name), then inactive
+            const sortedFavorites = favoritesCigars.sort((a, b) => {
+                const activeA = a.is_active !== false;
+                const activeB = b.is_active !== false;
+                if (activeA !== activeB) return activeB - activeA;
+                const brandA = getBrandName(a.brand_id).toUpperCase();
+                const brandB = getBrandName(b.brand_id).toUpperCase();
+                if (brandA !== brandB) return brandA.localeCompare(brandB);
+                return a.name.toUpperCase().localeCompare(b.name.toUpperCase());
+            });
+            
+            favoritesGrid.innerHTML = sortedFavorites.map(cigar => createFavoriteCard(cigar)).join('');
             
             // Update favorite icons for all loaded favorites that still exist (not out of stock)
             favoritesCigars.filter(c => !c.out_of_stock && c.id).forEach(cigar => updateFavoriteIcon(cigar.id, true));
@@ -4808,6 +4839,14 @@ async function loadWishList() {
                 wish_list_id: item.id
             }));
         console.log(`✓ ${wishListCigars.length} cigars with details:`, wishListCigars);
+        
+        // Sort alphabetically by brand then name
+        wishListCigars.sort((a, b) => {
+            const brandA = getBrandName(a.brand_id).toUpperCase();
+            const brandB = getBrandName(b.brand_id).toUpperCase();
+            if (brandA !== brandB) return brandA.localeCompare(brandB);
+            return a.name.toUpperCase().localeCompare(b.name.toUpperCase());
+        });
         
         const emptyState = document.getElementById('wishlistEmptyState');
         const wishlistGrid = document.getElementById('wishlistGrid');
@@ -6933,7 +6972,6 @@ window.revokeShare = revokeShare;
 // CIGAR RECOMMENDATION FEATURE
 // ============================================================================
 
-// Global variable to store current recommendation
 let currentRecommendation = null;
 
 /**
@@ -6975,7 +7013,7 @@ async function getRecommendation() {
     try {
         // Determine context - are we viewing a specific humidor?
         let humidorId = null;
-        if (currentRoute.humidorId) {
+        if (currentRoute?.humidorId) {
             humidorId = currentRoute.humidorId;
         }
         
@@ -7046,14 +7084,14 @@ function renderRecommendedCigar(cigar, message) {
             <div class="recommend-cigar-details">
                 ${cigar.size_name ? `
                     <div class="recommend-detail-item">
-                        <span class="recommend-detail-label">Size</span>
+                        <span class="recommend-detail-label">SIZE</span>
                         <span class="recommend-detail-value">${escapeHtml(cigar.size_name)}</span>
                     </div>
                 ` : ''}
                 
                 ${cigar.strength_name ? `
                     <div class="recommend-detail-item">
-                        <span class="recommend-detail-label">Strength</span>
+                        <span class="recommend-detail-label">STRENGTH</span>
                         <span class="recommend-detail-value">
                             ${escapeHtml(cigar.strength_name)}
                             <div class="recommend-strength-indicator">
@@ -7065,27 +7103,20 @@ function renderRecommendedCigar(cigar, message) {
                 
                 ${cigar.origin_name ? `
                     <div class="recommend-detail-item">
-                        <span class="recommend-detail-label">Origin</span>
+                        <span class="recommend-detail-label">ORIGIN</span>
                         <span class="recommend-detail-value">${escapeHtml(cigar.origin_name)}</span>
                     </div>
                 ` : ''}
                 
-                ${cigarData.wrapper ? `
-                    <div class="recommend-detail-item">
-                        <span class="recommend-detail-label">Wrapper</span>
-                        <span class="recommend-detail-value">${escapeHtml(cigarData.wrapper)}</span>
-                    </div>
-                ` : ''}
-                
                 <div class="recommend-detail-item">
-                    <span class="recommend-detail-label">Quantity Available</span>
+                    <span class="recommend-detail-label">QUANTITY AVAILABLE</span>
                     <span class="recommend-detail-value">${cigarData.quantity}</span>
                 </div>
             </div>
             
             ${cigarData.notes ? `
                 <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
-                    <span class="recommend-detail-label">Notes</span>
+                    <span class="recommend-detail-label">NOTES</span>
                     <p style="margin-top: 0.5rem; color: var(--text-secondary); line-height: 1.6;">
                         ${escapeHtml(cigarData.notes)}
                     </p>
@@ -7110,6 +7141,67 @@ async function getAnotherRecommendation() {
     `;
     
     await getRecommendation();
+}
+
+/**
+ * Update a cigar card in the DOM with new data
+ */
+function updateCigarCardInDOM(cigarId, updatedData) {
+    // Find the cigar card in the DOM
+    const cigarCard = document.querySelector(`.cigar-card[data-cigar-id="${cigarId}"]`);
+    if (!cigarCard) {
+        console.log('Cigar card not found in DOM, skipping update');
+        return;
+    }
+    
+    // Update the global cigars array
+    const cigarIndex = cigars.findIndex(c => c.id === cigarId);
+    if (cigarIndex !== -1) {
+        cigars[cigarIndex] = { ...cigars[cigarIndex], ...updatedData };
+    }
+    
+    // Update the quantity display in the card
+    const quantityValue = cigarCard.querySelector('.quantity-value');
+    if (quantityValue && updatedData.quantity !== undefined) {
+        quantityValue.textContent = updatedData.quantity;
+    }
+    
+    // If quantity is 0, mark as out of stock
+    if (updatedData.quantity === 0) {
+        cigarCard.style.opacity = '0.7';
+        
+        // Add out-of-stock badge if not present
+        if (!cigarCard.querySelector('.out-of-stock-badge')) {
+            const imageContainer = cigarCard.querySelector('.cigar-card-image');
+            if (imageContainer) {
+                const badge = document.createElement('div');
+                badge.className = 'out-of-stock-badge';
+                badge.style.cssText = 'position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: #e74c3c; color: white; padding: 4px 12px; border-radius: 4px; font-size: 0.875rem; font-weight: 600; z-index: 1; white-space: nowrap;';
+                badge.textContent = 'OUT OF STOCK';
+                imageContainer.insertBefore(badge, imageContainer.firstChild);
+            }
+        }
+        
+        // Update quantity display to show 0 with red color
+        if (quantityValue) {
+            quantityValue.textContent = '0';
+            quantityValue.style.color = '#e74c3c';
+        }
+        
+        // Replace action buttons with restock button
+        const actionsContainer = cigarCard.querySelector('.cigar-card-actions');
+        if (actionsContainer) {
+            actionsContainer.innerHTML = `<button class="action-btn edit-btn" onclick="restockCigar('${cigarId}')" title="Restock" style="background: #27ae60;">↻</button>`;
+        }
+        
+        // Disable quantity controls
+        const quantityContainer = cigarCard.querySelector('.cigar-card-quantity');
+        if (quantityContainer) {
+            quantityContainer.style.opacity = '0.5';
+            quantityContainer.onclick = null;
+            quantityContainer.innerHTML = `<span class="quantity-value" style="color: #e74c3c;">0</span>`;
+        }
+    }
 }
 
 /**
@@ -7151,17 +7243,14 @@ async function acceptRecommendation() {
             throw new Error('Failed to update cigar quantity');
         }
         
+        // Update the cigar card in the DOM immediately
+        updateCigarCardInDOM(cigarId, { 
+            quantity: newQuantity,
+            is_active: newQuantity > 0
+        });
+        
         showToast(`Enjoy your ${cigarData.name}! 🔥`, 'success');
         closeRecommendModal();
-        
-        // Reload humidor to show updated quantity
-        if (humidors && humidors.length === 1) {
-            await showHumidorDetail(humidors[0].id);
-        } else if (currentRoute.humidorId) {
-            await showHumidorDetail(currentRoute.humidorId);
-        } else {
-            await loadHumidors();
-        }
         
     } catch (error) {
         console.error('Error accepting recommendation:', error);
@@ -7195,3 +7284,4 @@ window.getRecommendation = getRecommendation;
 window.getAnotherRecommendation = getAnotherRecommendation;
 window.acceptRecommendation = acceptRecommendation;
 window.closeRecommendModal = closeRecommendModal;
+window.updateCigarCardInDOM = updateCigarCardInDOM;
