@@ -4338,7 +4338,7 @@ body {
 }
 
 .report-card-image-section > div {
-    background: linear-gradient(135deg, #8b6914 0%, #6b5411 100%);
+    background: linear-gradient(135deg, var(--secondary-color) 0%, var(--primary-color) 100%);
     border-radius: 16px;
     overflow: hidden;
     aspect-ratio: 1;
@@ -4445,8 +4445,8 @@ body {
 }
 
 .report-card-info-box {
-    background: rgba(139, 105, 20, 0.15);
-    border: 1px solid rgba(212, 175, 55, 0.3);
+    background: var(--surface-color);
+    border: 1px solid var(--border-color);
     border-radius: 12px;
     padding: 1.5rem;
 }
@@ -4501,8 +4501,8 @@ body {
 }
 
 .report-card-notes-section {
-    background: rgba(139, 105, 20, 0.15);
-    border: 1px solid rgba(212, 175, 55, 0.3);
+    background: var(--surface-color);
+    border: 1px solid var(--border-color);
     border-radius: 12px;
     padding: 1.5rem;
 }
@@ -4526,8 +4526,8 @@ body {
 }
 
 .report-card-retail-link-section {
-    background: rgba(139, 105, 20, 0.15);
-    border: 1px solid rgba(212, 175, 55, 0.3);
+    background: var(--surface-color);
+    border: 1px solid var(--border-color);
     border-radius: 12px;
     padding: 1.5rem;
     margin-top: 1.5rem;
@@ -4553,7 +4553,7 @@ body {
     max-width: 100%;
     /* Add smooth scrolling and scrollbar styling */
     scrollbar-width: thin;
-    scrollbar-color: var(--accent-gold) rgba(139, 105, 20, 0.15);
+    scrollbar-color: var(--accent-gold) var(--surface-color);
     -webkit-overflow-scrolling: touch;
 }
 
@@ -4562,7 +4562,7 @@ body {
 }
 
 .retail-link-container::-webkit-scrollbar-track {
-    background: rgba(139, 105, 20, 0.15);
+    background: var(--surface-color);
     border-radius: 3px;
 }
 
