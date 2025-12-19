@@ -4482,6 +4482,12 @@ body {
     padding-right: 0.5rem;
 }
 
+/* Strength indicator in report card - right align */
+.report-card-field span .strength-indicator {
+    margin-left: auto;
+    margin-right: 0;
+}
+
 .report-card-field span a {
     color: var(--accent-gold);
     text-decoration: none;
