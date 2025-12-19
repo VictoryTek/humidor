@@ -902,7 +902,7 @@ pub async fn scrape_cigar_url(
 }
 
 /// Get a random cigar recommendation
-/// GET /api/v1/cigars/recommend?humidor_id={optional}
+/// GET /api/v1/cigars/recommend?humidor_id={optional}&preference_type={optional}&preference_value={optional}
 pub async fn get_random_cigar(
     params: std::collections::HashMap<String, String>,
     auth: AuthContext,
@@ -925,6 +925,10 @@ pub async fn get_random_cigar(
     let humidor_id_filter = params
         .get("humidor_id")
         .and_then(|s| Uuid::parse_str(s).ok());
+    
+    // Parse optional preference parameters
+    let preference_type = params.get("preference_type").map(|s| s.as_str());
+    let preference_value = params.get("preference_value").cloned();
 
     // If humidor_id provided, verify access
     if let Some(hid) = humidor_id_filter {
@@ -933,72 +937,109 @@ pub async fn get_random_cigar(
             .map_err(warp::reject::custom)?;
     }
 
-    // Build query to get random cigar
+    // Build query to get random cigar with optional preference filter
     // IMPORTANT: Only select cigars with quantity > 0 and is_active = true
+    let preference_filter = match (preference_type, preference_value.as_ref()) {
+        (Some("brand"), Some(val)) => format!(" AND b.name = '{}'", val.replace("'", "''")),
+        (Some("size"), Some(val)) => format!(" AND s.name = '{}'", val.replace("'", "''")),
+        (Some("origin"), Some(val)) => format!(" AND o.name = '{}'", val.replace("'", "''")),
+        (Some("strength"), Some(val)) => format!(" AND st.name = '{}'", val.replace("'", "''")),
+        (Some("ring_gauge"), Some(val)) => {
+            if let Ok(gauge_val) = val.parse::<i32>() {
+                format!(" AND rg.gauge = {}", gauge_val)
+            } else {
+                String::new()
+            }
+        }
+        _ => String::new(),
+    };
+    
     let query = if humidor_id_filter.is_some() {
         // Single humidor
-        "SELECT c.id, c.humidor_id, c.name, b.name as brand_name, s.name as size_name,
-                st.name as strength_name, o.name as origin_name, c.wrapper, c.binder, c.filler,
-                c.quantity, c.notes, c.purchase_date, c.price as purchase_price, c.retail_link,
-                c.created_at, c.updated_at, c.is_active,
-                rg.gauge as ring_gauge, c.length, st.level as strength_score, c.image_url,
-                c.brand_id, c.size_id, c.strength_id, c.origin_id, c.ring_gauge_id
-         FROM cigars c
-         LEFT JOIN brands b ON c.brand_id = b.id
-         LEFT JOIN sizes s ON c.size_id = s.id
-         LEFT JOIN strengths st ON c.strength_id = st.id
-         LEFT JOIN origins o ON c.origin_id = o.id
-         LEFT JOIN ring_gauges rg ON c.ring_gauge_id = rg.id
-         INNER JOIN humidors h ON c.humidor_id = h.id
-         WHERE c.humidor_id = $1 
-           AND c.quantity > 0 
-           AND c.is_active = true
-         ORDER BY RANDOM()
-         LIMIT 1"
+        format!(
+            "SELECT c.id, c.humidor_id, c.name, b.name as brand_name, s.name as size_name,
+                    st.name as strength_name, o.name as origin_name, c.wrapper, c.binder, c.filler,
+                    c.quantity, c.notes, c.purchase_date, c.price as purchase_price, c.retail_link,
+                    c.created_at, c.updated_at, c.is_active,
+                    rg.gauge as ring_gauge, c.length, st.level as strength_score, c.image_url,
+                    c.brand_id, c.size_id, c.strength_id, c.origin_id, c.ring_gauge_id
+             FROM cigars c
+             LEFT JOIN brands b ON c.brand_id = b.id
+             LEFT JOIN sizes s ON c.size_id = s.id
+             LEFT JOIN strengths st ON c.strength_id = st.id
+             LEFT JOIN origins o ON c.origin_id = o.id
+             LEFT JOIN ring_gauges rg ON c.ring_gauge_id = rg.id
+             INNER JOIN humidors h ON c.humidor_id = h.id
+             WHERE c.humidor_id = $1 
+               AND c.quantity > 0 
+               AND c.is_active = true{}
+             ORDER BY RANDOM()
+             LIMIT 1",
+            preference_filter
+        )
     } else {
         // All user's humidors + shared humidors
-        "SELECT c.id, c.humidor_id, c.name, b.name as brand_name, s.name as size_name,
-                st.name as strength_name, o.name as origin_name, c.wrapper, c.binder, c.filler,
-                c.quantity, c.notes, c.purchase_date, c.price as purchase_price, c.retail_link,
-                c.created_at, c.updated_at, c.is_active,
-                rg.gauge as ring_gauge, c.length, st.level as strength_score, c.image_url,
-                c.brand_id, c.size_id, c.strength_id, c.origin_id, c.ring_gauge_id
-         FROM cigars c
-         LEFT JOIN brands b ON c.brand_id = b.id
-         LEFT JOIN sizes s ON c.size_id = s.id
-         LEFT JOIN strengths st ON c.strength_id = st.id
-         LEFT JOIN origins o ON c.origin_id = o.id
-         LEFT JOIN ring_gauges rg ON c.ring_gauge_id = rg.id
-         INNER JOIN humidors h ON c.humidor_id = h.id
-         LEFT JOIN humidor_shares hs ON h.id = hs.humidor_id AND hs.shared_with_user_id = $1
-         WHERE (h.user_id = $1 OR hs.id IS NOT NULL)
-           AND c.quantity > 0 
-           AND c.is_active = true
-         ORDER BY RANDOM()
-         LIMIT 1"
+        format!(
+            "SELECT c.id, c.humidor_id, c.name, b.name as brand_name, s.name as size_name,
+                    st.name as strength_name, o.name as origin_name, c.wrapper, c.binder, c.filler,
+                    c.quantity, c.notes, c.purchase_date, c.price as purchase_price, c.retail_link,
+                    c.created_at, c.updated_at, c.is_active,
+                    rg.gauge as ring_gauge, c.length, st.level as strength_score, c.image_url,
+                    c.brand_id, c.size_id, c.strength_id, c.origin_id, c.ring_gauge_id
+             FROM cigars c
+             LEFT JOIN brands b ON c.brand_id = b.id
+             LEFT JOIN sizes s ON c.size_id = s.id
+             LEFT JOIN strengths st ON c.strength_id = st.id
+             LEFT JOIN origins o ON c.origin_id = o.id
+             LEFT JOIN ring_gauges rg ON c.ring_gauge_id = rg.id
+             INNER JOIN humidors h ON c.humidor_id = h.id
+             LEFT JOIN humidor_shares hs ON h.id = hs.humidor_id AND hs.shared_with_user_id = $1
+             WHERE (h.user_id = $1 OR hs.id IS NOT NULL)
+               AND c.quantity > 0 
+               AND c.is_active = true{}
+             ORDER BY RANDOM()
+             LIMIT 1",
+            preference_filter
+        )
     };
 
-    // Also get total count of eligible cigars
+    // Also get total count of eligible cigars with preference filter
     let count_query = if humidor_id_filter.is_some() {
-        "SELECT COUNT(*) FROM cigars c
-         INNER JOIN humidors h ON c.humidor_id = h.id
-         WHERE c.humidor_id = $1 
-           AND c.quantity > 0 
-           AND c.is_active = true"
+        format!(
+            "SELECT COUNT(*) FROM cigars c
+             LEFT JOIN brands b ON c.brand_id = b.id
+             LEFT JOIN sizes s ON c.size_id = s.id
+             LEFT JOIN strengths st ON c.strength_id = st.id
+             LEFT JOIN origins o ON c.origin_id = o.id
+             LEFT JOIN ring_gauges rg ON c.ring_gauge_id = rg.id
+             INNER JOIN humidors h ON c.humidor_id = h.id
+             WHERE c.humidor_id = $1 
+               AND c.quantity > 0 
+               AND c.is_active = true{}",
+            preference_filter
+        )
     } else {
-        "SELECT COUNT(*) FROM cigars c
-         INNER JOIN humidors h ON c.humidor_id = h.id
-         LEFT JOIN humidor_shares hs ON h.id = hs.humidor_id AND hs.shared_with_user_id = $1
-         WHERE (h.user_id = $1 OR hs.id IS NOT NULL)
-           AND c.quantity > 0 
-           AND c.is_active = true"
+        format!(
+            "SELECT COUNT(*) FROM cigars c
+             LEFT JOIN brands b ON c.brand_id = b.id
+             LEFT JOIN sizes s ON c.size_id = s.id
+             LEFT JOIN strengths st ON c.strength_id = st.id
+             LEFT JOIN origins o ON c.origin_id = o.id
+             LEFT JOIN ring_gauges rg ON c.ring_gauge_id = rg.id
+             INNER JOIN humidors h ON c.humidor_id = h.id
+             LEFT JOIN humidor_shares hs ON h.id = hs.humidor_id AND hs.shared_with_user_id = $1
+             WHERE (h.user_id = $1 OR hs.id IS NOT NULL)
+               AND c.quantity > 0 
+               AND c.is_active = true{}",
+            preference_filter
+        )
     };
 
     // Execute queries
     let count_result = if let Some(hid) = humidor_id_filter {
-        db.query_one(count_query, &[&hid]).await
+        db.query_one(&count_query, &[&hid]).await
     } else {
-        db.query_one(count_query, &[&user_id]).await
+        db.query_one(&count_query, &[&user_id]).await
     };
 
     let eligible_count: i64 = match count_result {
@@ -1013,9 +1054,9 @@ pub async fn get_random_cigar(
 
     // Execute random selection
     let cigar_result = if let Some(hid) = humidor_id_filter {
-        db.query_opt(query, &[&hid]).await
+        db.query_opt(&query, &[&hid]).await
     } else {
-        db.query_opt(query, &[&user_id]).await
+        db.query_opt(&query, &[&user_id]).await
     };
 
     match cigar_result {

@@ -5,6 +5,70 @@ All notable changes to Humidor will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2025-12-19
+
+### Added
+- **Preference-Based Cigar Recommendations** 🎯
+  - Added preference selection screen when requesting cigar recommendations
+  - Users can now filter recommendations by: Brand, Size, Origin, Strength, or Ring Gauge
+  - "No Preference" option for completely random recommendations
+  - Preference options dynamically filtered to show only organizers available in current humidor
+  - Back navigation from organizer selection to preference menu
+  - Re-roll feature maintains selected preference for consistent recommendations
+  - Enhanced recommendation API with `preference_type` and `preference_value` query parameters
+  - Smart filtering prevents showing unavailable options (e.g., brands not in your humidor)
+
+### Fixed
+- **Recommendation Modal Strength Display** 💪
+  - Fixed strength indicators in recommendation modal to properly display lit gold dots
+  - Changed from manual dot rendering to using `getStrengthIndicatorHtml()` function
+  - Strength indicators now consistent between cigar cards and recommendation modal
+  - Dots correctly light up based on strength level (1-5)
+
+- **Report Card Strength Display** 📋
+  - Replaced text-based strength display with visual dot indicator system
+  - Report card now shows strength dots instead of strength names
+  - Consistent strength visualization across all views (cards, recommendations, report cards)
+
+- **Mobile Password Manager Support - Complete Fix** 🔐
+  - Fixed login form: Changed email field from `autocomplete="username"` to `autocomplete="email"`
+  - Added proper `action` and `method` attributes to all authentication forms
+  - Setup form: Added `action="/api/v1/auth/register"` and `method="post"`
+  - Forgot password form: Added `action="/api/v1/auth/forgot-password"` and `method="post"`
+  - Reset password form: Added `action="/api/v1/auth/reset-password"` and `method="post"`
+  - Password managers now work correctly on iOS Safari, Chrome, and PWA installations
+  - Supports iOS Keychain, Bitwarden, 1Password, LastPass, and other password managers
+  - Fixed both mobile web browser and PWA credential detection
+
+- **Real-Time Cigar Card Updates** ⚡
+  - Cigar quantity changes now update immediately in the UI without page refresh
+  - Accepting a recommendation updates the cigar card quantity instantly
+  - Using +/- quantity buttons updates cards without full page reload
+  - Out-of-stock state (quantity = 0) updates card styling immediately
+  - Improved user experience with instant visual feedback
+
+### Changed
+- **Recommendation Workflow** 🔄
+  - Opening recommendation modal now shows preference selection first
+  - More intuitive flow: preference → selection → recommendation → accept/re-roll
+  - Enhanced CSS styling for preference buttons and organizer options
+  - Better mobile responsive design for preference selection
+  - Grid layout for organizer value selection with touch-optimized buttons
+
+### Technical
+- **Backend API Enhancement**
+  - Updated `/api/v1/cigars/recommend` endpoint to accept preference filters
+  - Dynamic SQL query construction with proper parameter sanitization
+  - Enhanced query to join all organizer tables for filtering
+  - Maintains data isolation with user_id filtering
+  - Count query updated to reflect preference filters for accurate "X other options" messaging
+
+- **Frontend Architecture**
+  - Added `updateCigarCardInDOM()` utility function for targeted DOM updates
+  - Improved state management for recommendation preferences
+  - Enhanced modal navigation with `showPreferenceSelection()` and `showOrganizerOptions()`
+  - Better error handling and loading states
+
 ## [1.5.0] - 2025-12-17
 
 ### Added

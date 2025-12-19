@@ -149,7 +149,7 @@
                     <h2>Create Your Account</h2>
                     <p>Set up your administrator account to manage your humidor collection.</p>
                     
-                    <form id="accountForm" class="setup-form" name="signup">
+                    <form id="accountForm" class="setup-form" name="signup" action="/api/v1/auth/register" method="post">
                         <div class="form-group">
                             <label for="username">Username</label>
                             <input type="text" id="username" name="username" autocomplete="username" required>

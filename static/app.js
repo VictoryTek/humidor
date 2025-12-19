@@ -3667,7 +3667,13 @@ function openReportCard(cigarId) {
     document.getElementById('reportCardQuantity').textContent = cigar.quantity || '-';
     document.getElementById('reportCardSize').textContent = cigar.size_name || getSizeName(cigar.size_id);
     document.getElementById('reportCardRingGauge').textContent = cigar.ring_gauge || getRingGaugeName(cigar.ring_gauge_id);
-    document.getElementById('reportCardStrength').textContent = cigar.strength_name || getStrengthName(cigar.strength_id);
+    
+    // Set strength with visual indicator
+    const strengthElement = document.getElementById('reportCardStrength');
+    const strengthName = cigar.strength_name || getStrengthName(cigar.strength_id);
+    const strengthIndicator = getStrengthIndicatorHtml(cigar.strength_id);
+    strengthElement.innerHTML = strengthIndicator || strengthName || '-';
+    
     document.getElementById('reportCardOrigin').textContent = cigar.origin_name || getOriginName(cigar.origin_id);
     document.getElementById('reportCardPrice').textContent = cigar.price ? `$${parseFloat(cigar.price).toFixed(2)}` : '-';
     
@@ -6982,8 +6988,207 @@ async function openRecommendModal() {
     const modalBody = document.getElementById('recommendModalBody');
     const modalActions = document.getElementById('recommendModalActions');
     
-    // Show modal with loading state
+    // Show modal with preference selection
     modal.classList.add('active');
+    modalActions.style.display = 'none';
+    
+    try {
+        await showPreferenceSelection();
+    } catch (error) {
+        console.error('Error opening recommendation modal:', error);
+        showToast('Failed to show preferences', 'error');
+        closeRecommendModal();
+    }
+}
+
+/**
+ * Show preference selection screen
+ */
+async function showPreferenceSelection() {
+    const modalBody = document.getElementById('recommendModalBody');
+    
+    // Get available organizer values from cigars in current humidor
+    let availableCigars = [];
+    if (currentRoute?.humidorId) {
+        // Filter to current humidor only
+        availableCigars = cigars.filter(c => 
+            c.humidor_id === currentRoute.humidorId && 
+            c.quantity > 0 && 
+            c.is_active !== false
+        );
+    } else {
+        // Use all available cigars
+        availableCigars = cigars.filter(c => 
+            c.quantity > 0 && 
+            c.is_active !== false
+        );
+    }
+    
+    // Extract unique values for each organizer
+    const availableBrands = [...new Set(availableCigars
+        .map(c => c.brand_name || getBrandName(c.brand_id))
+        .filter(Boolean)
+    )].sort();
+    
+    const availableSizes = [...new Set(availableCigars
+        .map(c => c.size_name || getSizeName(c.size_id))
+        .filter(Boolean)
+    )].sort();
+    
+    const availableOrigins = [...new Set(availableCigars
+        .map(c => c.origin_name || getOriginName(c.origin_id))
+        .filter(Boolean)
+    )].sort();
+    
+    const availableStrengths = [...new Set(availableCigars
+        .map(c => c.strength_name || getStrengthName(c.strength_id))
+        .filter(Boolean)
+    )].sort();
+    
+    const availableRingGauges = [...new Set(availableCigars
+        .map(c => c.ring_gauge || getRingGaugeName(c.ring_gauge_id))
+        .filter(Boolean)
+        .map(String)
+    )].sort((a, b) => parseInt(a) - parseInt(b));
+    
+    // Build preference options HTML
+    const preferencesHtml = `
+        <div class="preference-selection">
+            <p style="margin-bottom: 1.5rem; color: var(--text-secondary); text-align: center;">
+                Do you have a preference for your recommendation?
+            </p>
+            
+            <button class="preference-option" onclick="getRecommendationWithPreference(null)">
+                <span class="mdi mdi-shuffle-variant"></span>
+                <span>No Preference</span>
+                <span style="font-size: 0.8rem; color: var(--text-muted);">Surprise me!</span>
+            </button>
+            
+            ${availableBrands.length > 0 ? `
+                <button class="preference-option" onclick="showOrganizerOptions('brand')">
+                    <span class="mdi mdi-tag-outline"></span>
+                    <span>Brand</span>
+                    <span style="font-size: 0.8rem; color: var(--text-muted);">${availableBrands.length} available</span>
+                </button>
+            ` : ''}
+            
+            ${availableSizes.length > 0 ? `
+                <button class="preference-option" onclick="showOrganizerOptions('size')">
+                    <span class="mdi mdi-ruler"></span>
+                    <span>Size</span>
+                    <span style="font-size: 0.8rem; color: var(--text-muted);">${availableSizes.length} available</span>
+                </button>
+            ` : ''}
+            
+            ${availableOrigins.length > 0 ? `
+                <button class="preference-option" onclick="showOrganizerOptions('origin')">
+                    <span class="mdi mdi-earth"></span>
+                    <span>Origin</span>
+                    <span style="font-size: 0.8rem; color: var(--text-muted);">${availableOrigins.length} available</span>
+                </button>
+            ` : ''}
+            
+            ${availableStrengths.length > 0 ? `
+                <button class="preference-option" onclick="showOrganizerOptions('strength')">
+                    <span class="mdi mdi-fire"></span>
+                    <span>Strength</span>
+                    <span style="font-size: 0.8rem; color: var(--text-muted);">${availableStrengths.length} available</span>
+                </button>
+            ` : ''}
+            
+            ${availableRingGauges.length > 0 ? `
+                <button class="preference-option" onclick="showOrganizerOptions('ring_gauge')">
+                    <span class="mdi mdi-diameter-outline"></span>
+                    <span>Ring Gauge</span>
+                    <span style="font-size: 0.8rem; color: var(--text-muted);">${availableRingGauges.length} available</span>
+                </button>
+            ` : ''}
+        </div>
+    `;
+    
+    modalBody.innerHTML = preferencesHtml;
+    
+    // Store available values for later use
+    window.recommendAvailableOrganizers = {
+        brands: availableBrands,
+        sizes: availableSizes,
+        origins: availableOrigins,
+        strengths: availableStrengths,
+        ring_gauges: availableRingGauges
+    };
+}
+
+/**
+ * Show specific organizer options
+ */
+function showOrganizerOptions(organizerType) {
+    const modalBody = document.getElementById('recommendModalBody');
+    const available = window.recommendAvailableOrganizers;
+    
+    let options = [];
+    let icon = '';
+    let title = '';
+    
+    switch(organizerType) {
+        case 'brand':
+            options = available.brands;
+            icon = 'mdi-tag-outline';
+            title = 'Select a Brand';
+            break;
+        case 'size':
+            options = available.sizes;
+            icon = 'mdi-ruler';
+            title = 'Select a Size';
+            break;
+        case 'origin':
+            options = available.origins;
+            icon = 'mdi-earth';
+            title = 'Select an Origin';
+            break;
+        case 'strength':
+            options = available.strengths;
+            icon = 'mdi-fire';
+            title = 'Select a Strength';
+            break;
+        case 'ring_gauge':
+            options = available.ring_gauges;
+            icon = 'mdi-diameter-outline';
+            title = 'Select a Ring Gauge';
+            break;
+    }
+    
+    const optionsHtml = `
+        <div class="organizer-options">
+            <div style="display: flex; align-items: center; margin-bottom: 1.5rem;">
+                <button class="btn-back-arrow" onclick="showPreferenceSelection()" style="background: none; border: none; color: var(--text-primary); cursor: pointer; padding: 0.5rem; margin-right: 0.5rem;">
+                    <span class="mdi mdi-arrow-left" style="font-size: 1.5rem;"></span>
+                </button>
+                <h3 style="margin: 0;">
+                    <span class="mdi ${icon}"></span>
+                    ${title}
+                </h3>
+            </div>
+            
+            <div class="organizer-option-list">
+                ${options.map(option => `
+                    <button class="organizer-option-item" onclick="getRecommendationWithPreference('${organizerType}', '${escapeHtml(option)}')">
+                        ${escapeHtml(option)}
+                    </button>
+                `).join('')}
+            </div>
+        </div>
+    `;
+    
+    modalBody.innerHTML = optionsHtml;
+}
+
+/**
+ * Get recommendation with optional preference filter
+ */
+async function getRecommendationWithPreference(preferenceType, preferenceValue) {
+    const modalBody = document.getElementById('recommendModalBody');
+    
+    // Show loading state
     modalBody.innerHTML = `
         <div style="text-align: center; padding: 3rem;">
             <div class="spinner"></div>
@@ -6992,21 +7197,20 @@ async function openRecommendModal() {
             </p>
         </div>
     `;
-    modalActions.style.display = 'none';
     
-    try {
-        await getRecommendation();
-    } catch (error) {
-        console.error('Error opening recommendation modal:', error);
-        showToast('Failed to get recommendation', 'error');
-        closeRecommendModal();
-    }
+    // Store preference for re-rolls
+    window.currentRecommendPreference = {
+        type: preferenceType,
+        value: preferenceValue
+    };
+    
+    await getRecommendation(preferenceType, preferenceValue);
 }
 
 /**
  * Fetch a cigar recommendation from the API
  */
-async function getRecommendation() {
+async function getRecommendation(preferenceType = null, preferenceValue = null) {
     const modalBody = document.getElementById('recommendModalBody');
     const modalActions = document.getElementById('recommendModalActions');
     
@@ -7017,9 +7221,20 @@ async function getRecommendation() {
             humidorId = currentRoute.humidorId;
         }
         
-        const url = humidorId 
-            ? `/api/v1/cigars/recommend?humidor_id=${humidorId}`
-            : '/api/v1/cigars/recommend';
+        // Build URL with optional preference parameters
+        let url = '/api/v1/cigars/recommend?';
+        const params = [];
+        
+        if (humidorId) {
+            params.push(`humidor_id=${humidorId}`);
+        }
+        
+        if (preferenceType && preferenceValue) {
+            params.push(`preference_type=${encodeURIComponent(preferenceType)}`);
+            params.push(`preference_value=${encodeURIComponent(preferenceValue)}`);
+        }
+        
+        url += params.join('&');
         
         const response = await makeAuthenticatedRequest(url);
         
@@ -7067,11 +7282,8 @@ function renderRecommendedCigar(cigar, message) {
     // Access nested cigar properties
     const cigarData = cigar.cigar || cigar;
     
-    // Generate strength indicators
-    const strengthScore = cigar.cigar?.strength_score || cigar.strength_score || 0;
-    const strengthDots = Array.from({ length: 5 }, (_, i) => 
-        `<span class="recommend-strength-dot ${i < strengthScore ? 'filled' : ''}"></span>`
-    ).join('');
+    // Generate strength indicators using the same method as cigar cards
+    const strengthIndicator = getStrengthIndicatorHtml(cigarData.strength_id);
     
     return `
         <div class="recommend-message">
@@ -7094,9 +7306,7 @@ function renderRecommendedCigar(cigar, message) {
                         <span class="recommend-detail-label">STRENGTH</span>
                         <span class="recommend-detail-value">
                             ${escapeHtml(cigar.strength_name)}
-                            <div class="recommend-strength-indicator">
-                                ${strengthDots}
-                            </div>
+                            ${strengthIndicator}
                         </span>
                     </div>
                 ` : ''}
@@ -7140,7 +7350,13 @@ async function getAnotherRecommendation() {
         </div>
     `;
     
-    await getRecommendation();
+    // Use stored preference if available
+    const pref = window.currentRecommendPreference;
+    if (pref && pref.type) {
+        await getRecommendation(pref.type, pref.value);
+    } else {
+        await getRecommendation();
+    }
 }
 
 /**
@@ -7280,6 +7496,9 @@ function escapeHtml(text) {
 
 // Export recommendation functions for global use
 window.openRecommendModal = openRecommendModal;
+window.showPreferenceSelection = showPreferenceSelection;
+window.showOrganizerOptions = showOrganizerOptions;
+window.getRecommendationWithPreference = getRecommendationWithPreference;
 window.getRecommendation = getRecommendation;
 window.getAnotherRecommendation = getAnotherRecommendation;
 window.acceptRecommendation = acceptRecommendation;
