@@ -5,6 +5,33 @@ All notable changes to Humidor will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.2] - 2025-12-20
+
+### Fixed
+- **Light Mode Cigar Details Modal** 🌞
+  - Fixed report card (Cigar Details modal) styling in light mode
+  - Modal background now uses light gradient instead of dark colors
+  - Text, labels, and headers properly colored for light mode
+  - Info boxes and notes sections use light backgrounds with visible borders
+  - Close button and action buttons styled appropriately for light mode
+  - All scrollbars themed for light mode
+  - Maintains premium design aesthetic in both themes
+
+- **External Cigar Image Loading** 🖼️
+  - Fixed issue where external cigar images showed placeholder on initial load
+  - Service worker now bypasses external image requests entirely
+  - External images (from user-provided URLs) load directly without SW interference
+  - Prevents CORS issues with external image domains
+  - Local images (logo, placeholder) still cached for offline support
+  - Images from cigarsinternational.com and other retailers now load immediately
+  - Updated service worker to v1.5.3
+
+- **Settings Section Headers Alignment** ⚖️
+  - Fixed unintended right-alignment of all settings section headers
+  - Only "About Humidor" section header uses space-between layout (for Install App button)
+  - All other section headers (User Management, Backup & Restore) now left-aligned
+  - Install App button correctly positioned on right side of About Humidor header only
+
 ## [1.5.1] - 2025-12-19
 
 ### Added
