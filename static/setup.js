@@ -13,7 +13,7 @@ const elements = {
     humidorForm: document.getElementById('humidorForm'),
     
     // Form fields
-    username: document.getElementById('username'),
+    username: document.querySelector('input[name="login"]'),
     fullName: document.getElementById('fullName'),
     email: document.getElementById('email'),
     password: document.getElementById('password'),

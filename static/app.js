@@ -229,10 +229,10 @@ function showInstallButton() {
     `;
     installButton.addEventListener('click', installApp);
     
-    // Add to header-right section
-    const headerRight = document.querySelector('.header-right');
-    if (headerRight) {
-        headerRight.insertBefore(installButton, headerRight.firstChild);
+    // Add to About Humidor section title in settings
+    const aboutSectionTitle = document.querySelector('.about-section .section-title');
+    if (aboutSectionTitle) {
+        aboutSectionTitle.appendChild(installButton);
     }
 }
 

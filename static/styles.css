@@ -4217,6 +4217,11 @@ body {
     font-size: 1.5rem;
 }
 
+/* About section title specifically uses space-between for Install App button alignment */
+.about-section .section-title {
+    justify-content: space-between;
+}
+
 .form-group {
     margin-bottom: 1.5rem;
 }
@@ -6769,7 +6774,6 @@ html.light-mode button.add-btn-sidebar:hover {
     cursor: pointer;
     transition: all 0.3s ease;
     box-shadow: 0 2px 8px rgba(212, 175, 55, 0.3);
-    margin-right: 1rem;
 }
 
 .pwa-install-button:hover {
@@ -7650,4 +7654,107 @@ html.light-mode button.add-btn-sidebar:hover {
 /* Pin Recommend button to bottom of Collections section */
 .nav-item.nav-item-bottom {
     margin-top: auto;
+}
+
+/* ===============================
+   LIGHT MODE OVERRIDES FOR REPORT CARD
+   =============================== */
+:root.light-mode .report-card-content {
+    background: linear-gradient(135deg, var(--card-background) 0%, var(--surface-color) 100%);
+    border: 2px solid var(--border-color);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15), 
+                0 0 0 1px rgba(160, 118, 90, 0.1),
+                0 0 30px rgba(160, 118, 90, 0.1);
+}
+
+:root.light-mode .report-card-content .modal-header {
+    border-bottom: 2px solid var(--border-color);
+}
+
+:root.light-mode .report-card-content .modal-header h2 {
+    color: var(--primary-color);
+    text-shadow: none;
+}
+
+:root.light-mode .report-card-image-section > div {
+    background: linear-gradient(135deg, var(--secondary-color) 0%, var(--primary-color) 100%);
+}
+
+:root.light-mode .report-brand {
+    color: var(--primary-color);
+}
+
+:root.light-mode .report-name {
+    color: var(--text-primary);
+}
+
+:root.light-mode .report-card-info-box {
+    background: var(--background-color);
+    border: 1px solid var(--border-color);
+}
+
+:root.light-mode .report-card-field label {
+    color: var(--text-secondary);
+}
+
+:root.light-mode .report-card-field span {
+    color: var(--text-primary);
+}
+
+:root.light-mode .report-card-notes-section {
+    background: var(--background-color);
+    border: 1px solid var(--border-color);
+}
+
+:root.light-mode .report-card-notes-section label {
+    color: var(--text-secondary);
+}
+
+:root.light-mode .report-notes {
+    color: var(--text-primary);
+}
+
+:root.light-mode .report-card-retail-link-section {
+    background: var(--background-color);
+    border: 1px solid var(--border-color);
+}
+
+:root.light-mode .report-card-retail-link-section label {
+    color: var(--text-secondary);
+}
+
+:root.light-mode .retail-link-container {
+    scrollbar-color: var(--accent-gold) var(--background-color);
+}
+
+:root.light-mode .retail-link-container::-webkit-scrollbar-track {
+    background: var(--background-color);
+}
+
+:root.light-mode .retail-link-container a {
+    color: var(--accent-gold);
+}
+
+:root.light-mode .retail-link-container a:hover {
+    color: var(--accent-copper);
+}
+
+:root.light-mode .btn-transfer {
+    color: var(--primary-dark);
+}
+
+:root.light-mode .btn-secondary {
+    color: var(--primary-dark);
+}
+
+:root.light-mode .close-btn {
+    background: rgba(160, 118, 90, 0.1);
+    border: 1px solid var(--border-color);
+    color: var(--primary-color);
+}
+
+:root.light-mode .close-btn:hover {
+    background: var(--primary-color);
+    color: var(--background-color);
+    border-color: var(--primary-color);
 }

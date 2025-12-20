@@ -1,6 +1,6 @@
 // Humidor Service Worker
-// Version: 1.5.1
-const CACHE_VERSION = 'humidor-v1.5.1';
+// Version: 1.5.3
+const CACHE_VERSION = 'humidor-v1.5.3';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 const IMAGE_CACHE = `${CACHE_VERSION}-images`;
@@ -93,10 +93,20 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Images - Cache first, network fallback
+  // Images - Only handle local images, let external images bypass service worker
   if (request.destination === 'image' || url.pathname.match(/\.(jpg|jpeg|png|gif|svg|webp|ico)$/)) {
-    event.respondWith(cacheFirstStrategy(request, IMAGE_CACHE));
-    return;
+    // Check if image is from same origin (local) or external
+    const isLocalImage = url.origin === self.location.origin;
+    
+    if (isLocalImage) {
+      // Local images (logo, placeholder, etc.) - cache first
+      event.respondWith(cacheFirstStrategy(request, IMAGE_CACHE));
+      return;
+    } else {
+      // External images (cigar images from URLs) - bypass service worker completely
+      // This avoids CORS issues and lets the browser handle them directly
+      return;
+    }
   }
 
   // Static assets (CSS, JS, fonts) - Cache first

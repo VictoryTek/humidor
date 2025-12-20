@@ -2,7 +2,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     const loginForm = document.getElementById('loginForm');
     const loginBtn = document.getElementById('loginBtn');
-    const usernameField = document.getElementById('email');
+    const usernameField = document.querySelector('input[name="login"]');
     const passwordField = document.getElementById('password');
     const toastContainer = document.getElementById('toastContainer');
 
