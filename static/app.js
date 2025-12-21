@@ -3584,7 +3584,7 @@ function createCigarCard(cigar) {
            </div>`;
     
     return `
-        <div class="cigar-card" data-cigar-id="${cigar.id}" onclick="openReportCard('${cigar.id}')" ${cardStyle}>
+        <div class="cigar-card" data-cigar-id="${cigar.id}" data-quantity="${cigar.quantity}" onclick="openReportCard('${cigar.id}')" ${cardStyle}>
             <div class="cigar-card-image">
                 ${outOfStockBadge}
                 ${imageHtml}
@@ -4448,8 +4448,20 @@ async function restockCigar(id) {
 }
 
 // Quantity update function
+// Track pending quantity changes for debouncing
+const pendingQuantityChanges = new Map();
+
 async function updateCigarQuantity(cigarId, currentQuantity, change) {
-    const newQuantity = currentQuantity + change;
+    // Get the card to read the most recent quantity from data attribute
+    const card = document.querySelector(`.cigar-card[data-cigar-id="${cigarId}"]`);
+    if (!card) {
+        console.error(`Cannot find card for cigar ${cigarId}`);
+        return;
+    }
+    
+    // Use the data-quantity attribute which reflects the most recent value
+    const actualCurrentQuantity = parseInt(card.getAttribute('data-quantity')) || currentQuantity;
+    const newQuantity = actualCurrentQuantity + change;
     
     // Don't allow quantity to go below 0
     if (newQuantity < 0) {
@@ -4457,55 +4469,71 @@ async function updateCigarQuantity(cigarId, currentQuantity, change) {
         return;
     }
     
-    // If quantity reaches 0, mark as out of stock by setting is_active=false
-    if (newQuantity === 0) {
-        try {
-            // Update with quantity 0, which will set is_active=false on the backend
-            const response = await makeAuthenticatedRequest(`/api/v1/cigars/${cigarId}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    quantity: 0
-                })
-            });
-            
-            if (response && response.ok) {
-                // Update the cigar card in the DOM immediately
-                updateCigarCardInDOM(cigarId, { quantity: 0, is_active: false });
-                showToast('Cigar marked as out of stock (quantity: 0)', 'info');
-            } else {
-                throw new Error('Failed to mark cigar as out of stock');
-            }
-        } catch (error) {
-            console.error('Error marking cigar as out of stock:', error);
-            showToast('Failed to mark cigar as out of stock', 'error');
-        }
-        return;
+    // Update the card's data attribute immediately for next click
+    card.setAttribute('data-quantity', newQuantity);
+    
+    // Update UI immediately (optimistic update)
+    updateCigarCardInDOM(cigarId, { quantity: newQuantity, is_active: newQuantity > 0 });
+    
+    // Store or update the pending change
+    if (pendingQuantityChanges.has(cigarId)) {
+        // Clear existing timeout
+        clearTimeout(pendingQuantityChanges.get(cigarId).timeout);
     }
     
-    try {
-        const response = await makeAuthenticatedRequest(`/api/v1/cigars/${cigarId}`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ quantity: newQuantity })
-        });
-        
-        if (response && response.ok) {
-            console.log(`✓ Updated quantity for cigar ${cigarId} to ${newQuantity}`);
-            // Update the cigar card in the DOM immediately
-            updateCigarCardInDOM(cigarId, { quantity: newQuantity, is_active: true });
-            showToast(`Quantity updated to ${newQuantity}`, 'success');
+    // Set new timeout for API call
+    const timeout = setTimeout(async () => {
+        // If quantity reaches 0, mark as out of stock by setting is_active=false
+        if (newQuantity === 0) {
+            try {
+                // Update with quantity 0, which will set is_active=false on the backend
+                const response = await makeAuthenticatedRequest(`/api/v1/cigars/${cigarId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        quantity: 0
+                    })
+                });
+                
+                if (response && response.ok) {
+                    showToast('Cigar marked as out of stock (quantity: 0)', 'info');
+                } else {
+                    throw new Error('Failed to mark cigar as out of stock');
+                }
+            } catch (error) {
+                console.error('Error marking cigar as out of stock:', error);
+                showToast('Failed to mark cigar as out of stock', 'error');
+            }
         } else {
-            throw new Error('Failed to update quantity');
+            try {
+                const response = await makeAuthenticatedRequest(`/api/v1/cigars/${cigarId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ quantity: newQuantity })
+                });
+                
+                if (response && response.ok) {
+                    console.log(`✓ Updated quantity for cigar ${cigarId} to ${newQuantity}`);
+                    showToast(`Quantity updated to ${newQuantity}`, 'success');
+                } else {
+                    throw new Error('Failed to update quantity');
+                }
+            } catch (error) {
+                console.error('Error updating quantity:', error);
+                showToast('Failed to update quantity', 'error');
+            }
         }
-    } catch (error) {
-        console.error('Error updating quantity:', error);
-        showToast('Failed to update quantity', 'error');
-    }
+        
+        // Clean up
+        pendingQuantityChanges.delete(cigarId);
+    }, 500);
+    
+    // Store the timeout reference
+    pendingQuantityChanges.set(cigarId, { timeout, quantity: newQuantity });
 }
 
 // Profile/Account Settings Functions
@@ -4765,7 +4793,7 @@ function createFavoriteCard(cigar) {
         : `onclick="removeFavorite('${cigar.id}')"`; // Use cigar_id for active cigars
     
     return `
-        <div class="cigar-card" data-cigar-id="${cigar.id}" onclick="openReportCard('${cigar.id}')" ${cardStyle}>
+        <div class="cigar-card" data-cigar-id="${cigar.id}" data-quantity="${cigar.quantity}" onclick="openReportCard('${cigar.id}')" ${cardStyle}>
             <div class="cigar-card-image" style="position: relative;">
                 ${outOfStockBadge}
                 ${imageHtml}
@@ -7368,6 +7396,11 @@ function updateCigarCardInDOM(cigarId, updatedData) {
     if (!cigarCard) {
         console.log('Cigar card not found in DOM, skipping update');
         return;
+    }
+    
+    // Update the data-quantity attribute if quantity changed
+    if (updatedData.quantity !== undefined) {
+        cigarCard.setAttribute('data-quantity', updatedData.quantity);
     }
     
     // Update the global cigars array

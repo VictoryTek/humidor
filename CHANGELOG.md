@@ -32,6 +32,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - All other section headers (User Management, Backup & Restore) now left-aligned
   - Install App button correctly positioned on right side of About Humidor header only
 
+- **Rapid Quantity Counter Updates** ⚡
+  - Fixed inability to rapidly click +/- quantity buttons on cigar cards
+  - Quantity changes now batched with 500ms debouncing
+  - Can quickly click multiple times (e.g., add 5 cigars) without waiting for API response
+  - UI updates immediately (optimistic updates) for responsive feel
+  - API calls automatically batched to reduce server load
+  - Uses data-quantity attribute tracking for accurate rapid updates
+
 ## [1.5.1] - 2025-12-19
 
 ### Added
