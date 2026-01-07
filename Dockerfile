@@ -68,13 +68,14 @@ RUN touch src/main.rs && cargo build --release && strip target/release/humidor
 FROM alpine:3.21
 
 # Update all packages to get latest security patches
-# This addresses CVE-2025-62408 (c-ares 1.34.5-r0 -> 1.34.6-r0)
-# Alpine automatically pulls fixed versions when available
-RUN apk upgrade --no-cache && \
+# Explicitly update c-ares to fix CVE-2025-62408 (1.34.5-r0 -> 1.34.6-r0)
+RUN apk update && \
+    apk upgrade --no-cache && \
     apk add --no-cache \
     ca-certificates \
     libgcc \
     curl \
+    c-ares>=1.34.6-r0 \
     && addgroup -S humidor && adduser -S -G humidor humidor
 
 WORKDIR /app

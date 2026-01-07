@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.5.3] - 2026-01-07
 
+### Security
+- **CVE-2025-62408 Fixed** 🔒
+  - Updated c-ares package from 1.34.5-r0 to ≥1.34.6-r0 in Docker image
+  - Added explicit package version constraint to prevent vulnerable versions
+  - Updated package update process to ensure latest security patches applied
+
 ### Improved
 - **Mobile-Friendly Settings Page** 📱
   - Converted User Management and Backup & Restore tables to card-based layouts on mobile devices
