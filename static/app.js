@@ -631,29 +631,6 @@ function checkAuth() {
     }
 }
 
-function showApp() {
-    const authLoading = document.getElementById('authLoading');
-    const app = document.getElementById('app');
-    
-    if (authLoading) {
-        authLoading.classList.add('fade-out');
-        setTimeout(() => {
-            authLoading.style.display = 'none';
-        }, 300);
-    }
-    
-    if (app) {
-        app.style.display = 'block';
-    }
-}
-
-function hideAuthLoading() {
-    const authLoading = document.getElementById('authLoading');
-    if (authLoading) {
-        authLoading.style.display = 'none';
-    }
-}
-
 function logout() {
     localStorage.removeItem('humidor_token');
     localStorage.removeItem('humidor_user');
@@ -2015,6 +1992,32 @@ async function findOrCreateRingGauge(gaugeValue) {
     }
 }
 
+// ============================================================
+// Early Authentication Check (before DOM loads)
+// ============================================================
+
+// Check authentication immediately, before DOM loads
+// This prevents showing a blank screen or flashing unauthorized content
+(function() {
+    const isPublicShare = window.location.pathname.startsWith('/shared/humidors/');
+    
+    // Public shares don't need authentication
+    if (isPublicShare) {
+        return;
+    }
+    
+    // Check for auth token synchronously
+    const token = localStorage.getItem('humidor_token');
+    if (!token) {
+        // No token - redirect to login immediately (before DOM renders)
+        window.location.href = '/login.html';
+        return;
+    }
+    
+    // We have a token - let the app load normally
+    // The checkAuth() function in DOMContentLoaded will validate the token properly
+})();
+
 // Event Listeners
 document.addEventListener('DOMContentLoaded', function() {
     // Check if this is a public share link
@@ -2022,20 +2025,18 @@ document.addEventListener('DOMContentLoaded', function() {
     
     if (isPublicShare) {
         // Handle public share view - show app without auth check
-        showApp();
         initializePublicShareView();
         return;
     }
     
-    // Check authentication first for regular app
+    // Validate authentication token (already checked for existence above)
     if (!checkAuth()) {
-        // Redirect to login without showing app content
+        // Token exists but is invalid - redirect to login
         window.location.href = '/login.html';
         return;
     }
     
-    // Authentication successful - show the app
-    showApp();
+    // Authentication successful - initialize the app
     
     // Initialize user info display
     initializeUserDisplay();

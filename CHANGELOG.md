@@ -31,13 +31,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Removed page size selector, page navigation buttons, and page indicators
 
 ### Fixed
-- **Authentication Loading Screen** 🔐
-  - Fixed flash of unauthorized content when accessing app without authentication
-  - Added professional loading screen that displays while authentication check runs
-  - Unauthenticated users now see only loading screen before redirect to login
-  - Authenticated users experience smooth fade transition from loading to app
-  - Public share links properly display without authentication requirements
-  - Eliminated jarring redirect experience for better UX
+- **Authentication Flow** 🔐
+  - Fixed blank screen issue on initial load and after login
+  - Implemented immediate pre-DOM authentication check using IIFE
+  - Unauthenticated users now redirect instantly to login (no blank screen)
+  - Authenticated users see app load normally without delay
+  - Removed unnecessary auth loading screen that caused complexity
+  - Follows Auth0/Auth.js best practices for early authentication checks
 
 ## [1.5.2] - 2025-12-20
 
