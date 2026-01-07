@@ -5,6 +5,34 @@ All notable changes to Humidor will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.3] - 2026-01-07
+
+### Improved
+- **Mobile-Friendly Settings Page** 📱
+  - Converted User Management and Backup & Restore tables to card-based layouts on mobile devices
+  - Tables now display as individual cards with labeled fields on screens ≤768px
+  - No more horizontal scrolling on mobile for settings tables
+  - Action buttons stack vertically with full width for easier tapping
+  - Improved touch targets and spacing throughout settings page
+  - Desktop table layout preserved for larger screens
+
+### Removed
+- **Pagination Feature** 🗑️
+  - Removed pagination from cigars list - all cigars now load in single scrollable view
+  - Removed pagination from user management - all users displayed at once
+  - Eliminated ~1,000 lines of pagination-related code (HTML, JavaScript, CSS)
+  - Simplified user experience with continuous scroll instead of page navigation
+  - Removed page size selector, page navigation buttons, and page indicators
+
+### Fixed
+- **Authentication Loading Screen** 🔐
+  - Fixed flash of unauthorized content when accessing app without authentication
+  - Added professional loading screen that displays while authentication check runs
+  - Unauthenticated users now see only loading screen before redirect to login
+  - Authenticated users experience smooth fade transition from loading to app
+  - Public share links properly display without authentication requirements
+  - Eliminated jarring redirect experience for better UX
+
 ## [1.5.2] - 2025-12-20
 
 ### Fixed

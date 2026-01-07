@@ -30,7 +30,16 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css" crossorigin="anonymous">
 </head>
 <body>
-    <div id="app">
+    <!-- Initial loading screen -->
+    <div id="authLoading" class="auth-loading">
+        <div class="auth-loading-content">
+            <img src="/static/logo.png" alt="Humidor" class="auth-loading-logo">
+            <div class="auth-loading-spinner"></div>
+            <p>Loading...</p>
+        </div>
+    </div>
+    
+    <div id="app" style="display: none;">
         <!-- Mobile menu backdrop -->
         <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
         
@@ -265,37 +274,6 @@
                             <!-- Humidor sections will be dynamically generated here -->
                         </div>
 
-                        <!-- Pagination Controls -->
-                        <div class="pagination-container" id="paginationContainer" style="display: none;">
-                            <div class="pagination-info">
-                                <span id="paginationInfo">Showing 1-50 of 100 cigars</span>
-                            </div>
-                            <div class="pagination-controls">
-                                <button class="pagination-btn" id="firstPageBtn" title="First page">
-                                    <span class="mdi mdi-page-first"></span>
-                                </button>
-                                <button class="pagination-btn" id="prevPageBtn" title="Previous page">
-                                    <span class="mdi mdi-chevron-left"></span>
-                                </button>
-                                <div class="pagination-pages" id="paginationPages">
-                                    <!-- Page numbers will be generated here -->
-                                </div>
-                                <button class="pagination-btn" id="nextPageBtn" title="Next page">
-                                    <span class="mdi mdi-chevron-right"></span>
-                                </button>
-                                <button class="pagination-btn" id="lastPageBtn" title="Last page">
-                                    <span class="mdi mdi-page-last"></span>
-                                </button>
-                            </div>
-                            <div class="pagination-size">
-                                <label for="pageSizeSelect">Items per page:</label>
-                                <select id="pageSizeSelect" class="page-size-select">
-                                    <option value="25">25</option>
-                                    <option value="50" selected>50</option>
-                                    <option value="100">100</option>
-                                </select>
-                            </div>
-                        </div>
                     </div>
                 </div>
 
@@ -544,7 +522,7 @@
                             <div class="about-content">
                                 <div class="about-item">
                                     <span class="about-label">Version:</span>
-                                    <span class="about-value">1.5.2</span>
+                                    <span class="about-value">1.5.3</span>
                                 </div>
                                 <div class="about-item">
                                     <span class="about-label">Description:</span>
@@ -602,19 +580,6 @@
                                         </tr>
                                     </tbody>
                                 </table>
-                            </div>
-
-                            <!-- Pagination -->
-                            <div class="pagination" id="usersPagination" style="display: none;">
-                                <button class="pagination-btn" id="prevPageBtn" disabled>
-                                    <span class="mdi mdi-chevron-left"></span>
-                                    Previous
-                                </button>
-                                <span class="pagination-info" id="paginationInfo">Page 1 of 1</span>
-                                <button class="pagination-btn" id="nextPageBtn" disabled>
-                                    Next
-                                    <span class="mdi mdi-chevron-right"></span>
-                                </button>
                             </div>
                         </div>
 

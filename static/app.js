@@ -456,11 +456,7 @@ let selectedStrengths = [];
 let selectedRingGauges = [];
 let filteredCigars = [];
 
-// Pagination State
-let currentCigarPage = 1;
-let cigarPageSize = 50;
 let totalCigars = 0;
-let totalCigarPages = 0;
 
 // Router State
 let currentRoute = { view: 'hub', humidorId: null };
@@ -635,6 +631,29 @@ function checkAuth() {
     }
 }
 
+function showApp() {
+    const authLoading = document.getElementById('authLoading');
+    const app = document.getElementById('app');
+    
+    if (authLoading) {
+        authLoading.classList.add('fade-out');
+        setTimeout(() => {
+            authLoading.style.display = 'none';
+        }, 300);
+    }
+    
+    if (app) {
+        app.style.display = 'block';
+    }
+}
+
+function hideAuthLoading() {
+    const authLoading = document.getElementById('authLoading');
+    if (authLoading) {
+        authLoading.style.display = 'none';
+    }
+}
+
 function logout() {
     localStorage.removeItem('humidor_token');
     localStorage.removeItem('humidor_user');
@@ -730,9 +749,7 @@ async function makeAuthenticatedRequest(url, options = {}) {
 // API Functions
 const API = {
     async getCigars(params = {}) {
-        // Add pagination parameters if not provided
-        if (!params.page) params.page = currentCigarPage;
-        if (!params.page_size) params.page_size = cigarPageSize;
+
         
         const searchParams = new URLSearchParams(params);
         const response = await fetch(`/api/v1/cigars?${searchParams}`);
@@ -1249,87 +1266,7 @@ function filterCigars() {
     renderCigars();
 }
 
-// Pagination Functions
-function updatePaginationControls() {
-    const paginationContainer = document.getElementById('paginationContainer');
-    const paginationInfo = document.getElementById('paginationInfo');
-    const paginationPages = document.getElementById('paginationPages');
-    const firstPageBtn = document.getElementById('firstPageBtn');
-    const prevPageBtn = document.getElementById('prevPageBtn');
-    const nextPageBtn = document.getElementById('nextPageBtn');
-    const lastPageBtn = document.getElementById('lastPageBtn');
-    
-    if (!paginationContainer) return;
-    
-    // Show/hide pagination based on whether we have cigars
-    if (totalCigars > 0) {
-        paginationContainer.style.display = 'flex';
-        
-        // Update info text
-        const startItem = (currentCigarPage - 1) * cigarPageSize + 1;
-        const endItem = Math.min(currentCigarPage * cigarPageSize, totalCigars);
-        paginationInfo.textContent = `Showing ${startItem}-${endItem} of ${totalCigars} cigars`;
-        
-        // Update button states
-        firstPageBtn.disabled = currentCigarPage === 1;
-        prevPageBtn.disabled = currentCigarPage === 1;
-        nextPageBtn.disabled = currentCigarPage === totalCigarPages;
-        lastPageBtn.disabled = currentCigarPage === totalCigarPages;
-        
-        // Generate page numbers
-        paginationPages.innerHTML = '';
-        const maxVisiblePages = 5;
-        let startPage = Math.max(1, currentCigarPage - Math.floor(maxVisiblePages / 2));
-        let endPage = Math.min(totalCigarPages, startPage + maxVisiblePages - 1);
-        
-        // Adjust start if we're near the end
-        if (endPage - startPage < maxVisiblePages - 1) {
-            startPage = Math.max(1, endPage - maxVisiblePages + 1);
-        }
-        
-        for (let i = startPage; i <= endPage; i++) {
-            const pageBtn = document.createElement('button');
-            pageBtn.className = 'pagination-page-btn' + (i === currentCigarPage ? ' active' : '');
-            pageBtn.textContent = i;
-            pageBtn.onclick = () => goToPage(i);
-            paginationPages.appendChild(pageBtn);
-        }
-    } else {
-        paginationContainer.style.display = 'none';
-    }
-}
 
-async function goToPage(page) {
-    if (page < 1 || page > totalCigarPages || page === currentCigarPage) return;
-    currentCigarPage = page;
-    await loadCigars();
-}
-
-async function nextPage() {
-    if (currentCigarPage < totalCigarPages) {
-        await goToPage(currentCigarPage + 1);
-    }
-}
-
-async function previousPage() {
-    if (currentCigarPage > 1) {
-        await goToPage(currentCigarPage - 1);
-    }
-}
-
-async function firstPage() {
-    await goToPage(1);
-}
-
-async function lastPage() {
-    await goToPage(totalCigarPages);
-}
-
-async function changePageSize(newSize) {
-    cigarPageSize = parseInt(newSize);
-    currentCigarPage = 1; // Reset to first page when changing page size
-    await loadCigars();
-}
 
 function closeCigarModal() {
     elements.cigarModal.classList.remove('show');
@@ -1431,19 +1368,15 @@ async function loadCigars() {
         const response = await API.getCigars();
         console.log('Cigars loaded successfully:', response);
         
-        // Extract cigars and pagination metadata
+        // Extract cigars
         cigars = response.cigars || [];
         totalCigars = response.total || 0;
-        currentCigarPage = response.page || 1;
-        cigarPageSize = response.page_size || 50;
-        totalCigarPages = response.total_pages || 0;
         
         filteredCigars = [...cigars];
         
         updateStats();
         updateFilters();
         renderCigars();
-        updatePaginationControls();
     } catch (error) {
         console.error('Detailed error loading cigars:', error);
         console.error('Error stack:', error.stack);
@@ -2088,16 +2021,21 @@ document.addEventListener('DOMContentLoaded', function() {
     const isPublicShare = window.location.pathname.startsWith('/shared/humidors/');
     
     if (isPublicShare) {
-        // Handle public share view
+        // Handle public share view - show app without auth check
+        showApp();
         initializePublicShareView();
         return;
     }
     
     // Check authentication first for regular app
     if (!checkAuth()) {
+        // Redirect to login without showing app content
         window.location.href = '/login.html';
         return;
     }
+    
+    // Authentication successful - show the app
+    showApp();
     
     // Initialize user info display
     initializeUserDisplay();
@@ -2434,45 +2372,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Mobile pagination auto-hide on scroll
-    let lastScrollTop = 0;
-    let scrollTimeout = null;
-    const paginationContainer = document.getElementById('paginationContainer');
-    
-    if (paginationContainer && window.innerWidth <= 768) {
-        window.addEventListener('scroll', () => {
-            // Clear existing timeout
-            if (scrollTimeout) {
-                clearTimeout(scrollTimeout);
-            }
-            
-            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-            
-            // Show pagination when scrolling up or at top
-            if (scrollTop <= 100 || scrollTop < lastScrollTop) {
-                paginationContainer.classList.remove('hidden');
-            } 
-            // Hide when scrolling down
-            else if (scrollTop > lastScrollTop && scrollTop > 100) {
-                paginationContainer.classList.add('hidden');
-            }
-            
-            lastScrollTop = scrollTop <= 0 ? 0 : scrollTop;
-            
-            // Always show pagination after user stops scrolling
-            scrollTimeout = setTimeout(() => {
-                paginationContainer.classList.remove('hidden');
-            }, 1000);
-        }, { passive: true });
-        
-        // Re-check on window resize
-        window.addEventListener('resize', () => {
-            if (window.innerWidth > 768) {
-                paginationContainer.classList.remove('hidden');
-            }
-        });
-    }
-    
     // Cigar modal events
     if (elements.closeCigarModal) {
         elements.closeCigarModal.addEventListener('click', closeCigarModal);
@@ -2622,34 +2521,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Pagination event listeners
-    const firstPageBtn = document.getElementById('firstPageBtn');
-    const prevPageBtn = document.getElementById('prevPageBtn');
-    const nextPageBtn = document.getElementById('nextPageBtn');
-    const lastPageBtn = document.getElementById('lastPageBtn');
-    const pageSizeSelect = document.getElementById('pageSizeSelect');
-    
-    if (firstPageBtn) {
-        firstPageBtn.addEventListener('click', firstPage);
-    }
-    
-    if (prevPageBtn) {
-        prevPageBtn.addEventListener('click', previousPage);
-    }
-    
-    if (nextPageBtn) {
-        nextPageBtn.addEventListener('click', nextPage);
-    }
-    
-    if (lastPageBtn) {
-        lastPageBtn.addEventListener('click', lastPage);
-    }
-    
-    if (pageSizeSelect) {
-        pageSizeSelect.addEventListener('change', (e) => {
-            changePageSize(e.target.value);
-        });
-    }
+
     
     // Initialize the interface
     // Note: loadHumidors() will call loadOrganizers() internally first
@@ -2939,15 +2811,9 @@ function showHumidorHub() {
     const welcomeSection = document.getElementById('welcomeSection');
     const mainContentSection = document.getElementById('mainContentSection');
     const humidorsContainer = document.getElementById('humidorsContainer');
-    const paginationContainer = document.getElementById('paginationContainer');
     
     welcomeSection.style.display = 'none';
     mainContentSection.style.display = 'block';
-    
-    // Hide pagination on hub view
-    if (paginationContainer) {
-        paginationContainer.style.display = 'none';
-    }
     
     // Render humidor cards
     humidorsContainer.innerHTML = `
@@ -3013,7 +2879,7 @@ function showHumidorHub() {
     `;
 }
 
-// Humidor Detail View (for single humidor with pagination)
+// Humidor Detail View
 async function showHumidorDetail(humidorId) {
     console.log('showHumidorDetail called with ID:', humidorId);
     console.log('Available humidors:', humidors);
@@ -3035,7 +2901,6 @@ async function showHumidorDetail(humidorId) {
     const welcomeSection = document.getElementById('welcomeSection');
     const mainContentSection = document.getElementById('mainContentSection');
     const humidorsContainer = document.getElementById('humidorsContainer');
-    const paginationContainer = document.getElementById('paginationContainer');
     
     console.log('Setting display properties...');
     console.log('welcomeSection:', welcomeSection);
@@ -3045,12 +2910,7 @@ async function showHumidorDetail(humidorId) {
     console.log('mainContentSection display after setting:', mainContentSection.style.display);
     console.log('mainContentSection computed display:', window.getComputedStyle(mainContentSection).display);
     
-    // Show pagination on detail view
-    if (paginationContainer) {
-        paginationContainer.style.display = 'flex';
-    }
-    
-    // Load cigars for this specific humidor with pagination
+    // Load cigars for this specific humidor
     try {
         console.log('Loading cigars for humidor:', humidorId);
         
@@ -3066,11 +2926,10 @@ async function showHumidorDetail(humidorId) {
             console.log('Using filtered cigars');
             cigarsToDisplay = filteredCigars.filter(c => c.humidor_id === humidorId);
             totalCigars = cigarsToDisplay.length;
-            totalCigarPages = 1; // No pagination when filtering
         } else {
-            // Load fresh from API with pagination
+            // Load fresh from API
             const response = await makeAuthenticatedRequest(
-                `/api/v1/cigars?humidor_id=${humidorId}&page=${currentCigarPage}&page_size=${cigarPageSize}`
+                `/api/v1/cigars?humidor_id=${humidorId}`
             );
             
             if (response.ok) {
@@ -3082,7 +2941,6 @@ async function showHumidorDetail(humidorId) {
                 // Add the freshly loaded cigars for this humidor
                 cigars.push(...cigarsToDisplay);
                 totalCigars = responseData.total || 0;
-                totalCigarPages = responseData.total_pages || 1;
             } else {
                 throw new Error('Failed to load humidor details');
             }
@@ -3127,13 +2985,6 @@ async function showHumidorDetail(humidorId) {
         humidorsContainer.innerHTML = renderedContent;
         console.log('humidorsContainer after render:', humidorsContainer);
         console.log('humidorsContainer children count:', humidorsContainer.children.length);
-        
-        // Update pagination controls (hide if filtering)
-        if (hasFilters) {
-            paginationContainer.style.display = 'none';
-        } else {
-            updatePaginationControls();
-        }
         
         // Update favorite icons for all displayed cigars
         updateAllFavoriteIcons();
@@ -5067,8 +4918,6 @@ async function deleteWishListCigar(cigarId, event) {
 // ============================================
 
 let users = [];
-let usersCurrentPage = 1;
-let usersTotalPages = 1;
 let editingUserId = null;
 let deleteUserId = null;
 let passwordResetUserId = null;
@@ -5079,9 +4928,9 @@ function isCurrentUserAdmin() {
     return user.is_admin === true;
 }
 
-// Load users with pagination
-async function loadUsers(page = 1, search = '') {
-    console.log('[loadUsers] Starting, page:', page, 'search:', search);
+// Load users
+async function loadUsers(search = '') {
+    console.log('[loadUsers] Starting, search:', search);
     
     if (!isCurrentUserAdmin()) {
         console.log('[loadUsers] Not admin, skipping user load');
@@ -5091,9 +4940,9 @@ async function loadUsers(page = 1, search = '') {
     console.log('[loadUsers] User is admin, loading users...');
 
     try {
-        let url = `/api/v1/admin/users?page=${page}&per_page=10`;
+        let url = `/api/v1/admin/users`;
         if (search) {
-            url += `&search=${encodeURIComponent(search)}`;
+            url += `?search=${encodeURIComponent(search)}`;
         }
         
         console.log('[loadUsers] Fetching from:', url);
@@ -5106,11 +4955,8 @@ async function loadUsers(page = 1, search = '') {
             const data = await response.json();
             console.log('[loadUsers] Data received:', data);
             users = data.users || [];
-            usersCurrentPage = page;
-            usersTotalPages = Math.ceil((data.total || users.length) / 10);
             console.log('[loadUsers] Rendering', users.length, 'users');
             renderUsersTable();
-            renderUsersPagination();
         } else {
             console.error('[loadUsers] Failed response:', response);
             showToast('Failed to load users', 'error');
@@ -5148,30 +4994,30 @@ function renderUsersTable() {
         
         return `
             <tr>
-                <td>
+                <td data-label="Username">
                     <div class="user-info">
                         <strong>${escapeHtml(user.username)}</strong>
                         ${isCurrentUser ? '<small style="color: var(--accent-gold);">(You)</small>' : ''}
                     </div>
                 </td>
-                <td>
+                <td data-label="Email">
                     <span class="user-email">${escapeHtml(user.email)}</span>
                 </td>
-                <td>${escapeHtml(user.full_name)}</td>
-                <td>
+                <td data-label="Full Name">${escapeHtml(user.full_name)}</td>
+                <td data-label="Role">
                     ${user.is_admin ? 
                         '<span class="user-badge admin-badge"><i class="mdi mdi-shield-crown"></i> Admin</span>' : 
                         '<span class="user-badge user-badge-regular"><i class="mdi mdi-account"></i> User</span>'}
                 </td>
-                <td>
+                <td data-label="Status">
                     ${user.is_active ? 
                         '<span class="status-badge status-active"><i class="mdi mdi-check-circle"></i> Active</span>' : 
                         '<span class="status-badge status-inactive"><i class="mdi mdi-cancel"></i> Inactive</span>'}
                 </td>
-                <td>
+                <td data-label="Created">
                     <span class="user-created-date">${createdDate}</span>
                 </td>
-                <td>
+                <td data-label="Actions">
                     <div class="user-actions">
                         <button class="btn btn-sm btn-edit" onclick="editUser('${user.id}')" title="Edit User">
                             <i class="mdi mdi-pencil"></i> Edit
@@ -5195,36 +5041,7 @@ function renderUsersTable() {
     }).join('');
 }
 
-// Render pagination
-function renderUsersPagination() {
-    const container = document.getElementById('usersPagination');
-    if (!container || usersTotalPages <= 1) {
-        if (container) container.innerHTML = '';
-        return;
-    }
-    
-    let html = '<div class="pagination">';
-    
-    // Previous button
-    if (usersCurrentPage > 1) {
-        html += `<button class="btn btn-secondary btn-sm" onclick="loadUsers(${usersCurrentPage - 1})">
-            <i class="mdi mdi-chevron-left"></i> Previous
-        </button>`;
-    }
-    
-    // Page numbers
-    html += `<span class="pagination-info">Page ${usersCurrentPage} of ${usersTotalPages}</span>`;
-    
-    // Next button
-    if (usersCurrentPage < usersTotalPages) {
-        html += `<button class="btn btn-secondary btn-sm" onclick="loadUsers(${usersCurrentPage + 1})">
-            Next <i class="mdi mdi-chevron-right"></i>
-        </button>`;
-    }
-    
-    html += '</div>';
-    container.innerHTML = html;
-}
+
 
 // Show create user modal
 function showCreateUserModal() {
@@ -5314,7 +5131,7 @@ async function handleUserFormSubmit(e) {
         if (response && response.ok) {
             showToast(editingUserId ? 'User updated successfully' : 'User created successfully', 'success');
             closeUserModal();
-            loadUsers(usersCurrentPage);
+            loadUsers();
         } else {
             const error = await response.json();
             showToast(error.message || 'Failed to save user', 'error');
@@ -5346,7 +5163,7 @@ async function toggleUserActive(userId) {
         
         if (response && response.ok) {
             showToast(`User ${action}d successfully`, 'success');
-            loadUsers(usersCurrentPage);
+            loadUsers();
         } else {
             showToast(`Failed to ${action} user`, 'error');
         }
@@ -5379,7 +5196,7 @@ async function confirmDeleteUser() {
         if (response && response.ok) {
             showToast('User deleted successfully', 'success');
             closeDeleteUserModal();
-            loadUsers(usersCurrentPage);
+            loadUsers();
         } else {
             const error = await response.json();
             showToast(error.message || 'Failed to delete user', 'error');
@@ -5670,10 +5487,10 @@ function renderBackupsTable() {
     
     tbody.innerHTML = backups.map(backup => `
         <tr>
-            <td><span class="backup-name">${backup.name}</span></td>
-            <td>${formatBackupDate(backup.date)}</td>
-            <td>${backup.size}</td>
-            <td class="actions-cell">
+            <td data-label="Backup Name"><span class="backup-name">${backup.name}</span></td>
+            <td data-label="Date Created">${formatBackupDate(backup.date)}</td>
+            <td data-label="Size">${backup.size}</td>
+            <td data-label="Actions" class="actions-cell">
                 <button class="btn-icon" onclick="downloadBackup('${backup.name}')" title="Download">
                     <span class="mdi mdi-download"></span>
                 </button>
