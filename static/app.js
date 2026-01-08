@@ -230,7 +230,7 @@ function showInstallButton() {
     installButton.addEventListener('click', installApp);
     
     // Add to About Humidor section title in settings
-    const aboutSectionTitle = document.querySelector('.about-section .section-title');
+    const aboutSectionTitle = document.querySelector('.about-section .section-title > div');
     if (aboutSectionTitle) {
         aboutSectionTitle.appendChild(installButton);
     }
@@ -2014,8 +2014,11 @@ async function findOrCreateRingGauge(gaugeValue) {
         return;
     }
     
-    // We have a token - let the app load normally
+    // We have a token - show the app and let it load normally
     // The checkAuth() function in DOMContentLoaded will validate the token properly
+    document.addEventListener('DOMContentLoaded', function() {
+        document.getElementById('app').style.visibility = 'visible';
+    }, { once: true });
 })();
 
 // Event Listeners
