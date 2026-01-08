@@ -1992,35 +1992,6 @@ async function findOrCreateRingGauge(gaugeValue) {
     }
 }
 
-// ============================================================
-// Early Authentication Check (before DOM loads)
-// ============================================================
-
-// Check authentication immediately, before DOM loads
-// This prevents showing a blank screen or flashing unauthorized content
-(function() {
-    const isPublicShare = window.location.pathname.startsWith('/shared/humidors/');
-    
-    // Public shares don't need authentication
-    if (isPublicShare) {
-        return;
-    }
-    
-    // Check for auth token synchronously
-    const token = localStorage.getItem('humidor_token');
-    if (!token) {
-        // No token - redirect to login immediately (before DOM renders)
-        window.location.href = '/login.html';
-        return;
-    }
-    
-    // We have a token - show the app and let it load normally
-    // The checkAuth() function in DOMContentLoaded will validate the token properly
-    document.addEventListener('DOMContentLoaded', function() {
-        document.getElementById('app').style.visibility = 'visible';
-    }, { once: true });
-})();
-
 // Event Listeners
 document.addEventListener('DOMContentLoaded', function() {
     // Check if this is a public share link
@@ -2032,9 +2003,8 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
     
-    // Validate authentication token (already checked for existence above)
+    // Check authentication for regular app
     if (!checkAuth()) {
-        // Token exists but is invalid - redirect to login
         window.location.href = '/login.html';
         return;
     }
