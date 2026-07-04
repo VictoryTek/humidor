@@ -1,0 +1,34 @@
+{
+  "effortLevel": "medium",
+  "permissions": {
+    "allow": [
+      "Bash(git status:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(git branch:*)",
+      "Bash(git show:*)",
+      "Bash(cargo build:*)",
+      "Bash(cargo check:*)",
+      "Bash(cargo fmt -- --check:*)",
+      "Bash(cargo clippy:*)",
+      "Bash(cargo test --lib:*)",
+      "Bash(cargo test --tests:*)",
+      "Bash(cargo audit:*)",
+      "Bash(docker compose up -d humidor_db:*)",
+      "Bash(docker compose config:*)",
+      "Bash(docker compose ps:*)"
+    ],
+    "deny": [
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git stash:*)",
+      "Bash(docker compose down -v:*)",
+      "Bash(docker-compose down -v:*)",
+      "Bash(docker compose down --volumes:*)",
+      "Bash(docker-compose down --volumes:*)",
+      "Bash(docker volume rm:*)",
+      "Bash(rm -rf:*)"
+    ]
+  }
+}
