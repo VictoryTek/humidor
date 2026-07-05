@@ -43,8 +43,9 @@ pub struct Claims {
     pub iat: usize, // issued at time (for tracking)
 }
 
-/// Get JWT secret from Docker secrets or environment variable
-/// Docker secrets take precedence over environment variables
+/// Get JWT secret from Docker secrets, persisted auto-generated file, or environment variable
+/// Must match the resolution order used by `read_secret()` in main.rs at startup, since that
+/// function may have auto-generated and persisted the secret rather than using an env var.
 /// Note: This function assumes the secret was validated at startup via validate_jwt_secret()
 /// If the secret is missing, this will return a default that will cause authentication to fail
 fn jwt_secret() -> String {
@@ -57,6 +58,11 @@ fn jwt_secret() -> String {
 
     // Try Docker secret file
     if let Ok(content) = fs::read_to_string("/run/secrets/jwt_secret") {
+        return content.trim().to_string();
+    }
+
+    // Try persisted auto-generated secret (written by get_or_generate_jwt_secret at startup)
+    if let Ok(content) = fs::read_to_string("/app/data/jwt_secret") {
         return content.trim().to_string();
     }
 
