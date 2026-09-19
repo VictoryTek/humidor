@@ -168,7 +168,7 @@ jobs:
           docker compose config --quiet
 
       - name: Run Trivy vulnerability scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           image-ref: humidor:${{ github.sha }}
           format: sarif
