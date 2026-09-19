@@ -166,10 +166,12 @@ The following environment variables can be configured (all have sensible default
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `POSTGRES_DB` | No | `humidor_db` | PostgreSQL database name |
-| `POSTGRES_USER` | No | `humidor_user` | PostgreSQL username |
-| `POSTGRES_PASSWORD` | No | `humidor_pass` | PostgreSQL password |
-| `DATABASE_URL` | Auto | Auto-generated | Full PostgreSQL connection string |
+| `DATABASE_URL` | Yes* | - | Full PostgreSQL connection string (set automatically by `docker-compose.yml`). See [Database Configuration](#database-configuration) |
+| `POSTGRES_HOST` | No | `localhost` | Database host (used when `DATABASE_URL` is not set) |
+| `POSTGRES_PORT` | No | `5432` | Database port (used when `DATABASE_URL` is not set) |
+| `POSTGRES_USER` | Yes* | `humidor_user` in `docker-compose.yml` only | Database user (used when `DATABASE_URL` is not set) |
+| `POSTGRES_PASSWORD` | Yes* | `humidor_pass` in `docker-compose.yml` only | Database password (used when `DATABASE_URL` is not set) |
+| `POSTGRES_DB` | Yes* | `humidor_db` in `docker-compose.yml` only | Database name (used when `DATABASE_URL` is not set) |
 | `PORT` | No | `9898` | Port for the web server to listen on |
 | `RUST_LOG` | No | `info` | Logging level (`trace`, `debug`, `info`, `warn`, `error`) |
 | `JWT_SECRET` | No | Auto-generated | Secret key for JWT token signing (auto-generated if not provided) |
@@ -182,7 +184,42 @@ The following environment variables can be configured (all have sensible default
 | `SMTP_PASSWORD` | No | - | SMTP authentication password |
 | `SMTP_FROM_EMAIL` | No | - | Email address to send from |
 
+\* Either `DATABASE_URL` or `POSTGRES_USER`, `POSTGRES_PASSWORD` and `POSTGRES_DB` must be set.
+
 **Note**: For production deployments, always override the default database credentials and JWT secret!
+
+## Database Configuration
+
+Humidor reads its database connection from the environment, in this order:
+
+1. `DATABASE_URL`, if set and non-empty, is used as-is. **It wins over the discrete variables below.**
+2. Otherwise the connection is built from `POSTGRES_HOST` (default `localhost`), `POSTGRES_PORT` (default `5432`), `POSTGRES_USER`, `POSTGRES_PASSWORD` and `POSTGRES_DB`. The user, password and database name have no defaults.
+
+If neither is fully configured, the app exits at startup with an error naming the missing variables. The discrete variables are passed to the driver as separate values, so a password containing characters such as `@`, `:`, `/` or `%` needs no URL encoding.
+
+```env
+# Option 1: single connection string
+DATABASE_URL=postgresql://humidor_user:change-me@db.internal:5432/humidor_db
+
+# Option 2: discrete variables (ignored if DATABASE_URL is set)
+POSTGRES_HOST=db.internal
+POSTGRES_PORT=5432
+POSTGRES_USER=humidor_user
+POSTGRES_PASSWORD=change-me
+POSTGRES_DB=humidor_db
+```
+
+This lets orchestrators keep the password in a separate secret (for example a systemd `EnvironmentFile=` or a compose `.env` file) instead of embedding it in one URL.
+
+## First Run
+
+Humidor ships with **no default account and no default password**, and it has no public sign-up.
+
+1. Open the app (`http://localhost:9898`). While no admin account exists, you are directed to the setup page (`/setup.html`); the login page also links to it.
+2. The setup wizard creates the first account, which is an **administrator**, and your first humidor. Choose a strong password (minimum 8 characters). Alternatively, the wizard can restore an existing Humidor backup.
+3. Once an admin exists, the setup endpoint refuses further requests ("Setup has already been completed"). Additional users are created by an admin in **Settings → User Management**, or use the [Admin Guide](docs/ADMIN_GUIDE.md).
+
+If you lose the admin password, use the "forgot password" flow (see [Password Reset Email Configuration](#password-reset-email-configuration)) or reset it from another admin account.
 
 ## Documentation
 

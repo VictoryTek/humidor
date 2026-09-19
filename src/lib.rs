@@ -1,6 +1,7 @@
 // Library exports for integration testing
 // This allows tests to access internal modules
 
+pub mod db_config;
 pub mod errors;
 pub mod handlers;
 pub mod middleware;

@@ -1,5 +1,6 @@
 #![recursion_limit = "256"]
 
+mod db_config;
 mod errors;
 mod handlers;
 mod middleware;
@@ -265,22 +266,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing::info!("Metrics collection initialized with Prometheus exporter");
 
-    // Build DATABASE_URL from secrets or environment
-    let database_url = if let Ok(template) = env::var("DATABASE_URL_TEMPLATE") {
+    // Build the database config from secrets or environment
+    let mut config = if let Ok(template) = env::var("DATABASE_URL_TEMPLATE") {
         // Using Docker secrets - read username and password from secret files
         let db_user =
             read_secret("db_user", "DB_USER").unwrap_or_else(|| "humidor_user".to_string());
         let db_password =
             read_secret("db_password", "DB_PASSWORD").unwrap_or_else(|| "humidor_pass".to_string());
 
-        template
-            .replace("{{DB_USER}}", &db_user)
-            .replace("{{DB_PASSWORD}}", &db_password)
+        let mut config = Config::new();
+        config.url = Some(
+            template
+                .replace("{{DB_USER}}", &db_user)
+                .replace("{{DB_PASSWORD}}", &db_password),
+        );
+        config
     } else {
-        // Fall back to DATABASE_URL environment variable or default
-        env::var("DATABASE_URL").unwrap_or_else(|_| {
-            "postgresql://humidor_user:humidor_pass@localhost:5432/humidor_db".to_string()
-        })
+        // DATABASE_URL, or discrete POSTGRES_* variables; fails fast if neither is set
+        db_config::resolve_database_config(|key| env::var(key).ok())?
     };
 
     // Create connection pool configuration
@@ -290,8 +293,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Creating database connection pool"
     );
 
-    let mut config = Config::new();
-    config.url = Some(database_url.clone());
     config.manager = Some(ManagerConfig {
         recycling_method: RecyclingMethod::Fast,
     });
