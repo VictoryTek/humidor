@@ -1,0 +1,27 @@
+# cargo-audit configuration
+# https://github.com/rustsec/rustsec/blob/main/cargo-audit/audit.toml.example
+# NOTE: cargo-audit only reads this file from .cargo/audit.toml (or ~/.cargo/audit.toml),
+# not from the repository root. Unmaintained/unsound advisories are warnings by default.
+
+[advisories]
+# Ignore specific advisories that are acceptable
+ignore = [
+    # fxhash unmaintained - transitive dependency via selectors crate
+    # Dependency chain: humidor -> scraper 0.24 -> selectors 0.31 -> fxhash 0.2.1
+    # Rationale for ignoring:
+    # - Not a security vulnerability, only unmaintained status
+    # - Transitive dependency we don't control directly
+    # - selectors crate is actively maintained by Mozilla Servo project
+    # - Latest scraper version (0.24) still uses selectors 0.31
+    # - Unmaintained ≠ vulnerable - no known security issues
+    "RUSTSEC-2025-0057",
+
+    # h2 0.3.27 - unbounded empty DATA frames (Low severity, denial of service)
+    # Dependency chain: humidor -> warp 0.3.7 -> hyper 0.14.32 -> h2 0.3.27
+    # Rationale for ignoring:
+    # - Patched only in h2 >= 0.4.16; no fix exists for the 0.3.x line that hyper 0.14 requires
+    # - warp is intentionally pinned to 0.3.x (see Cargo.toml and docs/DEPENDENCY_UPDATES_PLAN.md)
+    # - The h2 0.4.x copy used by reqwest/hyper 1.x has been updated to 0.4.16 in Cargo.lock
+    # REMOVE this ignore when warp/hyper are migrated to hyper 1.x (Phase 4 of the plan)
+    "RUSTSEC-2026-0258",
+]
