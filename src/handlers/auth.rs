@@ -104,9 +104,7 @@ pub async fn get_setup_status(pool: DbPool) -> Result<impl Reply, warp::Rejectio
         }
         Err(e) => {
             tracing::error!(error = %e, "Database error");
-            Ok(warp::reply::json(&json!({
-                "error": "Failed to check setup status"
-            })))
+            Err(warp::reject::custom(AppError::DatabaseError(e.to_string())))
         }
     }
 }
@@ -598,7 +596,7 @@ pub async fn get_current_user(
         }
         Err(e) => {
             tracing::error!(error = %e, "Database error");
-            Ok(warp::reply::json(&json!({"error": "Failed to fetch user"})))
+            Err(warp::reject::custom(AppError::DatabaseError(e.to_string())))
         }
     }
 }
@@ -676,9 +674,10 @@ pub async fn update_current_user(
         }
         Err(e) => {
             tracing::error!(error = %e, "Database error");
-            Ok(warp::reply::json(
-                &json!({"error": "Failed to update user"}),
-            ))
+            Err(warp::reject::custom(AppError::from_db_error(
+                &e,
+                "Username or email already exists",
+            )))
         }
     }
 }
@@ -710,16 +709,17 @@ pub async fn change_password(
             match verify_password(password_req.current_password.clone(), current_hash).await {
                 Ok(valid) => {
                     if !valid {
-                        return Ok(warp::reply::json(
-                            &json!({"error": "Current password is incorrect"}),
-                        ));
+                        // 400, not 401: the frontend treats any 401 as an expired session and logs out
+                        return Err(warp::reject::custom(AppError::BadRequest(
+                            "Current password is incorrect".to_string(),
+                        )));
                     }
                 }
                 Err(e) => {
                     tracing::error!(error = %e, "Password verification error");
-                    return Ok(warp::reply::json(
-                        &json!({"error": "Password verification failed"}),
-                    ));
+                    return Err(warp::reject::custom(AppError::InternalServerError(
+                        format!("Password verification failed: {e}"),
+                    )));
                 }
             }
 
@@ -728,9 +728,9 @@ pub async fn change_password(
                 Ok(h) => h,
                 Err(e) => {
                     tracing::error!(error = %e, "Password hashing error");
-                    return Ok(warp::reply::json(
-                        &json!({"error": "Failed to hash new password"}),
-                    ));
+                    return Err(warp::reject::custom(AppError::InternalServerError(
+                        format!("Failed to hash new password: {e}"),
+                    )));
                 }
             };
 
@@ -748,15 +748,13 @@ pub async fn change_password(
                 )),
                 Err(e) => {
                     tracing::error!(error = %e, "Database error");
-                    Ok(warp::reply::json(
-                        &json!({"error": "Failed to update password"}),
-                    ))
+                    Err(warp::reject::custom(AppError::DatabaseError(e.to_string())))
                 }
             }
         }
         Err(e) => {
             tracing::error!(error = %e, "Database error");
-            Ok(warp::reply::json(&json!({"error": "Failed to fetch user"})))
+            Err(warp::reject::custom(AppError::DatabaseError(e.to_string())))
         }
     }
 }

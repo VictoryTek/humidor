@@ -4451,7 +4451,7 @@ async function saveProfile() {
             showToast('Profile updated successfully!');
         } else {
             const error = await response.json();
-            showToast(error.error || 'Failed to update profile', 'error');
+            showToast(error.message || error.error || 'Failed to update profile', 'error');
         }
     } catch (error) {
         console.error('Error updating profile:', error);
@@ -4514,7 +4514,7 @@ async function changePassword() {
             document.getElementById('confirmPassword').value = '';
         } else {
             const error = await response.json();
-            showToast(error.error || 'Failed to change password', 'error');
+            showToast(error.message || error.error || 'Failed to change password', 'error');
         }
     } catch (error) {
         console.error('Error changing password:', error);

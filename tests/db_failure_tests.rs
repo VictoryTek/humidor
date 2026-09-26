@@ -112,3 +112,26 @@ async fn forgot_password_db_failure_is_500() {
         Err(e) => assert_database_error_500(e, "forgot_password").await,
     }
 }
+
+#[tokio::test]
+#[serial]
+async fn setup_status_and_profile_db_failures_are_500() {
+    let pool = pool_without_tables().await;
+
+    match handlers::auth::get_setup_status(pool.clone()).await {
+        Ok(_) => panic!("get_setup_status should fail"),
+        Err(e) => assert_database_error_500(e, "get_setup_status").await,
+    }
+    match handlers::auth::get_current_user(auth(), pool.clone()).await {
+        Ok(_) => panic!("get_current_user should fail"),
+        Err(e) => assert_database_error_500(e, "get_current_user").await,
+    }
+    let request = humidor::models::ChangePasswordRequest {
+        current_password: "a".to_string(),
+        new_password: "b".to_string(),
+    };
+    match handlers::auth::change_password(request, auth(), pool).await {
+        Ok(_) => panic!("change_password should fail"),
+        Err(e) => assert_database_error_500(e, "change_password").await,
+    }
+}

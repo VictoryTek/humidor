@@ -40,14 +40,15 @@ Tags: `[ARCH]` architecture doc, `[BUG]` bug doc, `[FEAT]` feature doc.
   `SMTP_FROM` vs. actual `SMTP_USER`/`SMTP_FROM_EMAIL`) — a fail-fast validator that certifies
   broken configs as good, or rejects working ones. **[ARCH 1.3] [BUG M4]**
   Files: `src/main.rs:167-211`, `src/services/email.rs:18-29`, `src/handlers/auth.rs:945-960`
-- [ ] 8. Three coexisting error-handling regimes across handlers; DB/internal error strings
+- [x] 8. Three coexisting error-handling regimes across handlers; DB/internal error strings
   leaked to clients in several handlers; many endpoints return `200 OK` on failure so clients
   can't distinguish success from error by status code. **[ARCH 3.1] [ARCH 1.9] [BUG M5] [BUG M6]**
   Files: `src/handlers/humidors.rs`, `src/handlers/backups.rs`, `src/handlers/auth.rs`,
   `src/handlers/cigars.rs`, `src/errors.rs`
-  *Phases 1-3 done (backups, humidors `details` leak, all `reject::reject()`→404 sites, cigar + organizer
-  200-on-failure). Remaining: 8 sites in `auth.rs` (`get_setup_status`, `get_current_user`, `update_current_user`,
-  `change_password`) — note wrong-current-password must not be 401 (frontend logs out on 401).*
+  *Done in 4 phases: error text no longer leaks; no 200-on-failure remains (regex sweep). Residual, deferred as
+  low priority: 43 sites (`auth.rs`, `humidors.rs`, dead `images.rs`) use correct statuses but an ad-hoc
+  `{"error": text}` body instead of `AppError`'s `{"error": CODE, "message": text}`; unifying risks breaking
+  `login.js` and friends that read `data.error` as text.*
 - [ ] 9. Dual-crate layout — `main.rs` re-declares the entire module tree privately instead of
   depending on the library crate; doubles compile time and lets bin/lib types (e.g. two `DbPool`
   aliases) drift apart silently. **[ARCH 1.1]**
