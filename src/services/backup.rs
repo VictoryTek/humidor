@@ -2,7 +2,7 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
 use std::io::{Read, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tokio_postgres::Client;
 use zip::write::FileOptions;
 use zip::{CompressionMethod, ZipArchive, ZipWriter};
@@ -66,26 +66,42 @@ pub async fn create_backup(db: &Client) -> Result<String, Box<dyn std::error::Er
     Ok(backup_name)
 }
 
+/// Resolve a client-supplied backup filename to a path inside `backups/`.
+/// Accepts only a bare `*.zip` filename; anything containing a path separator,
+/// `..`, or a NUL byte is rejected (a lexical `starts_with` check on the joined
+/// path is not sufficient, since `backups/../x` still starts with `backups`).
+pub fn backup_path(name: &str) -> Result<PathBuf, Box<dyn std::error::Error>> {
+    let is_bare_name = Path::new(name).file_name().and_then(|n| n.to_str()) == Some(name);
+    if !is_bare_name
+        || name == ".."
+        || name.contains(['/', '\\', '\0'])
+        || !name.to_ascii_lowercase().ends_with(".zip")
+    {
+        return Err("Invalid backup filename".into());
+    }
+    Ok(Path::new("backups").join(name))
+}
+
 pub async fn restore_backup(
     db: &Client,
     backup_name: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Check if backup_name is a full path or just a filename
-    let backup_path = if backup_name.contains("/") || backup_name.contains("\\") {
-        // It's a full path
-        Path::new(backup_name).to_path_buf()
-    } else {
-        // It's just a filename, look in backups directory
-        let backups_dir = Path::new("backups");
-        backups_dir.join(backup_name)
-    };
+    // Convert to String so no non-Send error is held across the await below.
+    let path = backup_path(backup_name).map_err(|e| e.to_string())?;
+    restore_backup_from_path(db, &path).await
+}
 
+/// Restore from an already-trusted path (caller must not derive it from client input).
+pub async fn restore_backup_from_path(
+    db: &Client,
+    backup_path: &Path,
+) -> Result<(), Box<dyn std::error::Error>> {
     if !backup_path.exists() {
         return Err("Backup file not found".into());
     }
 
     // Open ZIP file
-    let file = File::open(&backup_path)?;
+    let file = File::open(backup_path)?;
     let mut archive = ZipArchive::new(file)?;
 
     // Read and validate metadata
@@ -178,16 +194,10 @@ pub fn list_backups() -> Result<Vec<BackupInfo>, Box<dyn std::error::Error>> {
 }
 
 pub fn delete_backup(backup_name: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let backups_dir = Path::new("backups");
-    let backup_path = backups_dir.join(backup_name);
+    let backup_path = backup_path(backup_name)?;
 
-    if !backup_path.exists() || !backup_path.is_file() {
+    if !backup_path.is_file() {
         return Err("Backup file not found".into());
-    }
-
-    // Security check: ensure the path is within backups directory
-    if !backup_path.starts_with(backups_dir) {
-        return Err("Invalid backup path".into());
     }
 
     fs::remove_file(backup_path)?;
@@ -369,5 +379,35 @@ fn format_size(bytes: u64) -> String {
         format!("{:.2} KB", bytes as f64 / KB as f64)
     } else {
         format!("{} B", bytes)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::backup_path;
+
+    #[test]
+    fn backup_path_accepts_bare_zip_name() {
+        assert_eq!(
+            backup_path("humidor_backup_1.zip").unwrap(),
+            std::path::Path::new("backups").join("humidor_backup_1.zip")
+        );
+    }
+
+    #[test]
+    fn backup_path_rejects_traversal_and_non_zip() {
+        for bad in [
+            "../evil.zip",
+            "..\\evil.zip",
+            "a/b.zip",
+            "/etc/passwd.zip",
+            "..",
+            ".zip/..",
+            "x.zip\0.txt",
+            "backup.txt",
+            "",
+        ] {
+            assert!(backup_path(bad).is_err(), "should reject {bad:?}");
+        }
     }
 }

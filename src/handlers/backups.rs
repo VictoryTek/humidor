@@ -1,6 +1,8 @@
+use crate::errors::AppError;
 use crate::middleware::auth::AuthContext;
 use crate::services::backup::{
-    BackupInfo, create_backup, delete_backup, list_backups, restore_backup,
+    BackupInfo, backup_path, create_backup, delete_backup, list_backups, restore_backup,
+    restore_backup_from_path,
 };
 use bytes::Buf;
 use deadpool_postgres::Pool as DbPool;
@@ -58,11 +60,8 @@ pub async fn download_backup(
     _auth: AuthContext,
     _pool: DbPool,
 ) -> Result<impl Reply, Rejection> {
-    let backups_dir = Path::new("backups");
-    let backup_path = backups_dir.join(&filename);
-
-    // Security check: ensure the path is within backups directory
-    if !backup_path.starts_with(backups_dir) || !backup_path.exists() {
+    let backup_path = backup_path(&filename).map_err(|_| warp::reject::not_found())?;
+    if !backup_path.exists() {
         return Err(warp::reject::not_found());
     }
 
@@ -135,8 +134,8 @@ pub async fn restore_backup_handler(
 }
 
 pub async fn upload_backup(
-    form: warp::multipart::FormData,
     _auth: AuthContext,
+    form: warp::multipart::FormData,
     _pool: DbPool,
 ) -> Result<impl Reply, Rejection> {
     use futures::StreamExt;
@@ -153,21 +152,12 @@ pub async fn upload_backup(
         if part.name() == "file" {
             let filename = part.filename().unwrap_or("backup.zip").to_string();
 
-            // Security check: ensure it's a zip file
-            if !filename.ends_with(".zip") {
+            // Security check: bare *.zip filename only (no path components)
+            let Ok(backup_path) = backup_path(&filename) else {
                 return Ok(warp::reply::json(&MessageResponse {
-                    message: "Only .zip files are allowed".to_string(),
+                    message: "Invalid filename: only plain .zip filenames are allowed".to_string(),
                 }));
-            }
-
-            let backup_path = backups_dir.join(&filename);
-
-            // Security check: ensure the path is within backups directory
-            if !backup_path.starts_with(backups_dir) {
-                return Ok(warp::reply::json(&MessageResponse {
-                    message: "Invalid filename".to_string(),
-                }));
-            }
+            };
 
             // Collect all data into a buffer
             let mut buffer = Vec::new();
@@ -198,35 +188,44 @@ pub async fn upload_backup(
     }))
 }
 
-// Setup restore - upload and restore backup during initial setup (no auth required)
+// Setup restore - upload and restore backup during initial setup.
+// No auth, so it is only permitted while no admin exists (same rule as get_setup_status).
 pub async fn setup_restore_backup(
     mut form: warp::multipart::FormData,
     pool: DbPool,
 ) -> Result<impl Reply, Rejection> {
-    let uploads_dir = Path::new("uploads");
+    let db = pool.get().await.map_err(|e| {
+        tracing::error!(error = %e, "Failed to get database connection");
+        warp::reject::reject()
+    })?;
+    let admin_count: i64 = db
+        .query_one("SELECT COUNT(*) FROM users WHERE is_admin = true", &[])
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "Failed to check setup status");
+            warp::reject::reject()
+        })?
+        .get(0);
+    if admin_count > 0 {
+        return Err(warp::reject::custom(AppError::Forbidden(
+            "Setup already completed".to_string(),
+        )));
+    }
 
     // Process multipart form data
     while let Some(Ok(mut part)) = form.next().await {
         if part.name() == "file" {
-            let filename = part
-                .filename()
-                .map(|s| s.to_string())
-                .unwrap_or_else(|| "backup.zip".to_string());
+            let filename = part.filename().unwrap_or("backup.zip");
 
-            if !filename.ends_with(".zip") {
+            if !filename.to_ascii_lowercase().ends_with(".zip") {
                 return Ok(warp::reply::json(&MessageResponse {
                     message: "Invalid file type. Only .zip files are allowed".to_string(),
                 }));
             }
 
-            let backup_path = uploads_dir.join(&filename);
-
-            // Security check: ensure the path is within uploads directory
-            if !backup_path.starts_with(uploads_dir) {
-                return Ok(warp::reply::json(&MessageResponse {
-                    message: "Invalid filename".to_string(),
-                }));
-            }
+            // Never use the client-supplied filename on disk: server-generated name only.
+            let backup_path =
+                std::env::temp_dir().join(format!("setup_restore_{}.zip", uuid::Uuid::new_v4()));
 
             // Collect all data into a buffer
             let mut buffer = Vec::new();
@@ -246,18 +245,8 @@ pub async fn setup_restore_backup(
             })?;
 
             // Now restore the backup
-            let db = pool.get().await.map_err(|e| {
-                tracing::error!(error = %e, "Failed to get database connection");
-                warp::reject::reject()
-            })?;
-
-            let backup_path_str = backup_path.to_str().ok_or_else(|| {
-                tracing::error!("Invalid path");
-                warp::reject::reject()
-            })?;
-
             // Convert error to String immediately to avoid Send issues across await
-            let result = restore_backup(&db, backup_path_str)
+            let result = restore_backup_from_path(&db, &backup_path)
                 .await
                 .map_err(|e| format!("Error restoring backup: {}", e));
 

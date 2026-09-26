@@ -15,12 +15,12 @@ Tags: `[ARCH]` architecture doc, `[BUG]` bug doc, `[FEAT]` feature doc.
   sentinel `"INVALID_SECRET_NOT_CONFIGURED"`, a full authentication bypass on any deployment
   without an explicit `JWT_SECRET`. **[ARCH 1.2] [BUG H1]**
   Files: `src/main.rs:35-135`, `src/handlers/auth.rs:50-74`
-- [ ] 2. Backup endpoints access control gap — `POST /api/v1/setup/restore` has no auth at all
+- [x] 2. Backup endpoints access control gap — `POST /api/v1/setup/restore` has no auth at all
   (anonymous DB wipe + admin takeover); backup list/download use `with_current_user` instead of
   `with_admin`, so any authenticated user can download a full-DB export of every user's data.
   **[BUG H2] [FEAT #2 security part]**
   Files: `src/routes/backups.rs`, `src/handlers/backups.rs`, `src/services/backup.rs`
-- [ ] 3. Backup path-traversal guards are lexical no-ops — `starts_with(backups_dir)` on a
+- [x] 3. Backup path-traversal guards are lexical no-ops — `starts_with(backups_dir)` on a
   joined `../` path always passes; attacker-controlled multipart filename in upload/setup-restore
   can write outside the backups directory. **[ARCH 4.1]**
   Files: `src/handlers/backups.rs:65-67,163-170,222-229`
