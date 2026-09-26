@@ -46,7 +46,7 @@ pub async fn get_favorites(auth: AuthContext, pool: DbPool) -> Result<impl Reply
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "Database error getting favorites");
-            warp::reject::reject()
+            warp::reject::custom(AppError::DatabaseError(e.to_string()))
         })?;
 
     let favorites: Vec<serde_json::Value> = rows.iter().map(|row| {
@@ -147,7 +147,7 @@ pub async fn add_favorite(
                 error = %e,
                 "Database error fetching cigar for snapshot"
             );
-            warp::reject::reject()
+            warp::reject::custom(AppError::DatabaseError(e.to_string()))
         })?;
 
     let cigar = match cigar {
@@ -211,7 +211,7 @@ pub async fn add_favorite(
         }
         Err(e) => {
             tracing::error!(error = %e, "Database error adding favorite");
-            Err(warp::reject::reject())
+            Err(warp::reject::custom(AppError::DatabaseError(e.to_string())))
         }
     }
 }
@@ -239,7 +239,7 @@ pub async fn remove_favorite(
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "Database error removing favorite by cigar_id");
-            warp::reject::reject()
+            warp::reject::custom(AppError::DatabaseError(e.to_string()))
         })?;
 
     // If no rows deleted, try deleting by favorite id (for orphaned favorites)
@@ -251,7 +251,7 @@ pub async fn remove_favorite(
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "Database error removing favorite by id");
-            warp::reject::reject()
+            warp::reject::custom(AppError::DatabaseError(e.to_string()))
         })?;
     }
 
@@ -287,7 +287,7 @@ pub async fn is_favorite(
         }
         Err(e) => {
             tracing::error!(error = %e, "Database error checking favorite");
-            Err(warp::reject::reject())
+            Err(warp::reject::custom(AppError::DatabaseError(e.to_string())))
         }
     }
 }

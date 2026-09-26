@@ -796,7 +796,7 @@ pub async fn forgot_password(
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "Database error checking user");
-            warp::reject::reject()
+            warp::reject::custom(AppError::DatabaseError(e.to_string()))
         })?;
 
     // Don't reveal whether user exists (security best practice)
@@ -828,7 +828,7 @@ pub async fn forgot_password(
     .await
     .map_err(|e| {
         tracing::error!(error = %e, "Failed to store password reset token");
-        warp::reject::reject()
+        warp::reject::custom(AppError::DatabaseError(e.to_string()))
     })?;
 
     // Send email with reset link
@@ -878,7 +878,7 @@ pub async fn reset_password(
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "Database error checking token");
-            warp::reject::reject()
+            warp::reject::custom(AppError::DatabaseError(e.to_string()))
         })?;
 
     let token_row = match token_result {
@@ -930,7 +930,7 @@ pub async fn reset_password(
     .await
     .map_err(|e| {
         tracing::error!(error = %e, "Failed to update password");
-        warp::reject::reject()
+        warp::reject::custom(AppError::DatabaseError(e.to_string()))
     })?;
 
     // Delete the used token

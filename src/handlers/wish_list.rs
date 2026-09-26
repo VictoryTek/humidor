@@ -50,7 +50,7 @@ pub async fn get_wish_list(auth: AuthContext, pool: DbPool) -> Result<impl Reply
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "Database error getting wish list");
-            warp::reject::reject()
+            warp::reject::custom(AppError::DatabaseError(e.to_string()))
         })?;
 
     let wish_list: Vec<serde_json::Value> = rows
@@ -133,7 +133,7 @@ pub async fn add_to_wish_list(
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "Database error checking cigar");
-            warp::reject::reject()
+            warp::reject::custom(AppError::DatabaseError(e.to_string()))
         })?;
 
     if cigar_exists.is_none() {
@@ -161,7 +161,7 @@ pub async fn add_to_wish_list(
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "Database error adding to wish list");
-            warp::reject::reject()
+            warp::reject::custom(AppError::DatabaseError(e.to_string()))
         })?;
 
     // If insert succeeded, return the new item
@@ -203,7 +203,7 @@ pub async fn add_to_wish_list(
             }
             Err(e) => {
                 tracing::error!(error = %e, "Database error fetching existing wish list item");
-                Err(warp::reject::reject())
+                Err(warp::reject::custom(AppError::DatabaseError(e.to_string())))
             }
         }
     }
@@ -230,7 +230,7 @@ pub async fn remove_from_wish_list(
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "Database error removing from wish list");
-            warp::reject::reject()
+            warp::reject::custom(AppError::DatabaseError(e.to_string()))
         })?;
 
     if rows_deleted == 0 {
@@ -271,7 +271,7 @@ pub async fn check_wish_list(
         }
         Err(e) => {
             tracing::error!(error = %e, "Database error checking wish list");
-            Err(warp::reject::reject())
+            Err(warp::reject::custom(AppError::DatabaseError(e.to_string())))
         }
     }
 }
@@ -314,7 +314,7 @@ pub async fn update_wish_list_notes(
         ))),
         Err(e) => {
             tracing::error!(error = %e, "Database error updating wish list notes");
-            Err(warp::reject::reject())
+            Err(warp::reject::custom(AppError::DatabaseError(e.to_string())))
         }
     }
 }

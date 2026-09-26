@@ -45,8 +45,8 @@ Tags: `[ARCH]` architecture doc, `[BUG]` bug doc, `[FEAT]` feature doc.
   can't distinguish success from error by status code. **[ARCH 3.1] [ARCH 1.9] [BUG M5] [BUG M6]**
   Files: `src/handlers/humidors.rs`, `src/handlers/backups.rs`, `src/handlers/auth.rs`,
   `src/handlers/cigars.rs`, `src/errors.rs`
-  *Phase 1 done (backups handlers + humidors `details` leak). Remaining: `reject::reject()`→404 in favorites/
-  wish_list/auth, 200-on-failure in cigars + organizer handlers, auth.rs regimes.*
+  *Phases 1-2 done (backups handlers, humidors `details` leak, all `reject::reject()`→404 sites). Remaining:
+  200-on-failure in cigars + organizer handlers, auth.rs regimes.*
 - [ ] 9. Dual-crate layout — `main.rs` re-declares the entire module tree privately instead of
   depending on the library crate; doubles compile time and lets bin/lib types (e.g. two `DbPool`
   aliases) drift apart silently. **[ARCH 1.1]**
