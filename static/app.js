@@ -1775,7 +1775,7 @@ async function importFromUrl() {
         
         if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.error || 'Failed to scrape URL');
+            throw new Error(error.message || error.error || 'Failed to scrape URL');
         }
         
         scrapedCigarData = await response.json();

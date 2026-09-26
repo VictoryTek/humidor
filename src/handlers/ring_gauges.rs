@@ -35,7 +35,7 @@ pub async fn get_ring_gauges(auth: AuthContext, pool: DbPool) -> Result<impl Rep
         }
         Err(e) => {
             tracing::error!(error = %e, "Database error");
-            Ok(warp::reply::json(&json!({"error": "Failed to fetch ring gauges"})))
+            Err(warp::reject::custom(AppError::DatabaseError(e.to_string())))
         }
     }
 }
@@ -78,7 +78,7 @@ pub async fn create_ring_gauge(
         }
         Err(e) => {
             tracing::error!(error = %e, "Database error");
-            Ok(warp::reply::json(&json!({"error": "Failed to create ring gauge"})))
+            Err(warp::reject::custom(AppError::from_db_error(&e, "Ring gauge already exists")))
         }
     }
 }
@@ -133,14 +133,15 @@ pub async fn update_ring_gauge(
             };
             Ok(warp::reply::json(&ring_gauge))
         }
-        Ok(None) => Ok(warp::reply::json(
-            &json!({"error": "Ring gauge not found or unauthorized"}),
-        )),
+        Ok(None) => Err(warp::reject::custom(AppError::NotFound(
+            "Ring gauge".to_string(),
+        ))),
         Err(e) => {
             tracing::error!(error = %e, "Database error");
-            Ok(warp::reply::json(
-                &json!({"error": "Failed to update ring gauge"}),
-            ))
+            Err(warp::reject::custom(AppError::from_db_error(
+                &e,
+                "Ring gauge already exists",
+            )))
         }
     }
 }
@@ -170,16 +171,14 @@ pub async fn delete_ring_gauge(
                     &json!({"message": "Ring gauge deleted successfully"}),
                 ))
             } else {
-                Ok(warp::reply::json(
-                    &json!({"error": "Ring gauge not found or unauthorized"}),
-                ))
+                Err(warp::reject::custom(AppError::NotFound(
+                    "Ring gauge".to_string(),
+                )))
             }
         }
         Err(e) => {
             tracing::error!(error = %e, "Database error");
-            Ok(warp::reply::json(
-                &json!({"error": "Failed to delete ring gauge"}),
-            ))
+            Err(warp::reject::custom(AppError::DatabaseError(e.to_string())))
         }
     }
 }

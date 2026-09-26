@@ -36,7 +36,7 @@ pub async fn get_sizes(auth: AuthContext, pool: DbPool) -> Result<impl Reply, Re
         }
         Err(e) => {
             tracing::error!(error = %e, "Database error");
-            Ok(warp::reply::json(&json!({"error": "Failed to fetch sizes"})))
+            Err(warp::reject::custom(AppError::DatabaseError(e.to_string())))
         }
     }
 }
@@ -80,7 +80,7 @@ pub async fn create_size(
         }
         Err(e) => {
             tracing::error!(error = %e, "Database error");
-            Ok(warp::reply::json(&json!({"error": "Failed to create size"})))
+            Err(warp::reject::custom(AppError::from_db_error(&e, "Size already exists")))
         }
     }
 }
@@ -139,13 +139,11 @@ pub async fn update_size(
             Ok(warp::reply::json(&size))
         }
         Ok(None) => {
-            Ok(warp::reply::json(&json!({"error": "Size not found or unauthorized"})))
+            Err(warp::reject::custom(AppError::NotFound("Size".to_string())))
         }
         Err(e) => {
             tracing::error!(error = %e, "Database error");
-            Ok(warp::reply::json(
-                &json!({"error": "Failed to update size"}),
-            ))
+            Err(warp::reject::custom(AppError::from_db_error(&e, "Size already exists")))
         }
     }
 }
@@ -175,16 +173,12 @@ pub async fn delete_size(
                     &json!({"message": "Size deleted successfully"}),
                 ))
             } else {
-                Ok(warp::reply::json(
-                    &json!({"error": "Size not found or unauthorized"}),
-                ))
+                Err(warp::reject::custom(AppError::NotFound("Size".to_string())))
             }
         }
         Err(e) => {
             tracing::error!(error = %e, "Database error");
-            Ok(warp::reply::json(
-                &json!({"error": "Failed to delete size"}),
-            ))
+            Err(warp::reject::custom(AppError::DatabaseError(e.to_string())))
         }
     }
 }

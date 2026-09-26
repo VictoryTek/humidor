@@ -36,7 +36,7 @@ pub async fn get_origins(auth: AuthContext, pool: DbPool) -> Result<impl Reply, 
         }
         Err(e) => {
             tracing::error!(error = %e, "Database error");
-            Ok(warp::reply::json(&json!({"error": "Failed to fetch origins"})))
+            Err(warp::reject::custom(AppError::DatabaseError(e.to_string())))
         }
     }
 }
@@ -92,9 +92,7 @@ pub async fn create_origin(
         }
         Err(e) => {
             tracing::error!(error = %e, "Database error");
-            Ok(warp::reply::json(
-                &json!({"error": "Failed to create origin"}),
-            ))
+            Err(warp::reject::custom(AppError::from_db_error(&e, "Origin already exists")))
         }
     }
 }
@@ -152,14 +150,15 @@ pub async fn update_origin(
             };
             Ok(warp::reply::json(&origin))
         }
-        Ok(None) => Ok(warp::reply::json(
-            &json!({"error": "Origin not found or unauthorized"}),
-        )),
+        Ok(None) => Err(warp::reject::custom(AppError::NotFound(
+            "Origin".to_string(),
+        ))),
         Err(e) => {
             tracing::error!(error = %e, "Database error");
-            Ok(warp::reply::json(
-                &json!({"error": "Failed to update origin"}),
-            ))
+            Err(warp::reject::custom(AppError::from_db_error(
+                &e,
+                "Origin already exists",
+            )))
         }
     }
 }
@@ -189,16 +188,14 @@ pub async fn delete_origin(
                     &json!({"message": "Origin deleted successfully"}),
                 ))
             } else {
-                Ok(warp::reply::json(
-                    &json!({"error": "Origin not found or unauthorized"}),
-                ))
+                Err(warp::reject::custom(AppError::NotFound(
+                    "Origin".to_string(),
+                )))
             }
         }
         Err(e) => {
             tracing::error!(error = %e, "Database error");
-            Ok(warp::reply::json(
-                &json!({"error": "Failed to delete origin"}),
-            ))
+            Err(warp::reject::custom(AppError::DatabaseError(e.to_string())))
         }
     }
 }

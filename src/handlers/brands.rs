@@ -36,7 +36,7 @@ pub async fn get_brands(auth: AuthContext, pool: DbPool) -> Result<impl Reply, R
         }
         Err(e) => {
             tracing::error!(error = %e, "Database error fetching brands");
-            Ok(warp::reply::json(&json!({"error": "Failed to fetch brands"})))
+            Err(warp::reject::custom(AppError::DatabaseError(e.to_string())))
         }
     }
 }
@@ -92,9 +92,7 @@ pub async fn create_brand(
         }
         Err(e) => {
             tracing::error!(error = %e, brand_name = %create_brand.name, "Database error creating brand");
-            Ok(warp::reply::json(
-                &json!({"error": "Failed to create brand"}),
-            ))
+            Err(warp::reject::custom(AppError::from_db_error(&e, "Brand already exists")))
         }
     }
 }
@@ -152,14 +150,15 @@ pub async fn update_brand(
             };
             Ok(warp::reply::json(&brand))
         }
-        Ok(None) => Ok(warp::reply::json(
-            &json!({"error": "Brand not found or unauthorized"}),
-        )),
+        Ok(None) => Err(warp::reject::custom(AppError::NotFound(
+            "Brand".to_string(),
+        ))),
         Err(e) => {
             tracing::error!(error = %e, brand_id = %id, "Database error updating brand");
-            Ok(warp::reply::json(
-                &json!({"error": "Failed to update brand"}),
-            ))
+            Err(warp::reject::custom(AppError::from_db_error(
+                &e,
+                "Brand already exists",
+            )))
         }
     }
 }
@@ -189,16 +188,14 @@ pub async fn delete_brand(
                     &json!({"message": "Brand deleted successfully"}),
                 ))
             } else {
-                Ok(warp::reply::json(
-                    &json!({"error": "Brand not found or unauthorized"}),
-                ))
+                Err(warp::reject::custom(AppError::NotFound(
+                    "Brand".to_string(),
+                )))
             }
         }
         Err(e) => {
             tracing::error!(error = %e, brand_id = %id, "Database error deleting brand");
-            Ok(warp::reply::json(
-                &json!({"error": "Failed to delete brand"}),
-            ))
+            Err(warp::reject::custom(AppError::DatabaseError(e.to_string())))
         }
     }
 }

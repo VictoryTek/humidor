@@ -395,9 +395,7 @@ pub async fn get_cigars(
         }
         Err(e) => {
             tracing::error!(error = %e, "Database error fetching cigars");
-            Ok(warp::reply::json(
-                &json!({"error": "Failed to fetch cigars"}),
-            ))
+            Err(warp::reject::custom(AppError::DatabaseError(e.to_string())))
         }
     }
 }
@@ -461,7 +459,10 @@ pub async fn create_cigar(
         }
         Err(e) => {
             tracing::error!(error = %e, "Database error");
-            Ok(warp::reply::json(&json!({"error": "Failed to create cigar"})))
+            Err(warp::reject::custom(AppError::from_db_error(
+                &e,
+                "Cigar already exists",
+            )))
         }
     }
 }
@@ -511,7 +512,7 @@ pub async fn get_cigar(id: Uuid, auth: AuthContext, pool: DbPool) -> Result<impl
         }
         Err(e) => {
             tracing::error!(error = %e, "Database error");
-            Ok(warp::reply::json(&json!({"error": "Cigar not found"})))
+            Err(warp::reject::custom(AppError::DatabaseError(e.to_string())))
         }
     }
 }
@@ -614,7 +615,10 @@ pub async fn update_cigar(
         }
         Err(e) => {
             tracing::error!(error = %e, "Database error");
-            Ok(warp::reply::json(&json!({"error": "Failed to update cigar"})))
+            Err(warp::reject::custom(AppError::from_db_error(
+                &e,
+                "Cigar already exists",
+            )))
         }
     }
 }
@@ -675,14 +679,14 @@ pub async fn delete_cigar(
                     &json!({"message": "Cigar deleted successfully"}),
                 ))
             } else {
-                Ok(warp::reply::json(&json!({"error": "Cigar not found"})))
+                Err(warp::reject::custom(AppError::NotFound(
+                    "Cigar".to_string(),
+                )))
             }
         }
         Err(e) => {
             tracing::error!(error = %e, "Database error");
-            Ok(warp::reply::json(
-                &json!({"error": "Failed to delete cigar"}),
-            ))
+            Err(warp::reject::custom(AppError::DatabaseError(e.to_string())))
         }
     }
 }
@@ -894,9 +898,9 @@ pub async fn scrape_cigar_url(
         Ok(data) => Ok(warp::reply::json(&data)),
         Err(e) => {
             tracing::error!(error = %e, "Scraping error");
-            Ok(warp::reply::json(
-                &json!({"error": "Failed to scrape cigar information"}),
-            ))
+            Err(warp::reject::custom(AppError::BadRequest(
+                "Could not scrape cigar information from that URL".to_string(),
+            )))
         }
     }
 }

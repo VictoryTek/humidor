@@ -35,7 +35,7 @@ pub async fn get_strengths(auth: AuthContext, pool: DbPool) -> Result<impl Reply
         }
         Err(e) => {
             tracing::error!(error = %e, "Database error");
-            Ok(warp::reply::json(&json!({"error": "Failed to fetch strengths"})))
+            Err(warp::reject::custom(AppError::DatabaseError(e.to_string())))
         }
     }
 }
@@ -89,9 +89,10 @@ pub async fn create_strength(
         }
         Err(e) => {
             tracing::error!(error = %e, "Database error");
-            Ok(warp::reply::json(
-                &json!({"error": "Failed to create strength"}),
-            ))
+            Err(warp::reject::custom(AppError::from_db_error(
+                &e,
+                "Strength already exists",
+            )))
         }
     }
 }
@@ -146,14 +147,15 @@ pub async fn update_strength(
             };
             Ok(warp::reply::json(&strength))
         }
-        Ok(None) => Ok(warp::reply::json(
-            &json!({"error": "Strength not found or unauthorized"}),
-        )),
+        Ok(None) => Err(warp::reject::custom(AppError::NotFound(
+            "Strength".to_string(),
+        ))),
         Err(e) => {
             tracing::error!(error = %e, "Database error");
-            Ok(warp::reply::json(
-                &json!({"error": "Failed to update strength"}),
-            ))
+            Err(warp::reject::custom(AppError::from_db_error(
+                &e,
+                "Strength already exists",
+            )))
         }
     }
 }
@@ -183,16 +185,14 @@ pub async fn delete_strength(
                     &json!({"message": "Strength deleted successfully"}),
                 ))
             } else {
-                Ok(warp::reply::json(
-                    &json!({"error": "Strength not found or unauthorized"}),
-                ))
+                Err(warp::reject::custom(AppError::NotFound(
+                    "Strength".to_string(),
+                )))
             }
         }
         Err(e) => {
             tracing::error!(error = %e, "Database error");
-            Ok(warp::reply::json(
-                &json!({"error": "Failed to delete strength"}),
-            ))
+            Err(warp::reject::custom(AppError::DatabaseError(e.to_string())))
         }
     }
 }

@@ -1,5 +1,6 @@
 use serde::Serialize;
 use std::fmt;
+use tokio_postgres::error::SqlState;
 use warp::{Reply, http::StatusCode, reject::Reject};
 
 /// Custom error types for the application
@@ -63,6 +64,21 @@ impl ErrorResponse {
 }
 
 impl AppError {
+    /// Map a Postgres error to the most accurate client-facing error: unique violation -> 409
+    /// (with `conflict_msg`), foreign-key violation -> 400, anything else -> a generic 500
+    /// (the detail is logged by `to_http_response`, never sent to the client).
+    pub fn from_db_error(e: &tokio_postgres::Error, conflict_msg: &str) -> Self {
+        match e.code() {
+            Some(code) if *code == SqlState::UNIQUE_VIOLATION => {
+                AppError::Conflict(conflict_msg.to_string())
+            }
+            Some(code) if *code == SqlState::FOREIGN_KEY_VIOLATION => {
+                AppError::BadRequest("Referenced record does not exist".to_string())
+            }
+            _ => AppError::DatabaseError(e.to_string()),
+        }
+    }
+
     /// Convert AppError to HTTP response with proper error hiding
     /// Internal errors are logged but never exposed to clients
     pub fn to_http_response(&self) -> (StatusCode, ErrorResponse) {
