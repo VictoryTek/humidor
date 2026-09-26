@@ -1,18 +1,11 @@
 #![recursion_limit = "256"]
 
-mod db_config;
-mod errors;
-mod handlers;
-mod middleware;
-mod models;
-mod routes;
-mod services;
-mod validation;
-
 use anyhow::bail;
-use deadpool_postgres::{Config, ManagerConfig, Pool, RecyclingMethod, Runtime};
+use deadpool_postgres::{Config, ManagerConfig, RecyclingMethod, Runtime};
+use humidor::DbPool;
+use humidor::middleware::{RateLimiter, handle_rejection};
+use humidor::{db_config, middleware, routes, services};
 use metrics_exporter_prometheus::PrometheusBuilder;
-use middleware::{RateLimiter, handle_rejection};
 use once_cell::sync::Lazy;
 use refinery::embed_migrations;
 use std::env;
@@ -28,8 +21,6 @@ static STARTUP_TIME: Lazy<Instant> = Lazy::new(Instant::now);
 
 // Embed migrations from the migrations directory
 embed_migrations!("migrations");
-
-type DbPool = Pool;
 
 /// Read a secret from Docker secrets or fall back to environment variable
 /// Docker secrets are mounted at /run/secrets/<secret_name>

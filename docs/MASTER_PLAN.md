@@ -40,16 +40,20 @@ Tags: `[ARCH]` architecture doc, `[BUG]` bug doc, `[FEAT]` feature doc.
   `SMTP_FROM` vs. actual `SMTP_USER`/`SMTP_FROM_EMAIL`) — a fail-fast validator that certifies
   broken configs as good, or rejects working ones. **[ARCH 1.3] [BUG M4]**
   Files: `src/main.rs:167-211`, `src/services/email.rs:18-29`, `src/handlers/auth.rs:945-960`
-- [x] 8. Three coexisting error-handling regimes across handlers; DB/internal error strings
+- [ ] 8. Three coexisting error-handling regimes across handlers; DB/internal error strings
   leaked to clients in several handlers; many endpoints return `200 OK` on failure so clients
   can't distinguish success from error by status code. **[ARCH 3.1] [ARCH 1.9] [BUG M5] [BUG M6]**
   Files: `src/handlers/humidors.rs`, `src/handlers/backups.rs`, `src/handlers/auth.rs`,
   `src/handlers/cigars.rs`, `src/errors.rs`
-  *Done in 4 phases: error text no longer leaks; no 200-on-failure remains (regex sweep). Residual, deferred as
-  low priority: 43 sites (`auth.rs`, `humidors.rs`, dead `images.rs`) use correct statuses but an ad-hoc
-  `{"error": text}` body instead of `AppError`'s `{"error": CODE, "message": text}`; unifying risks breaking
-  `login.js` and friends that read `data.error` as text.*
-- [ ] 9. Dual-crate layout — `main.rs` re-declares the entire module tree privately instead of
+  *Phases 1-4 done: error text no longer leaks; no 200-on-failure remains (regex sweep of `src/handlers/**`).
+  **Left unchecked deliberately** for one residual: 43 sites (`auth.rs` 15, `humidors.rs` 21, dead `images.rs` 7)
+  use correct statuses but an ad-hoc `{"error": "<text>"}` body instead of `AppError`'s
+  `{"error": CODE, "message": text}`. Readers of `error` as display text: `login.js:60`, `forgot-password.js:84`,
+  `reset-password.js:115-116`. **Recommendation: leave as is** — converting only buys body-shape consistency and
+  would show codes ("UNAUTHORIZED") instead of messages unless all readers are updated in the same change, with
+  service-worker cache-busters bumped (stale cached JS) and external API clients (if any) at risk. If ever done:
+  convert sites + update those readers + bump cache-busters together.*
+- [x] 9. Dual-crate layout — `main.rs` re-declares the entire module tree privately instead of
   depending on the library crate; doubles compile time and lets bin/lib types (e.g. two `DbPool`
   aliases) drift apart silently. **[ARCH 1.1]**
   Files: `src/main.rs:3-9`, `src/lib.rs:4-10`, `Cargo.toml:6-12`
