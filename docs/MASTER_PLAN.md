@@ -29,7 +29,7 @@ Tags: `[ARCH]` architecture doc, `[BUG]` bug doc, `[FEAT]` feature doc.
   humidor pages; JWT lives in `localStorage` and is stealable. `escapeHtml()` exists but isn't
   used on these paths. **[BUG H3]**
   Files: `static/app.js:1067-1114,3520`
-- [ ] 5. SSRF via cigar-scrape endpoint — arbitrary URL fetched server-side with no scheme
+- [x] 5. SSRF via cigar-scrape endpoint — arbitrary URL fetched server-side with no scheme
   restriction or private/loopback-IP filtering. **[BUG H5]**
   Files: `src/handlers/cigars.rs:887-902`, `src/services/mod.rs:62-85,481-500`
 - [ ] 6. Permissive CORS default combines `allow_any_origin()` with `allow_credentials(true)` —

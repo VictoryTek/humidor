@@ -1,5 +1,6 @@
 pub mod backup;
 pub mod email;
+pub mod url_guard;
 
 use regex::Regex;
 use scraper::{Html, Selector};
@@ -35,9 +36,12 @@ impl ScrapedCigarData {
     }
 }
 
-pub struct CigarScraper {
-    client: reqwest::Client,
-}
+/// Max redirects followed per scrape; every hop is re-validated by `url_guard`.
+const MAX_REDIRECTS: usize = 5;
+/// Max response body read from a scraped site.
+const MAX_BODY_BYTES: usize = 5 * 1024 * 1024;
+
+pub struct CigarScraper;
 
 impl Default for CigarScraper {
     fn default() -> Self {
@@ -47,16 +51,7 @@ impl Default for CigarScraper {
 
 impl CigarScraper {
     pub fn new() -> Self {
-        let client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(15))
-            .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-            .build()
-            .unwrap_or_else(|e| {
-                tracing::error!(error = %e, "Failed to build HTTP client, using default");
-                reqwest::Client::new()
-            });
-
-        Self { client }
+        Self
     }
 
     pub async fn scrape(&self, url: &str) -> Result<ScrapedCigarData, Box<dyn std::error::Error>> {
@@ -78,10 +73,48 @@ impl CigarScraper {
         }
     }
 
+    /// Fetch a user-supplied URL with SSRF protection: each hop (including redirects) must resolve
+    /// only to public addresses, the connection is pinned to the validated addresses, and the
+    /// response size is capped.
     async fn fetch_html(&self, url: &str) -> Result<String, Box<dyn std::error::Error>> {
-        let response = self.client.get(url).send().await?;
-        let html = response.text().await?;
-        Ok(html)
+        let mut current = reqwest::Url::parse(url).map_err(|e| format!("Invalid URL: {e}"))?;
+
+        for _ in 0..=MAX_REDIRECTS {
+            let addrs = url_guard::check_url(&current).await?;
+            let host = current.host_str().ok_or("Missing host")?.to_string();
+
+            let client = reqwest::Client::builder()
+                .timeout(Duration::from_secs(15))
+                .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                .redirect(reqwest::redirect::Policy::none())
+                .resolve_to_addrs(&host, &addrs)
+                .build()?;
+
+            let mut response = client.get(current.clone()).send().await?;
+
+            if response.status().is_redirection() {
+                let location = response
+                    .headers()
+                    .get(reqwest::header::LOCATION)
+                    .and_then(|v| v.to_str().ok())
+                    .ok_or("Redirect without Location header")?;
+                current = current
+                    .join(location)
+                    .map_err(|e| format!("Invalid redirect target: {e}"))?;
+                continue;
+            }
+
+            let mut body: Vec<u8> = Vec::new();
+            while let Some(chunk) = response.chunk().await? {
+                if body.len() + chunk.len() > MAX_BODY_BYTES {
+                    return Err("Response too large".into());
+                }
+                body.extend_from_slice(&chunk);
+            }
+            return Ok(String::from_utf8_lossy(&body).into_owned());
+        }
+
+        Err("Too many redirects".into())
     }
 
     fn clean_text(&self, text: &str) -> Option<String> {
