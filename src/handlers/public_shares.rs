@@ -9,7 +9,7 @@ use std::env;
 use uuid::Uuid;
 use warp::{Rejection, Reply, reject, reply};
 
-use super::humidor_shares::is_humidor_owner;
+use crate::services::permissions::is_humidor_owner;
 
 /// Create or update public share for a humidor
 /// POST /api/v1/humidors/:id/public-share

@@ -1,5 +1,7 @@
 pub mod backup;
 pub mod email;
+pub mod jwt;
+pub mod permissions;
 pub mod url_guard;
 
 use regex::Regex;

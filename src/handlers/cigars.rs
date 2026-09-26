@@ -7,9 +7,9 @@ use warp::{Rejection, Reply};
 use crate::{
     DbPool,
     errors::AppError,
-    handlers::humidor_shares::{can_edit_humidor, can_view_humidor},
     middleware::auth::AuthContext,
     models::*,
+    services::permissions::{can_edit_humidor, can_view_humidor},
     validation::Validate,
 };
 
@@ -660,7 +660,7 @@ pub async fn delete_cigar(
     };
 
     // Check if user can manage (delete requires full permission)
-    use crate::handlers::humidor_shares::can_manage_humidor;
+    use crate::services::permissions::can_manage_humidor;
     if !can_manage_humidor(&pool, &auth.user_id, &humidor_id)
         .await
         .map_err(warp::reject::custom)?

@@ -1,7 +1,7 @@
 use crate::DbPool;
 use crate::errors::AppError;
-use crate::handlers::auth::verify_token;
 use crate::models::UserResponse;
+use crate::services::jwt::verify_token;
 use std::convert::Infallible;
 use uuid::Uuid;
 use warp::{Filter, Rejection, reject};

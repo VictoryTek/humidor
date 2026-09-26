@@ -1,7 +1,7 @@
 use crate::DbPool;
-use crate::handlers::humidor_shares::can_view_humidor;
 use crate::middleware::AuthContext;
 use crate::models::{CreateHumidorRequest, Humidor, UpdateHumidorRequest};
+use crate::services::permissions::can_view_humidor;
 use crate::validation::Validate;
 use serde_json::json;
 use std::convert::Infallible;

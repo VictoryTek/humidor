@@ -57,7 +57,7 @@ Tags: `[ARCH]` architecture doc, `[BUG]` bug doc, `[FEAT]` feature doc.
   depending on the library crate; doubles compile time and lets bin/lib types (e.g. two `DbPool`
   aliases) drift apart silently. **[ARCH 1.1]**
   Files: `src/main.rs:3-9`, `src/lib.rs:4-10`, `Cargo.toml:6-12`
-- [ ] 10. Middleware → handler dependency inversion; authorization predicates
+- [x] 10. Middleware → handler dependency inversion; authorization predicates
   (`can_view_humidor`, `can_manage_humidor`) live in an unrelated handler file with no owning
   module. **[ARCH 1.4]**
   Files: `src/middleware/auth.rs:3`, `src/handlers/humidor_shares.rs`, `src/handlers/humidors.rs:2`,
