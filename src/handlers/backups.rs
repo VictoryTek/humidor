@@ -1,14 +1,13 @@
 use crate::errors::AppError;
 use crate::middleware::auth::AuthContext;
 use crate::services::backup::{
-    BackupInfo, backup_path, create_backup, delete_backup, list_backups, restore_backup,
-    restore_backup_from_path,
+    BackupInfo, BackupInputError, backup_path, create_backup, delete_backup, list_backups,
+    restore_backup, restore_backup_from_path,
 };
 use bytes::Buf;
 use deadpool_postgres::Pool as DbPool;
 use futures::StreamExt;
 use serde::Serialize;
-use std::path::Path;
 use warp::{Rejection, Reply};
 
 #[derive(Serialize)]
@@ -21,37 +20,53 @@ pub struct MessageResponse {
     pub message: String,
 }
 
-pub async fn get_backups(_auth: AuthContext, _pool: DbPool) -> Result<impl Reply, Rejection> {
-    match list_backups() {
-        Ok(backups) => Ok(warp::reply::json(&BackupsResponse { backups })),
-        Err(e) => {
-            tracing::error!(error = %e, "Error listing backups");
-            Ok(warp::reply::json(&BackupsResponse {
-                backups: Vec::new(),
-            }))
+/// Classify a backup service error. Caller-caused failures become 4xx; everything else is
+/// an internal error whose detail is logged but never sent to the client.
+fn backup_app_error(context: &str, e: Box<dyn std::error::Error>) -> AppError {
+    match e.downcast_ref::<BackupInputError>() {
+        Some(BackupInputError::NotFound) => AppError::NotFound("Backup".to_string()),
+        Some(BackupInputError::InvalidFilename) => {
+            AppError::BadRequest("Invalid backup filename".to_string())
         }
+        None if e.is::<zip::result::ZipError>() || e.is::<serde_json::Error>() => {
+            AppError::BadRequest("Invalid or corrupt backup file".to_string())
+        }
+        None => AppError::InternalServerError(format!("{context}: {e}")),
     }
+}
+
+fn internal(context: &str, e: impl std::fmt::Display) -> Rejection {
+    warp::reject::custom(AppError::InternalServerError(format!("{context}: {e}")))
+}
+
+async fn get_db(pool: &DbPool) -> Result<deadpool_postgres::Client, Rejection> {
+    pool.get().await.map_err(|e| {
+        warp::reject::custom(AppError::DatabaseError(format!(
+            "Failed to get database connection: {e}"
+        )))
+    })
+}
+
+pub async fn get_backups(_auth: AuthContext, _pool: DbPool) -> Result<impl Reply, Rejection> {
+    let backups = list_backups()
+        .map_err(|e| warp::reject::custom(backup_app_error("Error listing backups", e)))?;
+    Ok(warp::reply::json(&BackupsResponse { backups }))
 }
 
 pub async fn create_backup_handler(
     _auth: AuthContext,
     pool: DbPool,
 ) -> Result<impl Reply, Rejection> {
-    let db = pool.get().await.map_err(|e| {
-        tracing::error!(error = %e, "Failed to get database connection");
-        warp::reject::reject()
-    })?;
+    let db = get_db(&pool).await?;
 
     match create_backup(&db).await {
         Ok(backup_name) => Ok(warp::reply::json(&MessageResponse {
             message: format!("Backup created successfully: {}", backup_name),
         })),
-        Err(e) => {
-            tracing::error!(error = %e, "Error creating backup");
-            Ok(warp::reply::json(&MessageResponse {
-                message: format!("Error creating backup: {}", e),
-            }))
-        }
+        Err(e) => Err(warp::reject::custom(backup_app_error(
+            "Error creating backup",
+            e,
+        ))),
     }
 }
 
@@ -60,36 +75,26 @@ pub async fn download_backup(
     _auth: AuthContext,
     _pool: DbPool,
 ) -> Result<impl Reply, Rejection> {
-    let backup_path = backup_path(&filename).map_err(|_| warp::reject::not_found())?;
+    let backup_path = backup_path(&filename)
+        .map_err(|e| warp::reject::custom(backup_app_error("Download", e)))?;
     if !backup_path.exists() {
-        return Err(warp::reject::not_found());
+        return Err(warp::reject::custom(AppError::NotFound(
+            "Backup".to_string(),
+        )));
     }
 
-    // Read the file
-    match tokio::fs::read(&backup_path).await {
-        Ok(contents) => {
-            let response = warp::http::Response::builder()
-                .header("Content-Type", "application/zip")
-                .header(
-                    "Content-Disposition",
-                    format!("attachment; filename=\"{}\"", filename),
-                )
-                .body(contents)
-                .map_err(|e| {
-                    tracing::error!(error = %e, "Failed to build HTTP response for backup download");
-                    warp::reject::reject()
-                })?;
-            Ok(response)
-        }
-        Err(e) => {
-            tracing::error!(
-                filename = %filename,
-                error = %e,
-                "Error reading backup file"
-            );
-            Err(warp::reject::not_found())
-        }
-    }
+    let contents = tokio::fs::read(&backup_path)
+        .await
+        .map_err(|e| internal("Error reading backup file", e))?;
+
+    warp::http::Response::builder()
+        .header("Content-Type", "application/zip")
+        .header(
+            "Content-Disposition",
+            format!("attachment; filename=\"{}\"", filename),
+        )
+        .body(contents)
+        .map_err(|e| internal("Failed to build backup download response", e))
 }
 
 pub async fn delete_backup_handler(
@@ -101,12 +106,10 @@ pub async fn delete_backup_handler(
         Ok(()) => Ok(warp::reply::json(&MessageResponse {
             message: format!("Backup {} deleted successfully", filename),
         })),
-        Err(e) => {
-            tracing::error!(error = %e, "Error deleting backup");
-            Ok(warp::reply::json(&MessageResponse {
-                message: format!("Error deleting backup: {}", e),
-            }))
-        }
+        Err(e) => Err(warp::reject::custom(backup_app_error(
+            "Error deleting backup",
+            e,
+        ))),
     }
 }
 
@@ -115,21 +118,16 @@ pub async fn restore_backup_handler(
     _auth: AuthContext,
     pool: DbPool,
 ) -> Result<impl Reply, Rejection> {
-    let db = pool.get().await.map_err(|e| {
-        tracing::error!(error = %e, "Failed to get database connection");
-        warp::reject::reject()
-    })?;
+    let db = get_db(&pool).await?;
 
     match restore_backup(&db, &filename).await {
         Ok(()) => Ok(warp::reply::json(&MessageResponse {
             message: "Backup restored successfully. Please refresh the page.".to_string(),
         })),
-        Err(e) => {
-            tracing::error!(error = %e, "Error restoring backup");
-            Ok(warp::reply::json(&MessageResponse {
-                message: format!("Error restoring backup: {}", e),
-            }))
-        }
+        Err(e) => Err(warp::reject::custom(backup_app_error(
+            "Error restoring backup",
+            e,
+        ))),
     }
 }
 
@@ -138,13 +136,9 @@ pub async fn upload_backup(
     form: warp::multipart::FormData,
     _pool: DbPool,
 ) -> Result<impl Reply, Rejection> {
-    use futures::StreamExt;
-
-    let backups_dir = Path::new("backups");
-    std::fs::create_dir_all(backups_dir).map_err(|e| {
-        tracing::error!(error = %e, "Failed to create backups directory");
-        warp::reject::reject()
-    })?;
+    let backups_dir = std::path::Path::new("backups");
+    std::fs::create_dir_all(backups_dir)
+        .map_err(|e| internal("Failed to create backups directory", e))?;
 
     let mut parts = form;
 
@@ -153,11 +147,11 @@ pub async fn upload_backup(
             let filename = part.filename().unwrap_or("backup.zip").to_string();
 
             // Security check: bare *.zip filename only (no path components)
-            let Ok(backup_path) = backup_path(&filename) else {
-                return Ok(warp::reply::json(&MessageResponse {
-                    message: "Invalid filename: only plain .zip filenames are allowed".to_string(),
-                }));
-            };
+            let backup_path = backup_path(&filename).map_err(|_| {
+                warp::reject::custom(AppError::BadRequest(
+                    "Invalid filename: only plain .zip filenames are allowed".to_string(),
+                ))
+            })?;
 
             // Collect all data into a buffer
             let mut buffer = Vec::new();
@@ -172,10 +166,9 @@ pub async fn upload_backup(
             }
 
             // Write to file
-            tokio::fs::write(&backup_path, &buffer).await.map_err(|e| {
-                tracing::error!(error = %e, "Error writing file");
-                warp::reject::reject()
-            })?;
+            tokio::fs::write(&backup_path, &buffer)
+                .await
+                .map_err(|e| internal("Error writing uploaded backup", e))?;
 
             return Ok(warp::reply::json(&MessageResponse {
                 message: format!("Backup {} uploaded successfully", filename),
@@ -183,9 +176,9 @@ pub async fn upload_backup(
         }
     }
 
-    Ok(warp::reply::json(&MessageResponse {
-        message: "No file provided".to_string(),
-    }))
+    Err(warp::reject::custom(AppError::BadRequest(
+        "No file provided".to_string(),
+    )))
 }
 
 // Setup restore - upload and restore backup during initial setup.
@@ -194,17 +187,11 @@ pub async fn setup_restore_backup(
     mut form: warp::multipart::FormData,
     pool: DbPool,
 ) -> Result<impl Reply, Rejection> {
-    let db = pool.get().await.map_err(|e| {
-        tracing::error!(error = %e, "Failed to get database connection");
-        warp::reject::reject()
-    })?;
+    let db = get_db(&pool).await?;
     let admin_count: i64 = db
         .query_one("SELECT COUNT(*) FROM users WHERE is_admin = true", &[])
         .await
-        .map_err(|e| {
-            tracing::error!(error = %e, "Failed to check setup status");
-            warp::reject::reject()
-        })?
+        .map_err(|e| internal("Failed to check setup status", e))?
         .get(0);
     if admin_count > 0 {
         return Err(warp::reject::custom(AppError::Forbidden(
@@ -218,9 +205,9 @@ pub async fn setup_restore_backup(
             let filename = part.filename().unwrap_or("backup.zip");
 
             if !filename.to_ascii_lowercase().ends_with(".zip") {
-                return Ok(warp::reply::json(&MessageResponse {
-                    message: "Invalid file type. Only .zip files are allowed".to_string(),
-                }));
+                return Err(warp::reject::custom(AppError::BadRequest(
+                    "Invalid file type. Only .zip files are allowed".to_string(),
+                )));
             }
 
             // Never use the client-supplied filename on disk: server-generated name only.
@@ -239,35 +226,29 @@ pub async fn setup_restore_backup(
             }
 
             // Write to file
-            tokio::fs::write(&backup_path, &buffer).await.map_err(|e| {
-                tracing::error!(error = %e, "Error writing file");
-                warp::reject::reject()
-            })?;
+            tokio::fs::write(&backup_path, &buffer)
+                .await
+                .map_err(|e| internal("Error writing uploaded backup", e))?;
 
-            // Now restore the backup
-            // Convert error to String immediately to avoid Send issues across await
+            // Now restore the backup. Convert the error to an AppError immediately so no
+            // non-Send error value is held across the await below.
             let result = restore_backup_from_path(&db, &backup_path)
                 .await
-                .map_err(|e| format!("Error restoring backup: {}", e));
+                .map_err(|e| backup_app_error("Error restoring backup", e));
 
             // Clean up the uploaded file regardless of success/failure
             let _ = tokio::fs::remove_file(&backup_path).await;
 
-            match result {
-                Ok(_) => {
-                    return Ok(warp::reply::json(&MessageResponse {
-                        message: "Backup restored successfully".to_string(),
-                    }));
-                }
-                Err(error_msg) => {
-                    tracing::error!(message = %error_msg, "Backup error");
-                    return Ok(warp::reply::json(&MessageResponse { message: error_msg }));
-                }
-            }
+            return match result {
+                Ok(()) => Ok(warp::reply::json(&MessageResponse {
+                    message: "Backup restored successfully".to_string(),
+                })),
+                Err(app_err) => Err(warp::reject::custom(app_err)),
+            };
         }
     }
 
-    Ok(warp::reply::json(&MessageResponse {
-        message: "No file provided".to_string(),
-    }))
+    Err(warp::reject::custom(AppError::BadRequest(
+        "No file provided".to_string(),
+    )))
 }

@@ -150,3 +150,135 @@ async fn setup_restore_is_forbidden_once_an_admin_exists() {
         .await;
     assert_eq!(res.status(), StatusCode::FORBIDDEN);
 }
+
+async fn admin_request<F, R>(
+    api: &F,
+    admin: &str,
+    method: &str,
+    path: &str,
+) -> (StatusCode, serde_json::Value)
+where
+    F: Filter<Extract = (R,), Error = std::convert::Infallible> + Clone + 'static,
+    R: warp::Reply + Send + 'static,
+{
+    let res = warp::test::request()
+        .method(method)
+        .path(path)
+        .header("authorization", format!("Bearer {admin}"))
+        .reply(api)
+        .await;
+    let body = serde_json::from_slice(res.body()).unwrap_or(serde_json::Value::Null);
+    (res.status(), body)
+}
+
+#[tokio::test]
+#[serial]
+async fn backup_failures_return_real_error_statuses() {
+    let ctx = setup_test_db().await;
+    let api = create_backup_routes(ctx.pool.clone()).recover(handle_rejection);
+    let admin = token_for(&ctx, "adm", true).await;
+
+    // Missing backup: 404 for download, delete and restore (was 200 + message on delete/restore).
+    for (method, path) in [
+        ("GET", "/api/v1/backups/does_not_exist.zip/download"),
+        ("DELETE", "/api/v1/backups/does_not_exist.zip"),
+        ("POST", "/api/v1/backups/does_not_exist.zip/restore"),
+    ] {
+        let (status, body) = admin_request(&api, &admin, method, path).await;
+        assert_eq!(status, StatusCode::NOT_FOUND, "{method} {path}");
+        assert_eq!(body["error"], "NOT_FOUND");
+    }
+
+    // Invalid filename: 400 (was 200 + message).
+    for (method, path) in [
+        ("DELETE", "/api/v1/backups/notazip.txt"),
+        ("POST", "/api/v1/backups/notazip.txt/restore"),
+    ] {
+        let (status, body) = admin_request(&api, &admin, method, path).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{method} {path}");
+        assert_eq!(body["error"], "BAD_REQUEST");
+    }
+}
+
+#[tokio::test]
+#[serial]
+async fn restoring_a_corrupt_backup_is_a_400_and_leaves_data_intact() {
+    let ctx = setup_test_db().await;
+    let api = create_backup_routes(ctx.pool.clone()).recover(handle_rejection);
+    let admin = token_for(&ctx, "adm", true).await;
+
+    std::fs::create_dir_all("backups").unwrap();
+    let name = format!("corrupt_{}.zip", uuid::Uuid::new_v4());
+    let path = std::path::Path::new("backups").join(&name);
+    std::fs::write(&path, b"this is not a zip file").unwrap();
+
+    let users_before: i64 = ctx
+        .pool
+        .get()
+        .await
+        .unwrap()
+        .query_one("SELECT COUNT(*) FROM users", &[])
+        .await
+        .unwrap()
+        .get(0);
+
+    let (status, body) = admin_request(
+        &api,
+        &admin,
+        "POST",
+        &format!("/api/v1/backups/{name}/restore"),
+    )
+    .await;
+    let _ = std::fs::remove_file(&path);
+
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(body["message"], "Invalid or corrupt backup file");
+    // No internal detail (zip/parse error text, paths) reaches the client.
+    assert!(!body.to_string().to_lowercase().contains("zip error"));
+    assert!(!body.to_string().contains("backups/"));
+
+    let users_after: i64 = ctx
+        .pool
+        .get()
+        .await
+        .unwrap()
+        .query_one("SELECT COUNT(*) FROM users", &[])
+        .await
+        .unwrap()
+        .get(0);
+    assert_eq!(
+        users_before, users_after,
+        "a rejected restore must not touch the database"
+    );
+}
+
+#[tokio::test]
+#[serial]
+async fn upload_without_file_or_with_bad_name_is_a_400() {
+    let ctx = setup_test_db().await;
+    let api = create_backup_routes(ctx.pool.clone()).recover(handle_rejection);
+    let admin = token_for(&ctx, "adm", true).await;
+    let ct = format!("multipart/form-data; boundary={BOUNDARY}");
+
+    let empty = format!("--{BOUNDARY}--\r\n").into_bytes();
+    let res = warp::test::request()
+        .method("POST")
+        .path("/api/v1/backups/upload")
+        .header("authorization", format!("Bearer {admin}"))
+        .header("content-type", &ct)
+        .body(empty)
+        .reply(&api)
+        .await;
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+    let res = warp::test::request()
+        .method("POST")
+        .path("/api/v1/backups/upload")
+        .header("authorization", format!("Bearer {admin}"))
+        .header("content-type", &ct)
+        .body(multipart_body("../evil.zip"))
+        .reply(&api)
+        .await;
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+    assert!(!std::path::Path::new("evil.zip").exists());
+}

@@ -58,8 +58,7 @@ pub async fn get_humidors(auth: AuthContext, pool: DbPool) -> Result<impl Reply,
         Err(e) => {
             tracing::error!(error = %e, "Database error");
             let error_response = json!({
-                "error": "Failed to fetch humidors",
-                "details": e.to_string()
+                "error": "Failed to fetch humidors"
             });
             Ok(reply::with_status(
                 reply::json(&error_response),
@@ -128,8 +127,7 @@ pub async fn get_humidor(
                 Err(e) => {
                     tracing::error!(error = %e, "Database error");
                     let error_response = json!({
-                        "error": "Failed to fetch humidor",
-                        "details": e.to_string()
+                        "error": "Failed to fetch humidor"
                     });
                     Ok(reply::with_status(
                         reply::json(&error_response),
@@ -237,8 +235,7 @@ pub async fn create_humidor(
         Err(e) => {
             tracing::error!(error = %e, "Database error");
             let error_response = json!({
-                "error": "Failed to create humidor",
-                "details": e.to_string()
+                "error": "Failed to create humidor"
             });
             Ok(reply::with_status(
                 reply::json(&error_response),
@@ -330,8 +327,7 @@ pub async fn update_humidor(
         Err(e) => {
             tracing::error!(error = %e, "Database error");
             let error_response = json!({
-                "error": "Failed to update humidor",
-                "details": e.to_string()
+                "error": "Failed to update humidor"
             });
             Ok(reply::with_status(
                 reply::json(&error_response),
@@ -383,8 +379,7 @@ pub async fn delete_humidor(
         Err(e) => {
             tracing::error!(error = %e, "Database error");
             let error_response = json!({
-                "error": "Failed to delete humidor",
-                "details": e.to_string()
+                "error": "Failed to delete humidor"
             });
             Ok(reply::with_status(
                 reply::json(&error_response),
@@ -454,8 +449,7 @@ pub async fn get_humidor_cigars(
                 Err(e) => {
                     tracing::error!(error = %e, "Database error");
                     let error_response = json!({
-                        "error": "Failed to fetch cigars",
-                        "details": e.to_string()
+                        "error": "Failed to fetch cigars"
                     });
                     Ok(reply::with_status(
                         reply::json(&error_response),
@@ -476,8 +470,7 @@ pub async fn get_humidor_cigars(
         Err(e) => {
             tracing::error!(error = %e, "Database error");
             let error_response = json!({
-                "error": "Failed to verify humidor access",
-                "details": e.to_string()
+                "error": "Failed to verify humidor access"
             });
             Ok(reply::with_status(
                 reply::json(&error_response),

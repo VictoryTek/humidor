@@ -7,6 +7,24 @@ use tokio_postgres::Client;
 use zip::write::FileOptions;
 use zip::{CompressionMethod, ZipArchive, ZipWriter};
 
+/// Caller-caused backup failures (as opposed to internal ones), so handlers can pick a 4xx status.
+#[derive(Debug)]
+pub enum BackupInputError {
+    NotFound,
+    InvalidFilename,
+}
+
+impl std::fmt::Display for BackupInputError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BackupInputError::NotFound => write!(f, "Backup file not found"),
+            BackupInputError::InvalidFilename => write!(f, "Invalid backup filename"),
+        }
+    }
+}
+
+impl std::error::Error for BackupInputError {}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BackupInfo {
     pub name: String,
@@ -77,7 +95,7 @@ pub fn backup_path(name: &str) -> Result<PathBuf, Box<dyn std::error::Error>> {
         || name.contains(['/', '\\', '\0'])
         || !name.to_ascii_lowercase().ends_with(".zip")
     {
-        return Err("Invalid backup filename".into());
+        return Err(BackupInputError::InvalidFilename.into());
     }
     Ok(Path::new("backups").join(name))
 }
@@ -86,8 +104,9 @@ pub async fn restore_backup(
     db: &Client,
     backup_name: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Convert to String so no non-Send error is held across the await below.
-    let path = backup_path(backup_name).map_err(|e| e.to_string())?;
+    // backup_path only fails with InvalidFilename; map to that (Send) value so no non-Send
+    // error is held across the await below while keeping the error type for the handler.
+    let path = backup_path(backup_name).map_err(|_| BackupInputError::InvalidFilename)?;
     restore_backup_from_path(db, &path).await
 }
 
@@ -97,7 +116,7 @@ pub async fn restore_backup_from_path(
     backup_path: &Path,
 ) -> Result<(), Box<dyn std::error::Error>> {
     if !backup_path.exists() {
-        return Err("Backup file not found".into());
+        return Err(BackupInputError::NotFound.into());
     }
 
     // Open ZIP file
@@ -197,7 +216,7 @@ pub fn delete_backup(backup_name: &str) -> Result<(), Box<dyn std::error::Error>
     let backup_path = backup_path(backup_name)?;
 
     if !backup_path.is_file() {
-        return Err("Backup file not found".into());
+        return Err(BackupInputError::NotFound.into());
     }
 
     fs::remove_file(backup_path)?;
