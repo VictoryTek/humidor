@@ -25,6 +25,10 @@ CORS_MODE=permissive
 
 **No configuration needed** - just set `CORS_MODE=permissive` (or use the default).
 
+> **Credentials:** permissive mode does not send `Access-Control-Allow-Credentials`, so other sites cannot make
+> cookie-authenticated requests. The web app authenticates with an `Authorization` header, which is unaffected.
+> Strict mode (explicit `ALLOWED_ORIGINS`) does allow credentialed requests.
+
 ### Production with Fixed Domain
 
 Use **strict mode** with explicit domain list:

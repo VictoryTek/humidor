@@ -199,7 +199,7 @@ ALLOWED_ORIGINS=http://localhost:9898,https://humidor.example.com
 
 **Default**: Same-origin only
 **Production**: Explicit whitelist required
-**Credentials**: Cookies and Authorization headers allowed
+**Credentials**: Allowed in strict mode only (explicit `ALLOWED_ORIGINS`); permissive mode never sends `Access-Control-Allow-Credentials`
 
 #### Rate Limiting
 

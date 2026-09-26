@@ -32,7 +32,7 @@ Tags: `[ARCH]` architecture doc, `[BUG]` bug doc, `[FEAT]` feature doc.
 - [x] 5. SSRF via cigar-scrape endpoint — arbitrary URL fetched server-side with no scheme
   restriction or private/loopback-IP filtering. **[BUG H5]**
   Files: `src/handlers/cigars.rs:887-902`, `src/services/mod.rs:62-85,481-500`
-- [ ] 6. Permissive CORS default combines `allow_any_origin()` with `allow_credentials(true)` —
+- [x] 6. Permissive CORS default combines `allow_any_origin()` with `allow_credentials(true)` —
   invalid per the Fetch/CORS spec and a real credential-leak misconfiguration for any cookie-based
   flow. **[ARCH 1.6] [BUG H4]**
   Files: `src/main.rs:545-557,617-628`

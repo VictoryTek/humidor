@@ -550,11 +550,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                  Perfect for self-hosted environments with dynamic IPs."
             );
 
-            warp::cors()
-                .allow_any_origin()
-                .allow_headers(vec!["content-type", "authorization"])
-                .allow_methods(vec!["GET", "POST", "PUT", "DELETE"])
-                .allow_credentials(true)
+            middleware::cors::permissive()
         }
 
         "strict" => {
@@ -621,11 +617,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "Unknown CORS_MODE '{}'. Defaulting to permissive mode.", mode
             );
 
-            warp::cors()
-                .allow_any_origin()
-                .allow_headers(vec!["content-type", "authorization"])
-                .allow_methods(vec!["GET", "POST", "PUT", "DELETE"])
-                .allow_credentials(true)
+            middleware::cors::permissive()
         }
     };
 
