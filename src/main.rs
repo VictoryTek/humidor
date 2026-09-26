@@ -177,37 +177,20 @@ fn validate_smtp_config() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    // If SMTP is enabled, validate required configuration
-    let mut missing = Vec::new();
-
-    if env::var("SMTP_HOST").is_err() {
-        missing.push("SMTP_HOST");
-    }
-    if env::var("SMTP_PORT").is_err() {
-        missing.push("SMTP_PORT");
-    }
-    if env::var("SMTP_USERNAME").is_err() {
-        missing.push("SMTP_USERNAME");
-    }
-    if env::var("SMTP_PASSWORD").is_err() {
-        missing.push("SMTP_PASSWORD");
-    }
-    if env::var("SMTP_FROM").is_err() {
-        missing.push("SMTP_FROM");
-    }
-
-    if !missing.is_empty() {
+    // If SMTP is enabled, validate exactly what the mailer reads (see EmailService::validate_env)
+    if let Err(problems) = services::EmailService::validate_env() {
         bail!(
-            "SMTP is enabled but required configuration is missing: {}. \
-             Either set SMTP_ENABLED=false or provide all SMTP configuration variables.",
-            missing.join(", ")
+            "SMTP is enabled but its configuration is invalid: {}. \
+             Either set SMTP_ENABLED=false or fix these variables.",
+            problems.join("; ")
         );
     }
 
+    let (smtp_host, smtp_port, smtp_from) = services::EmailService::describe_env();
     tracing::info!(
-        smtp_host = env::var("SMTP_HOST").unwrap(),
-        smtp_port = env::var("SMTP_PORT").unwrap(),
-        smtp_from = env::var("SMTP_FROM").unwrap(),
+        smtp_host = smtp_host,
+        smtp_port = smtp_port,
+        smtp_from = smtp_from,
         "SMTP configuration validated successfully"
     );
 

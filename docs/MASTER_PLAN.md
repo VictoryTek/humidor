@@ -36,7 +36,7 @@ Tags: `[ARCH]` architecture doc, `[BUG]` bug doc, `[FEAT]` feature doc.
   invalid per the Fetch/CORS spec and a real credential-leak misconfiguration for any cookie-based
   flow. **[ARCH 1.6] [BUG H4]**
   Files: `src/main.rs:545-557,617-628`
-- [ ] 7. SMTP startup validation checks env vars the mailer never reads (`SMTP_USERNAME`/
+- [x] 7. SMTP startup validation checks env vars the mailer never reads (`SMTP_USERNAME`/
   `SMTP_FROM` vs. actual `SMTP_USER`/`SMTP_FROM_EMAIL`) — a fail-fast validator that certifies
   broken configs as good, or rejects working ones. **[ARCH 1.3] [BUG M4]**
   Files: `src/main.rs:167-211`, `src/services/email.rs:18-29`, `src/handlers/auth.rs:945-960`

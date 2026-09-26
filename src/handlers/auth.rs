@@ -950,15 +950,8 @@ pub async fn reset_password(
 
 /// Check if email service is configured
 pub async fn check_email_config() -> Result<impl Reply, warp::Rejection> {
-    let smtp_host = env::var("SMTP_HOST").ok();
-    let smtp_user = env::var("SMTP_USER").ok();
-    let smtp_password = env::var("SMTP_PASSWORD").ok();
-
-    // Use pattern matching to safely check all conditions
-    let is_configured = matches!(
-        (&smtp_host, &smtp_user, &smtp_password),
-        (Some(h), Some(u), Some(p)) if !h.is_empty() && !u.is_empty() && !p.is_empty()
-    );
+    // Same rules as startup validation and the mailer itself (SMTP_USER, SMTP_PASSWORD, SMTP_FROM_EMAIL)
+    let is_configured = EmailService::validate_env().is_ok();
 
     Ok(warp::reply::json(&json!({
         "email_configured": is_configured
