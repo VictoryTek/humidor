@@ -24,7 +24,7 @@ Tags: `[ARCH]` architecture doc, `[BUG]` bug doc, `[FEAT]` feature doc.
   joined `../` path always passes; attacker-controlled multipart filename in upload/setup-restore
   can write outside the backups directory. **[ARCH 4.1]**
   Files: `src/handlers/backups.rs:65-67,163-170,222-229`
-- [ ] 4. Stored XSS in cigar rendering — user-controlled fields (`notes`, `wrapper`, `binder`,
+- [x] 4. Stored XSS in cigar rendering — user-controlled fields (`notes`, `wrapper`, `binder`,
   `filler`, `name`, `retail_link`, ...) interpolated unescaped into `innerHTML` on shared/public
   humidor pages; JWT lives in `localStorage` and is stealable. `escapeHtml()` exists but isn't
   used on these paths. **[BUG H3]**

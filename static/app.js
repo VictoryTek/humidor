@@ -528,11 +528,29 @@ function navigateToHumidorDetail(humidorId) {
 }
 
 // Utility function to escape HTML
+// Escapes text for HTML element content AND double/single-quoted attribute values.
 function escapeHtml(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+    if (text === null || text === undefined || text === '') return '';
+    return String(text).replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+}
+
+// Encodes a value as a JS string literal that is safe inside a double-quoted inline
+// event-handler attribute, e.g. onclick="fn(${jsArg(name)})".
+function jsArg(value) {
+    return escapeHtml(JSON.stringify(String(value ?? '')));
+}
+
+// Returns an attribute-safe http(s) URL (absolute or same-origin relative), or '' if the
+// scheme is anything else (e.g. javascript:, data:).
+function safeUrl(url) {
+    try {
+        const u = new URL(String(url), window.location.origin);
+        return (u.protocol === 'http:' || u.protocol === 'https:') ? escapeHtml(String(url)) : '';
+    } catch (e) {
+        return '';
+    }
 }
 
 // Helper functions to get organizer names from IDs
@@ -979,7 +997,7 @@ function showToast(message, type = 'success') {
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
     toast.innerHTML = `
-        <div class="toast-message">${message}</div>
+        <div class="toast-message">${escapeHtml(message)}</div>
         <button class="toast-close" style="background: none; border: none; color: inherit; font-size: 1.25rem; cursor: pointer; padding: 0 0.5rem; margin-left: 1rem; opacity: 0.7;">×</button>
     `;
     toast.style.display = 'flex';
@@ -1068,41 +1086,41 @@ function createCigarCard(cigar) {
         <div class="cigar-card-image" style="position: relative;">
             ${outOfStockBadge}
             <div class="cigar-card-overlay">
-                <strong>Notes:</strong> ${cigar.notes || 'No notes available'}
+                <strong>Notes:</strong> ${escapeHtml(cigar.notes) || 'No notes available'}
                 <br><br>
-                <strong>Wrapper:</strong> ${cigar.wrapper || 'N/A'}
+                <strong>Wrapper:</strong> ${escapeHtml(cigar.wrapper) || 'N/A'}
                 <br>
-                <strong>Binder:</strong> ${cigar.binder || 'N/A'}
+                <strong>Binder:</strong> ${escapeHtml(cigar.binder) || 'N/A'}
                 <br>
-                <strong>Filler:</strong> ${cigar.filler || 'N/A'}
+                <strong>Filler:</strong> ${escapeHtml(cigar.filler) || 'N/A'}
             </div>
         </div>
         <div class="cigar-card-content">
             <div class="cigar-header">
-                <div class="cigar-brand">${getBrandName(cigar.brand_id)}</div>
+                <div class="cigar-brand">${escapeHtml(getBrandName(cigar.brand_id))}</div>
                 <div class="cigar-actions">
                     ${actionButtons}
                 </div>
             </div>
             
-            <div class="cigar-name">${cigar.name}</div>
+            <div class="cigar-name">${escapeHtml(cigar.name)}</div>
             
             <div class="cigar-details">
                 <div class="detail-item">
                     <div class="detail-label">Size</div>
-                    <div class="detail-value">${getSizeName(cigar.size_id)}</div>
+                    <div class="detail-value">${escapeHtml(getSizeName(cigar.size_id))}</div>
                 </div>
                 <div class="detail-item">
                     <div class="detail-label">Strength</div>
-                    <div class="detail-value" style="color: ${getStrengthColor(getStrengthName(cigar.strength_id))}">${getStrengthName(cigar.strength_id)}</div>
+                    <div class="detail-value" style="color: ${getStrengthColor(getStrengthName(cigar.strength_id))}">${escapeHtml(getStrengthName(cigar.strength_id))}</div>
                 </div>
                 <div class="detail-item">
                     <div class="detail-label">Origin</div>
-                    <div class="detail-value">${getOriginName(cigar.origin_id)}</div>
+                    <div class="detail-value">${escapeHtml(getOriginName(cigar.origin_id))}</div>
                 </div>
                 <div class="detail-item">
                     <div class="detail-label">Location</div>
-                    <div class="detail-value">${cigar.humidor_location || 'Not specified'}</div>
+                    <div class="detail-value">${escapeHtml(cigar.humidor_location) || 'Not specified'}</div>
                 </div>
             </div>
             
@@ -1513,7 +1531,7 @@ function createOrganizerCard(organizer, type) {
 
     const getMetadata = (organizer, type) => {
         if (type === 'brands' && organizer.country) {
-            return `<p class="organizer-metadata">📍 ${organizer.country}</p>`;
+            return `<p class="organizer-metadata">📍 ${escapeHtml(organizer.country)}</p>`;
         }
         if (type === 'sizes' && organizer.length_inches) {
             return `<p class="organizer-metadata">${organizer.length_inches}" length</p>`;
@@ -1522,7 +1540,7 @@ function createOrganizerCard(organizer, type) {
             return `<p class="organizer-metadata strength-level">${getStrengthMeter(organizer.level)} Level ${organizer.level}/5</p>`;
         }
         if (type === 'ringGauges' && organizer.common_names && organizer.common_names.length > 0) {
-            return `<p class="organizer-metadata">Common: ${organizer.common_names.join(', ')}</p>`;
+            return `<p class="organizer-metadata">Common: ${escapeHtml(organizer.common_names.join(', '))}</p>`;
         }
         return '';
     };
@@ -1531,14 +1549,14 @@ function createOrganizerCard(organizer, type) {
         <div class="organizer-card" data-id="${organizer.id}">
             <div class="organizer-header">
                 <span class="organizer-icon">${getTypeIcon(type)}</span>
-                <h3 class="organizer-name">${getDisplayValue(organizer, type)}</h3>
+                <h3 class="organizer-name">${escapeHtml(getDisplayValue(organizer, type))}</h3>
                 <div class="organizer-actions">
                     <button class="action-btn edit-btn" onclick="editOrganizer('${organizer.id}', '${type}')" title="Edit">✏️</button>
                     <button class="action-btn delete-btn" onclick="deleteOrganizer('${organizer.id}', '${type}')" title="Delete">🗑️</button>
                 </div>
             </div>
             ${getMetadata(organizer, type)}
-            ${organizer.description ? `<p class="organizer-description">${organizer.description}</p>` : ''}
+            ${organizer.description ? `<p class="organizer-description">${escapeHtml(organizer.description)}</p>` : ''}
         </div>
     `;
 }
@@ -1765,12 +1783,12 @@ async function importFromUrl() {
         
         // Build a summary of what was found
         let summary = '<div class="scraped-summary"><strong>Found:</strong><ul>';
-        if (scrapedCigarData.brand) summary += `<li>Brand: ${scrapedCigarData.brand}</li>`;
-        if (scrapedCigarData.name) summary += `<li>Name: ${scrapedCigarData.name}</li>`;
-        if (scrapedCigarData.size) summary += `<li>Size: ${scrapedCigarData.size}</li>`;
-        if (scrapedCigarData.ring_gauge) summary += `<li>Ring Gauge: ${scrapedCigarData.ring_gauge}</li>`;
-        if (scrapedCigarData.strength) summary += `<li>Strength: ${scrapedCigarData.strength}</li>`;
-        if (scrapedCigarData.origin) summary += `<li>Origin: ${scrapedCigarData.origin}</li>`;
+        if (scrapedCigarData.brand) summary += `<li>Brand: ${escapeHtml(scrapedCigarData.brand)}</li>`;
+        if (scrapedCigarData.name) summary += `<li>Name: ${escapeHtml(scrapedCigarData.name)}</li>`;
+        if (scrapedCigarData.size) summary += `<li>Size: ${escapeHtml(scrapedCigarData.size)}</li>`;
+        if (scrapedCigarData.ring_gauge) summary += `<li>Ring Gauge: ${escapeHtml(scrapedCigarData.ring_gauge)}</li>`;
+        if (scrapedCigarData.strength) summary += `<li>Strength: ${escapeHtml(scrapedCigarData.strength)}</li>`;
+        if (scrapedCigarData.origin) summary += `<li>Origin: ${escapeHtml(scrapedCigarData.origin)}</li>`;
         summary += '</ul></div>';
         
         statusDiv.innerHTML = `<p class="success-message"><i class="mdi mdi-check-circle"></i> Successfully scraped cigar information!</p>${summary}`;
@@ -1785,7 +1803,7 @@ async function importFromUrl() {
         
     } catch (error) {
         console.error('Import error:', error);
-        statusDiv.innerHTML = `<p class="error-message"><i class="mdi mdi-alert-circle"></i> ${error.message}</p>`;
+        statusDiv.innerHTML = `<p class="error-message"><i class="mdi mdi-alert-circle"></i> ${escapeHtml(error.message)}</p>`;
     } finally {
         importBtn.disabled = false;
     }
@@ -1885,7 +1903,7 @@ async function createCigarFromScrapedData(humidorId, quantity, isWishList) {
         
     } catch (error) {
         console.error('Error creating cigar:', error);
-        statusDiv.innerHTML = `<p class="error-message"><i class="mdi mdi-alert-circle"></i> ${error.message}</p>`;
+        statusDiv.innerHTML = `<p class="error-message"><i class="mdi mdi-alert-circle"></i> ${escapeHtml(error.message)}</p>`;
     } finally {
         confirmBtn.disabled = false;
     }
@@ -2802,7 +2820,7 @@ function showHumidorHub() {
                     
                     // Determine image source or use placeholder
                     const imageHtml = humidor.image_url 
-                        ? `<img src="${humidor.image_url}" alt="${escapeHtml(humidor.name)}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                        ? `<img src="${escapeHtml(humidor.image_url)}" alt="${escapeHtml(humidor.name)}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
                            <img src="/static/humidor-placeholder.png" alt="Humidor placeholder" style="display: none; width: 100%; height: 100%; object-fit: cover;">`
                         : `<img src="/static/humidor-placeholder.png" alt="Humidor placeholder" style="width: 100%; height: 100%; object-fit: cover;">`;
                     
@@ -2811,7 +2829,7 @@ function showHumidorHub() {
                             <div class="humidor-card-image">
                                 ${imageHtml}
                                 <div class="humidor-card-actions" onclick="event.stopPropagation();">
-                                    <button class="btn-icon" onclick="openShareHumidorModal('${humidor.id}', '${escapeHtml(humidor.name).replace(/'/g, "\\'")}'))" title="Share Humidor">
+                                    <button class="btn-icon" onclick="openShareHumidorModal('${humidor.id}', ${jsArg(humidor.name)})" title="Share Humidor">
                                         <i class="mdi mdi-share-variant"></i>
                                     </button>
                                     <button class="btn-icon" onclick="editHumidor('${humidor.id}')" title="Edit Humidor">
@@ -2986,7 +3004,7 @@ function renderSingleHumidorSection(humidor, humidorCigars) {
                     </div>
                     <div class="humidor-actions">
                         ${currentHumidorPermission === 'full' ? `
-                            <button class="btn-icon" onclick="openShareHumidorModal('${humidor.id}', '${escapeHtml(humidor.name).replace(/'/g, "\\'")}')" title="Share Humidor">
+                            <button class="btn-icon" onclick="openShareHumidorModal('${humidor.id}', ${jsArg(humidor.name)})" title="Share Humidor">
                                 <i class="mdi mdi-share-variant"></i>
                             </button>
                             <button class="btn-icon" onclick="editHumidor('${humidor.id}')" title="Edit Humidor">
@@ -3225,8 +3243,8 @@ function renderFilterList(items) {
     
     filterList.innerHTML = items.map(item => `
         <div class="filter-item">
-            <input type="checkbox" id="filter-${item}" value="${item}" ${tempSelectedItems.includes(item) ? 'checked' : ''}>
-            <label for="filter-${item}">${item}</label>
+            <input type="checkbox" id="filter-${escapeHtml(item)}" value="${escapeHtml(item)}" ${tempSelectedItems.includes(item) ? 'checked' : ''}>
+            <label for="filter-${escapeHtml(item)}">${escapeHtml(item)}</label>
         </div>
     `).join('');
     
@@ -3352,9 +3370,9 @@ function createHumidorSection(humidor, humidorCigars) {
         <div class="humidor-section" data-humidor-id="${humidor.id}">
             <div class="humidor-section-header">
                 <div class="humidor-info">
-                    <h2 class="humidor-title">${humidor.name}</h2>
+                    <h2 class="humidor-title">${escapeHtml(humidor.name)}</h2>
                     <div class="humidor-meta">
-                        <span class="humidor-type">${humidor.type || 'Humidor'}</span>
+                        <span class="humidor-type">${escapeHtml(humidor.type) || 'Humidor'}</span>
                         <span class="humidor-count">${cigarCount}/${humidor.capacity || '∞'} cigars</span>
                         <span class="humidor-capacity">${capacityPercentage}% full</span>
                     </div>
@@ -3384,7 +3402,7 @@ function createCigarCard(cigar) {
     
     // Determine image source or use placeholder
     const imageHtml = cigar.image_url 
-        ? `<img src="${cigar.image_url}" alt="${cigar.name}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+        ? `<img src="${escapeHtml(cigar.image_url)}" alt="${escapeHtml(cigar.name)}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
            <img src="/static/cigar-placeholder.png" alt="Cigar placeholder" style="display: none; width: 100%; height: 100%; object-fit: contain; padding: 2rem;">`
         : `<img src="/static/cigar-placeholder.png" alt="Cigar placeholder" style="width: 100%; height: 100%; object-fit: contain; padding: 2rem;">`;
     
@@ -3421,8 +3439,8 @@ function createCigarCard(cigar) {
                 </div>
             </div>
             <div class="cigar-card-content">
-                <div class="cigar-card-brand">${brandName}</div>
-                <h3 class="cigar-card-name">${cigar.name}</h3>
+                <div class="cigar-card-brand">${escapeHtml(brandName)}</div>
+                <h3 class="cigar-card-name">${escapeHtml(cigar.name)}</h3>
                 <div class="cigar-card-footer">
                     ${getStrengthIndicatorHtml(cigar.strength_id)}
                     ${quantityControls}
@@ -3517,7 +3535,10 @@ function openReportCard(cigarId) {
     const retailLinkContainer = document.getElementById('reportCardRetailLink');
     if (cigar.retail_link) {
         retailLinkSection.style.display = 'block';
-        retailLinkContainer.innerHTML = `<a href="${cigar.retail_link}" target="_blank" rel="noopener noreferrer">${cigar.retail_link}</a>`;
+        const retailHref = safeUrl(cigar.retail_link);
+        retailLinkContainer.innerHTML = retailHref
+            ? `<a href="${retailHref}" target="_blank" rel="noopener noreferrer">${escapeHtml(cigar.retail_link)}</a>`
+            : escapeHtml(cigar.retail_link);
     } else {
         retailLinkSection.style.display = 'none';
     }
@@ -4595,7 +4616,7 @@ function createFavoriteCard(cigar) {
     const humidorName = humidor ? humidor.name : 'Unknown Humidor';
     
     const imageHtml = cigar.image_url 
-        ? `<img src="${cigar.image_url}" alt="${cigar.name}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+        ? `<img src="${escapeHtml(cigar.image_url)}" alt="${escapeHtml(cigar.name)}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
            <img src="/static/cigar-placeholder.png" alt="Cigar placeholder" style="display: none; width: 100%; height: 100%; object-fit: contain; padding: 2rem;">`
         : `<img src="/static/cigar-placeholder.png" alt="Cigar placeholder" style="width: 100%; height: 100%; object-fit: contain; padding: 2rem;">`;
     
@@ -4628,8 +4649,8 @@ function createFavoriteCard(cigar) {
                 </div>
             </div>
             <div class="cigar-card-content">
-                <div class="cigar-card-brand">${brandName}</div>
-                <h3 class="cigar-card-name">${cigar.name}</h3>
+                <div class="cigar-card-brand">${escapeHtml(brandName)}</div>
+                <h3 class="cigar-card-name">${escapeHtml(cigar.name)}</h3>
                 <div class="cigar-card-humidor">
                     <i class="mdi mdi-home-variant"></i>
                     <span>${escapeHtml(humidorName)}</span>
@@ -4728,7 +4749,7 @@ function createWishListCard(cigar) {
     const brandName = getBrandName(cigar.brand_id);
     
     const imageHtml = cigar.image_url 
-        ? `<img src="${cigar.image_url}" alt="${cigar.name}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+        ? `<img src="${escapeHtml(cigar.image_url)}" alt="${escapeHtml(cigar.name)}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
            <img src="/static/cigar-placeholder.png" alt="Cigar placeholder" style="display: none; width: 100%; height: 100%; object-fit: contain; padding: 2rem;">`
         : `<img src="/static/cigar-placeholder.png" alt="Cigar placeholder" style="width: 100%; height: 100%; object-fit: contain; padding: 2rem;">`;
     
@@ -4742,8 +4763,8 @@ function createWishListCard(cigar) {
                 </div>
             </div>
             <div class="cigar-card-content">
-                <div class="cigar-card-brand">${brandName}</div>
-                <h3 class="cigar-card-name">${cigar.name}</h3>
+                <div class="cigar-card-brand">${escapeHtml(brandName)}</div>
+                <h3 class="cigar-card-name">${escapeHtml(cigar.name)}</h3>
                 ${getStrengthIndicatorHtml(cigar.strength_id)}
             </div>
         </div>
@@ -4831,7 +4852,7 @@ function showHumidorSelectionModal(humidors) {
                     <div class="form-group" style="margin-bottom: 1.5rem;">
                         <label for="humidorSelect" style="display: block; margin-bottom: 0.5rem; color: var(--text-primary); font-weight: 500;">Choose a humidor</label>
                         <select id="humidorSelect" class="form-control" style="width: 100%; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid var(--border-color); background: var(--background-secondary); color: var(--text-primary);">
-                            ${humidors.map(h => `<option value="${h.id}">${h.name}</option>`).join('')}
+                            ${humidors.map(h => `<option value="${h.id}">${escapeHtml(h.name)}</option>`).join('')}
                         </select>
                     </div>
                     <div class="form-group" style="margin-bottom: 1.5rem;">
@@ -5461,17 +5482,17 @@ function renderBackupsTable() {
     
     tbody.innerHTML = backups.map(backup => `
         <tr>
-            <td data-label="Backup Name"><span class="backup-name">${backup.name}</span></td>
+            <td data-label="Backup Name"><span class="backup-name">${escapeHtml(backup.name)}</span></td>
             <td data-label="Date Created">${formatBackupDate(backup.date)}</td>
             <td data-label="Size">${backup.size}</td>
             <td data-label="Actions" class="actions-cell">
-                <button class="btn-icon" onclick="downloadBackup('${backup.name}')" title="Download">
+                <button class="btn-icon" onclick="downloadBackup(${jsArg(backup.name)})" title="Download">
                     <span class="mdi mdi-download"></span>
                 </button>
-                <button class="btn-icon btn-restore" onclick="showRestoreDialog('${backup.name}')" title="Restore">
+                <button class="btn-icon btn-restore" onclick="showRestoreDialog(${jsArg(backup.name)})" title="Restore">
                     <span class="mdi mdi-database-import"></span>
                 </button>
-                <button class="btn-icon btn-delete" onclick="showDeleteDialog('${backup.name}')" title="Delete">
+                <button class="btn-icon btn-delete" onclick="showDeleteDialog(${jsArg(backup.name)})" title="Delete">
                     <span class="mdi mdi-delete"></span>
                 </button>
             </td>
@@ -6175,8 +6196,8 @@ function showActivePublicShares(shares) {
             <div class="public-share-item" data-token="${share.token_id}">
                 ${share.label ? `<div class="share-label">${escapeHtml(share.label)}</div>` : ''}
                 <div class="share-link-box">
-                    <input type="text" value="${shareUrl}" readonly class="share-url-input" />
-                    <button class="btn-icon" onclick="copyShareLink('${shareUrl}')" title="Copy Link">
+                    <input type="text" value="${escapeHtml(shareUrl)}" readonly class="share-url-input" />
+                    <button class="btn-icon" onclick="copyShareLink(${jsArg(shareUrl)})" title="Copy Link">
                         <span class="mdi mdi-content-copy"></span>
                     </button>
                 </div>
@@ -6489,7 +6510,7 @@ function renderPublicHumidor(data) {
 
 function createPublicCigarCard(cigar) {
     const imageHtml = cigar.image_url 
-        ? `<img src="${cigar.image_url}" alt="${escapeHtml(cigar.name)}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+        ? `<img src="${escapeHtml(cigar.image_url)}" alt="${escapeHtml(cigar.name)}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
            <img src="/static/cigar-placeholder.png" alt="Cigar placeholder" style="display: none; width: 100%; height: 100%; object-fit: contain; padding: 2rem;">` 
         : `<img src="/static/cigar-placeholder.png" alt="Cigar placeholder" style="width: 100%; height: 100%; object-fit: contain; padding: 2rem;">`;
     
@@ -6990,7 +7011,7 @@ function showOrganizerOptions(organizerType) {
             
             <div class="organizer-option-list">
                 ${options.map(option => `
-                    <button class="organizer-option-item" onclick="getRecommendationWithPreference('${organizerType}', '${escapeHtml(option)}')">
+                    <button class="organizer-option-item" onclick="getRecommendationWithPreference(${jsArg(organizerType)}, ${jsArg(option)})">
                         ${escapeHtml(option)}
                     </button>
                 `).join('')}
@@ -7311,11 +7332,12 @@ function closeRecommendModal() {
 /**
  * Escape HTML to prevent XSS
  */
+// Escapes text for HTML element content AND double/single-quoted attribute values.
 function escapeHtml(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+    if (text === null || text === undefined || text === '') return '';
+    return String(text).replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
 }
 
 // Export recommendation functions for global use
