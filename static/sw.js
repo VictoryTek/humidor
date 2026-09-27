@@ -87,6 +87,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Personal data exports: never intercept or cache (the API cache is not cleared on logout)
+  if (url.pathname.startsWith('/api/v1/export')) {
+    return;
+  }
+
   // API requests - Network first, cache fallback
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(networkFirstStrategy(request, DYNAMIC_CACHE));

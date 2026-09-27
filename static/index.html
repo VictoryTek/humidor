@@ -492,6 +492,26 @@
                                 Change Password
                             </button>
                         </div>
+
+                        <!-- Export Section -->
+                        <div class="settings-section">
+                            <h3 class="section-title">
+                                <span class="mdi mdi-download"></span>
+                                Export My Collection
+                            </h3>
+                            <p style="color: var(--text-muted); margin-bottom: 1rem;">
+                                Download your humidors, cigars, favorites and wish list. Images are not included.
+                                CSV opens in Excel or Google Sheets; JSON contains everything.
+                            </p>
+                            <button class="btn btn-primary" id="exportCsvBtn">
+                                <span class="mdi mdi-file-delimited"></span>
+                                Export CSV
+                            </button>
+                            <button class="btn btn-secondary" id="exportJsonBtn">
+                                <span class="mdi mdi-code-json"></span>
+                                Export JSON
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -1598,6 +1618,6 @@
         </div>
     </div>
 
-    <script src="/static/app.js?version=20260926_001"></script>
+    <script src="/static/app.js?version=20260926_002"></script>
 </body>
 </html>

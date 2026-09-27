@@ -75,7 +75,7 @@ Tags: `[ARCH]` architecture doc, `[BUG]` bug doc, `[FEAT]` feature doc.
 - [ ] 13. Smoking journal / tasting sessions with ratings — biggest expected-feature gap for a
   cigar-inventory app; new `smoking_sessions` table + endpoints, reusing the existing
   quantity-decrement pattern. **[FEAT #1]**
-- [ ] 14. Per-user data export (CSV/JSON) of the requesting user's own collection. **[FEAT #2
+- [x] 14. Per-user data export (CSV/JSON) of the requesting user's own collection. **[FEAT #2
   feature part]**
 - [ ] 15. Email notifications for share/revoke events — `EmailService` infrastructure already
   paid for, just needs two more methods and fire-and-forget calls from the share handlers.

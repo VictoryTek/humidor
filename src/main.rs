@@ -450,6 +450,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let humidor_routes = routes::create_humidor_routes(db_pool.clone()).boxed();
     let favorite_routes = routes::create_favorite_routes(db_pool.clone()).boxed();
     let backup_routes = routes::create_backup_routes(db_pool.clone()).boxed();
+    let export_routes = routes::create_export_routes(db_pool.clone()).boxed();
     let public_share_routes = routes::create_public_share_routes(db_pool.clone()).boxed();
 
     // Combine all API routes
@@ -461,6 +462,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .or(humidor_routes)
         .or(favorite_routes)
         .or(backup_routes)
+        .or(export_routes)
         .or(public_share_routes); // No auth required for public shares
 
     // Health check endpoint (no auth required)

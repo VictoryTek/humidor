@@ -2605,6 +2605,8 @@ function initializeNavigation() {
     // Add event listeners for profile/settings buttons
     document.getElementById('saveProfileBtn')?.addEventListener('click', saveProfile);
     document.getElementById('changePasswordBtn')?.addEventListener('click', changePassword);
+    document.getElementById('exportCsvBtn')?.addEventListener('click', () => exportCollection('csv'));
+    document.getElementById('exportJsonBtn')?.addEventListener('click', () => exportCollection('json'));
     
     // Add event listener for Account Settings in user dropdown
     document.querySelectorAll('[data-page="profile"]').forEach(item => {
@@ -4523,6 +4525,40 @@ async function changePassword() {
         const changeBtn = document.getElementById('changePasswordBtn');
         changeBtn.disabled = false;
         changeBtn.innerHTML = '<span class="mdi mdi-lock-check"></span> Change Password';
+    }
+}
+
+// Export the user's own collection (CSV or JSON) as a file download
+async function exportCollection(format) {
+    const btn = document.getElementById(format === 'csv' ? 'exportCsvBtn' : 'exportJsonBtn');
+    if (btn) btn.disabled = true;
+
+    try {
+        const response = await makeAuthenticatedRequest(`/api/v1/export?format=${encodeURIComponent(format)}`);
+        if (!response || !response.ok) {
+            throw new Error('Export failed');
+        }
+
+        // Use the server-provided filename when present
+        const disposition = response.headers.get('Content-Disposition') || '';
+        const match = disposition.match(/filename="([^"]+)"/);
+        const filename = match ? match[1] : `humidor-collection.${format}`;
+
+        const blob = await response.blob();
+        const link = document.createElement('a');
+        link.href = window.URL.createObjectURL(blob);
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(link.href);
+
+        showToast('Collection exported successfully', 'success');
+    } catch (error) {
+        console.error('Error exporting collection:', error);
+        showToast('Failed to export collection', 'error');
+    } finally {
+        if (btn) btn.disabled = false;
     }
 }
 

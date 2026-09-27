@@ -3,6 +3,7 @@ pub mod auth;
 pub mod backups;
 pub mod brands;
 pub mod cigars;
+pub mod export;
 pub mod favorites;
 pub mod humidor_shares;
 pub mod humidors;
