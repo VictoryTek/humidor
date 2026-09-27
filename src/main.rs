@@ -194,7 +194,9 @@ async fn validate_environment(pool: &DbPool) -> anyhow::Result<()> {
 
     // Validate JWT secret
     tracing::debug!("Validating JWT secret configuration...");
-    get_or_generate_jwt_secret()?;
+    // Hand the secret to the JWT service. Without this, an auto-generated secret that could not be
+    // persisted to disk would be lost and runtime would have no secret to sign or verify with.
+    services::jwt::init_secret(get_or_generate_jwt_secret()?);
 
     // Validate database connectivity
     tracing::debug!("Validating database connection...");

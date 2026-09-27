@@ -339,11 +339,15 @@ pub async fn cleanup_db(pool: &Pool) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+// These must be #[serial]: `setup_test_db()` ends with `DELETE FROM users`, which would otherwise
+// run concurrently with the `#[serial]` tests in the same binary and delete users they just created.
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
 
     #[tokio::test]
+    #[serial]
     async fn test_setup_test_db() {
         let ctx = setup_test_db().await;
 
@@ -358,6 +362,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_create_test_user() {
         let ctx = setup_test_db().await;
 
