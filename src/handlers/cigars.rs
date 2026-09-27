@@ -71,7 +71,7 @@ async fn verify_humidor_ownership(
 }
 
 /// Helper function to verify that a cigar belongs to the authenticated user (through its humidor) OR is shared with them
-async fn verify_cigar_ownership(
+pub(crate) async fn verify_cigar_ownership(
     pool: &DbPool,
     cigar_id: Uuid,
     user_id: Uuid,

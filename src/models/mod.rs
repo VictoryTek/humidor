@@ -7,6 +7,7 @@ pub mod password_reset;
 pub mod public_share;
 pub mod ring_gauge;
 pub mod size;
+pub mod smoking_session;
 pub mod strength;
 pub mod user;
 
@@ -19,5 +20,6 @@ pub use password_reset::*;
 pub use public_share::*;
 pub use ring_gauge::*;
 pub use size::*;
+pub use smoking_session::*;
 pub use strength::*;
 pub use user::*;

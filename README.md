@@ -19,6 +19,7 @@ This project was started because I am a homelabber and couldn't find anything to
 - **User Permissions**: Admin and standard user roles with proper access control
 - **Humidor Sharing**: Share your humidors with other users (view/edit/full permissions)
 - **Favorites & Wish Lists**: Mark favorite cigars and maintain a wish list
+- **Smoking Journal**: Log a "Smoke One" session per cigar (rating, duration, pairing, notes optional) — decrements quantity and keeps a per-cigar and personal smoking history
 - **Data Export**: Download your own collection as CSV (spreadsheet-ready) or JSON from Account Settings, or via `GET /api/v1/export?format=csv|json`
 - **Search & Filter**: Find cigars by brand, strength, origin, or search terms
 - **Mobile-Friendly**: Responsive design for phones and tablets

@@ -3573,6 +3573,16 @@ function openReportCard(cigarId) {
         actionsContainer.insertBefore(moveBtn, editBtn);
     }
     
+    // "Smoke One" - only for cigars actually in a humidor (not wish list) with stock remaining;
+    // logging a session decrements quantity server-side (see smokeOneCigar).
+    const smokeBtn = document.getElementById('reportCardSmokeBtn');
+    if (!isInWishList && cigar.quantity > 0) {
+        smokeBtn.style.display = 'inline-block';
+        smokeBtn.onclick = () => smokeOneCigar(cigarId);
+    } else {
+        smokeBtn.style.display = 'none';
+    }
+
     // Show/hide transfer button based on whether cigar is in a humidor
     const transferBtn = document.getElementById('reportCardTransferBtn');
     if (!isInWishList && humidors.length > 1) {
@@ -4292,6 +4302,42 @@ async function restockCigar(id) {
     } catch (error) {
         console.error('Error restocking cigar:', error);
         showToast('Failed to restock cigar', 'error');
+    }
+}
+
+// Log a smoking session for a cigar ("Smoke One"). The server decrements quantity by 1 and flips
+// is_active at 0 in the same transaction as the session insert (see services #13).
+async function smokeOneCigar(cigarId) {
+    const btn = document.getElementById('reportCardSmokeBtn');
+    if (btn) btn.disabled = true;
+
+    try {
+        const response = await makeAuthenticatedRequest(`/api/v1/cigars/${cigarId}/sessions`, {
+            method: 'POST',
+            body: JSON.stringify({})
+        });
+
+        if (!response || !response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.message || 'Failed to log smoking session');
+        }
+
+        const result = await response.json();
+        updateCigarCardInDOM(cigarId, {
+            quantity: result.cigar_quantity,
+            is_active: result.cigar_is_active
+        });
+
+        const quantityField = document.getElementById('reportCardQuantity');
+        if (quantityField) quantityField.textContent = result.cigar_quantity || '-';
+        if (btn && result.cigar_quantity <= 0) btn.style.display = 'none';
+
+        showToast('Smoking session logged!', 'success');
+    } catch (error) {
+        console.error('Error logging smoking session:', error);
+        showToast(error.message || 'Failed to log smoking session', 'error');
+    } finally {
+        if (btn) btn.disabled = false;
     }
 }
 

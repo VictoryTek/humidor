@@ -452,6 +452,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let backup_routes = routes::create_backup_routes(db_pool.clone()).boxed();
     let export_routes = routes::create_export_routes(db_pool.clone()).boxed();
     let public_share_routes = routes::create_public_share_routes(db_pool.clone()).boxed();
+    let smoking_session_routes = routes::create_smoking_session_routes(db_pool.clone()).boxed();
 
     // Combine all API routes
     let api = auth_routes
@@ -463,6 +464,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .or(favorite_routes)
         .or(backup_routes)
         .or(export_routes)
+        .or(smoking_session_routes)
         .or(public_share_routes); // No auth required for public shares
 
     // Health check endpoint (no auth required)

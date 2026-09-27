@@ -11,6 +11,7 @@ pub mod origins;
 pub mod public_shares;
 pub mod ring_gauges;
 pub mod sizes;
+pub mod smoking_sessions;
 pub mod strengths;
 pub mod wish_list;
 

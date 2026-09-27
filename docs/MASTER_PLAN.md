@@ -83,7 +83,7 @@ Tags: `[ARCH]` architecture doc, `[BUG]` bug doc, `[FEAT]` feature doc.
   misleads anyone searching for how uploads actually work (they're base64 JSON, not multipart).
   **[ARCH 2.2] [BUG L1]**
   Files: `src/handlers/images.rs`, `src/handlers/mod.rs`
-- [ ] 13. Smoking journal / tasting sessions with ratings — biggest expected-feature gap for a
+- [x] 13. Smoking journal / tasting sessions with ratings — biggest expected-feature gap for a
   cigar-inventory app; new `smoking_sessions` table + endpoints, reusing the existing
   quantity-decrement pattern. **[FEAT #1]**
 - [x] 14. Per-user data export (CSV/JSON) of the requesting user's own collection. **[FEAT #2
