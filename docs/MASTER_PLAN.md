@@ -46,7 +46,7 @@ Tags: `[ARCH]` architecture doc, `[BUG]` bug doc, `[FEAT]` feature doc.
   Files: `src/handlers/humidors.rs`, `src/handlers/backups.rs`, `src/handlers/auth.rs`,
   `src/handlers/cigars.rs`, `src/errors.rs`
   *Phases 1-4 done: error text no longer leaks; no 200-on-failure remains (regex sweep of `src/handlers/**`).
-  **Left unchecked deliberately** for one residual: 43 sites (`auth.rs` 15, `humidors.rs` 21, dead `images.rs` 7)
+  **Left unchecked deliberately** for one residual: 36 sites (`auth.rs` 15, `humidors.rs` 21; the 7 in dead `images.rs` went away with #12)
   use correct statuses but an ad-hoc `{"error": "<text>"}` body instead of `AppError`'s
   `{"error": CODE, "message": text}`. Readers of `error` as display text: `login.js:60`, `forgot-password.js:84`,
   `reset-password.js:115-116`. **Recommendation: leave as is** — converting only buys body-shape consistency and
@@ -68,7 +68,7 @@ Tags: `[ARCH]` architecture doc, `[BUG]` bug doc, `[FEAT]` feature doc.
   *Done: `.env` untracked (local copy kept), `.gitignore` covers `.env.*`, and `scripts/preflight.sh` fails if secret
   files are tracked. History still contains the file (dev placeholders; rewrite not recommended) — treat the committed
   JWT secret / default DB password as public. Not yet pushed at time of writing.*
-- [ ] 12. `src/handlers/images.rs` — 159 lines of dead, unrouted multipart image-upload code;
+- [x] 12. `src/handlers/images.rs` — 159 lines of dead, unrouted multipart image-upload code;
   misleads anyone searching for how uploads actually work (they're base64 JSON, not multipart).
   **[ARCH 2.2] [BUG L1]**
   Files: `src/handlers/images.rs`, `src/handlers/mod.rs`
