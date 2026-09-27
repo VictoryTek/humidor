@@ -65,6 +65,9 @@ Tags: `[ARCH]` architecture doc, `[BUG]` bug doc, `[FEAT]` feature doc.
 - [ ] 11. `.env` containing a real-looking `JWT_SECRET` and DB credentials is tracked in git
   despite being gitignored. **[ARCH 2.1]**
   Files: `.env`, `.gitignore:12`
+  *In progress: `.gitignore` hardened and a tracked-secrets guard added to `scripts/preflight.sh` (fails until the
+  file is untracked). **Blocked on the user running `git rm --cached .env`** (agents may not change the index). Values are
+  dev placeholders (JWT secret is published, so never reuse it); history rewrite not recommended.*
 - [ ] 12. `src/handlers/images.rs` — 159 lines of dead, unrouted multipart image-upload code;
   misleads anyone searching for how uploads actually work (they're base64 JSON, not multipart).
   **[ARCH 2.2] [BUG L1]**

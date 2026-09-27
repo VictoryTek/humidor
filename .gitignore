@@ -10,6 +10,8 @@ test_results.txt
 
 # Environment and secrets
 .env
+.env.*
+!.env.example
 secrets/*.txt
 !secrets/*.txt.example
 
