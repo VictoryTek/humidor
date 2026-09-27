@@ -4,10 +4,64 @@ use crate::models::{
     HumidorShareResponse, HumidorSharesListResponse, PermissionLevel, ShareHumidorRequest,
     SharedHumidorInfo, SharedHumidorsResponse, UpdateSharePermissionRequest, UserInfo,
 };
+use crate::services::email::EmailService;
 use crate::services::permissions::{can_view_humidor, is_humidor_owner};
 use deadpool_postgres::Pool;
 use std::str::FromStr;
 use uuid::Uuid;
+
+/// Fire off a share-notification email in the background: it never delays or fails the
+/// share/revoke request itself, and a missing/misconfigured SMTP setup is logged at debug level
+/// (same convention as `forgot_password`), not surfaced to the caller.
+async fn send_notification(what: &'static str, result: anyhow::Result<()>) {
+    if let Err(e) = result {
+        tracing::error!(error = %e, notification = what, "Failed to send email notification");
+    }
+}
+
+fn notify_humidor_shared(
+    to_email: String,
+    sharer_username: String,
+    humidor_name: String,
+    permission_level: String,
+) {
+    tokio::spawn(async move {
+        let result = match EmailService::from_env() {
+            Ok(email_service) => {
+                email_service
+                    .send_humidor_shared_email(
+                        &to_email,
+                        &sharer_username,
+                        &humidor_name,
+                        &permission_level,
+                    )
+                    .await
+            }
+            Err(e) => {
+                tracing::debug!(error = %e, "Email service not configured; skipping share notification");
+                return;
+            }
+        };
+        send_notification("humidor_shared", result).await;
+    });
+}
+
+fn notify_share_revoked(to_email: String, humidor_name: String) {
+    tokio::spawn(async move {
+        let result = match EmailService::from_env() {
+            Ok(email_service) => {
+                email_service
+                    .send_humidor_share_revoked_email(&to_email, &humidor_name)
+                    .await
+            }
+            Err(e) => {
+                tracing::debug!(error = %e, "Email service not configured; skipping revoke notification");
+                return;
+            }
+        };
+        send_notification("share_revoked", result).await;
+    });
+}
 use warp::{Rejection, Reply, reject, reply};
 
 /// Share a humidor with another user
@@ -55,10 +109,10 @@ pub async fn share_humidor(
         ))
     })?;
 
-    // Verify the target user exists and is active
-    let user_exists = client
+    // Verify the target user exists and is active; fetch their email for the notification below
+    let target_user = client
         .query_opt(
-            "SELECT id FROM users WHERE id = $1 AND is_active = true",
+            "SELECT email FROM users WHERE id = $1 AND is_active = true",
             &[&request.user_id],
         )
         .await
@@ -67,11 +121,25 @@ pub async fn share_humidor(
             reject::custom(AppError::DatabaseError("Failed to verify user".to_string()))
         })?;
 
-    if user_exists.is_none() {
-        return Err(reject::custom(AppError::NotFound(
-            "User not found or inactive".to_string(),
-        )));
-    }
+    let target_email: String = match target_user {
+        Some(row) => row.get(0),
+        None => {
+            return Err(reject::custom(AppError::NotFound(
+                "User not found or inactive".to_string(),
+            )));
+        }
+    };
+
+    let humidor_name: String = client
+        .query_one("SELECT name FROM humidors WHERE id = $1", &[&humidor_id])
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to fetch humidor name: {}", e);
+            reject::custom(AppError::DatabaseError(
+                "Failed to look up humidor".to_string(),
+            ))
+        })?
+        .get(0);
 
     // Insert or update the share
     let share_id = Uuid::new_v4();
@@ -103,6 +171,13 @@ pub async fn share_humidor(
         "Successfully shared humidor {} with user {}",
         humidor_id,
         request.user_id
+    );
+
+    notify_humidor_shared(
+        target_email,
+        auth.username.clone(),
+        humidor_name,
+        permission_str.to_string(),
     );
 
     Ok(reply::with_status(
@@ -151,6 +226,22 @@ pub async fn revoke_share(
         ))
     })?;
 
+    // Fetch the target user's email and the humidor's name up front (for the notification below)
+    // so we don't need to look them up again after the share row is gone.
+    let notification_target: Option<(String, String)> = client
+        .query_opt(
+            "SELECT u.email, h.name FROM users u, humidors h WHERE u.id = $1 AND h.id = $2",
+            &[&user_id, &humidor_id],
+        )
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to look up user/humidor for notification: {}", e);
+            reject::custom(AppError::DatabaseError(
+                "Failed to look up user or humidor".to_string(),
+            ))
+        })?
+        .map(|row| (row.get(0), row.get(1)));
+
     let rows_affected = client
         .execute(
             "DELETE FROM humidor_shares WHERE humidor_id = $1 AND shared_with_user_id = $2",
@@ -175,6 +266,10 @@ pub async fn revoke_share(
         humidor_id,
         user_id
     );
+
+    if let Some((target_email, humidor_name)) = notification_target {
+        notify_share_revoked(target_email, humidor_name);
+    }
 
     Ok(reply::with_status(
         reply::json(&serde_json::json!({

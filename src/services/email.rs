@@ -74,6 +74,136 @@ impl EmailService {
         )
     }
 
+    /// Escape text interpolated into the HTML emails below (humidor names, usernames): both are
+    /// arbitrary user input, and mail clients render HTML email bodies just like a browser.
+    fn escape_html(text: &str) -> String {
+        text.replace('&', "&amp;")
+            .replace('<', "&lt;")
+            .replace('>', "&gt;")
+            .replace('"', "&quot;")
+            .replace('\'', "&#39;")
+    }
+
+    fn send(&self, to_email: &str, subject: &str, html_body: String) -> Result<()> {
+        let email = Message::builder()
+            .from(self.from_email.parse()?)
+            .to(to_email.parse()?)
+            .subject(subject)
+            .header(ContentType::TEXT_HTML)
+            .body(html_body)?;
+
+        let creds = Credentials::new(self.smtp_user.clone(), self.smtp_password.clone());
+        let mailer = SmtpTransport::relay(&self.smtp_host)?
+            .port(self.smtp_port)
+            .credentials(creds)
+            .build();
+
+        mailer.send(&email)?;
+        Ok(())
+    }
+
+    /// Notify `to_email` that `sharer_username` shared `humidor_name` with them.
+    /// Build the "humidor shared" HTML body. A free function (not a method) so it is a pure,
+    /// directly unit-testable string transform, independent of sending the mail.
+    fn shared_email_html(
+        sharer_username: &str,
+        humidor_name: &str,
+        permission_level: &str,
+    ) -> String {
+        let sharer = Self::escape_html(sharer_username);
+        let humidor = Self::escape_html(humidor_name);
+        format!(
+            r#"<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+        .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+        .header {{ background: linear-gradient(135deg, #8B6914 0%, #D4AF37 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }}
+        .content {{ background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }}
+        .footer {{ text-align: center; color: #666; font-size: 0.9em; margin-top: 20px; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎁 A Humidor Was Shared With You</h1>
+        </div>
+        <div class="content">
+            <p>Hello,</p>
+            <p><strong>{sharer}</strong> has shared their humidor "<strong>{humidor}</strong>" with you on Humidor,
+               with <strong>{permission_level}</strong> access.</p>
+            <p>Log in to your account to view it.</p>
+            <div class="footer">
+                <p>© 2025 Humidor - Cigar Inventory Management</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+"#
+        )
+    }
+
+    /// Build the "share revoked" HTML body (see `shared_email_html`).
+    fn revoked_email_html(humidor_name: &str) -> String {
+        let humidor = Self::escape_html(humidor_name);
+        format!(
+            r#"<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+        .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+        .header {{ background: linear-gradient(135deg, #8B6914 0%, #D4AF37 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }}
+        .content {{ background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }}
+        .footer {{ text-align: center; color: #666; font-size: 0.9em; margin-top: 20px; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔒 Humidor Access Removed</h1>
+        </div>
+        <div class="content">
+            <p>Hello,</p>
+            <p>Your access to the humidor "<strong>{humidor}</strong>" on Humidor has been removed.</p>
+            <p>If you believe this was a mistake, contact the humidor's owner.</p>
+            <div class="footer">
+                <p>© 2025 Humidor - Cigar Inventory Management</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+"#
+        )
+    }
+
+    /// Notify `to_email` that `sharer_username` shared `humidor_name` with them.
+    pub async fn send_humidor_shared_email(
+        &self,
+        to_email: &str,
+        sharer_username: &str,
+        humidor_name: &str,
+        permission_level: &str,
+    ) -> Result<()> {
+        let html_body = Self::shared_email_html(sharer_username, humidor_name, permission_level);
+        self.send(to_email, "A humidor was shared with you", html_body)
+    }
+
+    /// Notify `to_email` that their access to `humidor_name` was revoked.
+    pub async fn send_humidor_share_revoked_email(
+        &self,
+        to_email: &str,
+        humidor_name: &str,
+    ) -> Result<()> {
+        let html_body = Self::revoked_email_html(humidor_name);
+        self.send(to_email, "Your access to a humidor was removed", html_body)
+    }
+
     pub async fn send_password_reset_email(&self, to_email: &str, reset_url: &str) -> Result<()> {
         let html_body = format!(
             r#"
@@ -216,5 +346,45 @@ mod tests {
             ])
             .is_ok()
         );
+    }
+
+    #[test]
+    fn escape_html_neutralises_all_five_special_characters() {
+        assert_eq!(
+            EmailService::escape_html("<b>Tom & \"Jerry's\" Humidor</b>"),
+            "&lt;b&gt;Tom &amp; &quot;Jerry&#39;s&quot; Humidor&lt;/b&gt;"
+        );
+    }
+
+    /// A humidor name / username containing HTML must not appear unescaped in the rendered body:
+    /// mail clients render HTML email bodies like a browser, so this is the same class of bug as
+    /// stored XSS in the web UI.
+    #[test]
+    fn shared_email_html_escapes_humidor_name_and_sharer_username() {
+        let body = EmailService::shared_email_html(
+            "attacker<img src=x onerror=alert(1)>",
+            "<script>alert(1)</script>",
+            "full",
+        );
+        assert!(!body.contains("<img src=x"));
+        assert!(!body.contains("<script>alert"));
+        assert!(body.contains("&lt;img src=x onerror=alert(1)&gt;"));
+        assert!(body.contains("&lt;script&gt;alert(1)&lt;/script&gt;"));
+        assert!(body.contains("full"));
+    }
+
+    #[test]
+    fn revoked_email_html_escapes_humidor_name() {
+        let body = EmailService::revoked_email_html("<script>alert(1)</script>");
+        assert!(!body.contains("<script>alert"));
+        assert!(body.contains("&lt;script&gt;alert(1)&lt;/script&gt;"));
+    }
+
+    #[test]
+    fn shared_email_html_contains_the_permission_level_and_plain_names() {
+        let body = EmailService::shared_email_html("alice", "Main Humidor", "view");
+        assert!(body.contains("alice"));
+        assert!(body.contains("Main Humidor"));
+        assert!(body.contains("view"));
     }
 }

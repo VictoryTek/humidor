@@ -39,16 +39,23 @@ pub fn create_humidor_routes(
         .and(warp::path("v1"))
         .and(warp::path("humidors"))
         .and(with_uuid())
+        .and(warp::path::end())
         .and(warp::put())
         .and(json_body())
         .and(with_current_user(db_pool.clone()))
         .and(with_db(db_pool.clone()))
         .and_then(handlers::update_humidor);
 
+    // CRITICAL: path::end() is required here. Without it this filter matches ANY DELETE under
+    // /api/v1/humidors/{id}/**, and warp's `.or()` falls through to the next alternative not only
+    // on a routing mismatch but also whenever an earlier and_then's handler returns an Err — so a
+    // legitimate 404 from revoke_share/delete_public_share/revoke_public_share (e.g. revoking an
+    // already-revoked share) would silently fall through and delete the whole humidor instead.
     let delete_humidor = warp::path("api")
         .and(warp::path("v1"))
         .and(warp::path("humidors"))
         .and(with_uuid())
+        .and(warp::path::end())
         .and(warp::delete())
         .and(with_current_user(db_pool.clone()))
         .and(with_db(db_pool.clone()))

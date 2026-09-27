@@ -10,6 +10,17 @@ Tags: `[ARCH]` architecture doc, `[BUG]` bug doc, `[FEAT]` feature doc.
 ---
 
 ## High Priority
+- [x] 0. **[NEW, found during #15]** `revoke_share`/`delete_public_share`/`revoke_public_share` returning 404 for
+  an already-gone share fell through warp's `.or()` chain into `delete_humidor` (missing `path::end()` let it match
+  any DELETE under `/humidors/{id}/**`), silently **deleting the entire humidor and its cigars**. Triggerable via a
+  UI double-click (`revokeShare`/`deletePublicShare` don't disable their button while in flight); owner-only, no
+  cross-user exposure. Fixed: `path::end()` added to `update_humidor`/`delete_humidor`.
+  Files: `src/routes/humidors.rs`, `src/routes/organizers.rs`
+  *Also fixed (same session, user asked to extend it): the identical gap in 5 organizer route pairs
+  (brands/sizes/origins/strengths/ring-gauges, 10 filters) in `src/routes/organizers.rs`. Lower severity there —
+  no destructive cascade, since no longer-path route exists to fall through from — but the same bug class
+  (a garbage-suffixed `PUT .../{id}/garbage` silently updated the record). Mutation-checked; covered by
+  `tests/organizer_route_end_tests.rs`.*
 
 - [x] 1. JWT secret resolution duplicated & diverged — runtime falls back to the hardcoded
   sentinel `"INVALID_SECRET_NOT_CONFIGURED"`, a full authentication bypass on any deployment
@@ -77,7 +88,7 @@ Tags: `[ARCH]` architecture doc, `[BUG]` bug doc, `[FEAT]` feature doc.
   quantity-decrement pattern. **[FEAT #1]**
 - [x] 14. Per-user data export (CSV/JSON) of the requesting user's own collection. **[FEAT #2
   feature part]**
-- [ ] 15. Email notifications for share/revoke events — `EmailService` infrastructure already
+- [x] 15. Email notifications for share/revoke events — `EmailService` infrastructure already
   paid for, just needs two more methods and fire-and-forget calls from the share handlers.
   **[FEAT #3]**
 
