@@ -213,6 +213,71 @@ POSTGRES_DB=humidor_db
 
 This lets orchestrators keep the password in a separate secret (for example a systemd `EnvironmentFile=` or a compose `.env` file) instead of embedding it in one URL.
 
+## Nix / NixOS
+
+In addition to Docker, Humidor can be built and run natively via a Nix flake. This is a separate deployment path — it doesn't touch or replace the Docker Compose setup above.
+
+```bash
+# Build the binary (uses the committed Cargo.lock, no network access at build time)
+nix build .#default
+./result/bin/humidor
+```
+
+### NixOS module
+
+The flake exposes a NixOS module under the **`services.humidor`** option namespace, which runs the app as a native systemd service.
+
+| Option | Default | Description |
+|---|---|---|
+| `services.humidor.enable` | `false` | Enable the service. |
+| `services.humidor.port` | `9898` | HTTP port (`PORT`). |
+| `services.humidor.dataDir` | `/var/lib/humidor` | Working directory; holds `backups/`, `uploads/`, a symlink to the packaged static frontend, and (if auto-generated) the JWT secret. When left at the default, the service runs with `DynamicUser` + `StateDirectory`; a custom `dataDir` instead gets a dedicated `humidor` system user. |
+| `services.humidor.environmentFile` | `null` | Path to a systemd `EnvironmentFile=` (`KEY=VALUE` lines) for secrets that shouldn't live in the Nix store — `JWT_SECRET`, `POSTGRES_PASSWORD`, SMTP credentials, etc. **Recommended:** set `JWT_SECRET` (32+ characters) here for production; the app's own secret auto-generation persists to a Docker-specific path and isn't reliable across restarts under this module without it. |
+| `services.humidor.openFirewall` | `true` | Open `port` in the firewall. |
+| `services.humidor.database.url` | `null` | Full `DATABASE_URL`; takes precedence over the discrete options below (same precedence as the app itself). |
+| `services.humidor.database.host` / `.port` / `.user` / `.name` | `localhost` / `5432` / `humidor_user` / `humidor_db` | Discrete Postgres connection settings (used when `database.url` is unset). Set `POSTGRES_PASSWORD` via `environmentFile`. |
+| `services.humidor.database.createLocally` | `false` | Provision a local `services.postgresql` with the database/user above, and permit loopback-only password-less connections for them. Intended for single-host convenience (like the Docker Compose defaults), not multi-host production. |
+
+Database migrations run automatically at application startup (the app embeds and applies them itself), so the module does not run a separate migration step.
+
+Minimal usage example, self-managed local Postgres:
+
+```nix
+{
+  inputs.humidor.url = "path:/path/to/humidor"; # or a git/github URL once published
+
+  outputs = { self, nixpkgs, humidor }: {
+    nixosConfigurations.example = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        humidor.nixosModules.default
+        {
+          services.humidor = {
+            enable = true;
+            environmentFile = "/run/secrets/humidor.env"; # contains JWT_SECRET=...
+            database.createLocally = true;
+          };
+        }
+      ];
+    };
+  };
+}
+```
+
+Or against an externally-provided Postgres instance:
+
+```nix
+services.humidor = {
+  enable = true;
+  environmentFile = "/run/secrets/humidor.env"; # JWT_SECRET=..., POSTGRES_PASSWORD=...
+  database = {
+    host = "db.internal";
+    user = "humidor_user";
+    name = "humidor_db";
+  };
+};
+```
+
 ## First Run
 
 Humidor ships with **no default account and no default password**, and it has no public sign-up.
