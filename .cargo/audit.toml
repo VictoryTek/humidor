@@ -24,4 +24,19 @@ ignore = [
     # - The h2 0.4.x copy used by reqwest/hyper 1.x has been updated to 0.4.16 in Cargo.lock
     # REMOVE this ignore when warp/hyper are migrated to hyper 1.x (Phase 4 of the plan)
     "RUSTSEC-2026-0258",
+
+    # zip 0.6.6 - extract() symlink / permission handling (RUSTSEC-2026-0367, 0368, 0369)
+    # Fixed only in zip >= 9.0.0; zip is intentionally pinned to 0.6 (see Cargo.toml).
+    # REMOVE these ignores when zip is migrated 0.6 -> 9 (Phase 3 of docs/DEPENDENCY_UPDATES_PLAN.md)
+    # Common rationale: Humidor restores backups in src/services/backup.rs via by_index() and
+    # mangled_name() and never calls extract(); clippy.toml forbids ZipArchive::extract and
+    # ZipStreamReader::extract so that premise is enforced by `cargo clippy`.
+    # Review by 2027-01-20 (added 2026-10-20): re-check whether zip 9 migration has landed.
+
+    # SUID/SGID bits preserved by extract(); Humidor never calls extract() or sets file modes.
+    "RUSTSEC-2026-0367",
+    # ZipArchive::extract creates symlinks with attacker-chosen targets; Humidor never extracts.
+    "RUSTSEC-2026-0368",
+    # extract() applies permissions through symlinks; Humidor restores plain files only.
+    "RUSTSEC-2026-0369",
 ]

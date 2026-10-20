@@ -1,0 +1,9 @@
+# Backup restore (src/services/backup.rs) reads zip entries one by one and writes them to
+# paths from mangled_name(). It never calls extract(), which is what RUSTSEC-2026-0367,
+# 0368 and 0369 (zip < 9.0.0) are about. Those advisories are ignored in .cargo/audit.toml on
+# that premise, so calling extract() must fail `cargo clippy -- -D warnings` until zip is
+# migrated to >= 9.0.0 (docs/DEPENDENCY_UPDATES_PLAN.md).
+disallowed-methods = [
+    { path = "zip::ZipArchive::extract", reason = "RUSTSEC-2026-0367/0368/0369 are ignored in .cargo/audit.toml only because extract() is never called; extract entries manually via mangled_name() or migrate zip to >= 9.0.0" },
+    { path = "zip::unstable::stream::ZipStreamReader::extract", reason = "RUSTSEC-2026-0367/0368/0369 are ignored in .cargo/audit.toml only because extract() is never called; extract entries manually via mangled_name() or migrate zip to >= 9.0.0" },
+]

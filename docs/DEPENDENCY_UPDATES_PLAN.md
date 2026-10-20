@@ -41,7 +41,7 @@ The majority of updates are related to the HTTP stack migration from 0.2.x to 1.
 | Package | Current | Latest | Impact |
 |---------|---------|--------|--------|
 | jsonwebtoken | 9.3.1 | 10.2.0 | **Breaking** - JWT handling |
-| zip | 0.6.6 | 6.0.0 | **Breaking** - Archive operations |
+| zip | 0.6.6 | 9.0.0 | **Breaking** - Archive operations (RUSTSEC-2026-0367/0368/0369 are fixed only in >= 9.0.0) |
 | sync_wrapper | 0.1.2 | 1.0.2 | **Breaking** - Sync primitives |
 
 **Analysis**: 
@@ -79,8 +79,11 @@ The majority of updates are related to the HTTP stack migration from 0.2.x to 1.
 1. Update `jsonwebtoken` (9.3.1 → 10.2.0)
 2. Update authentication middleware
 3. Test JWT generation/validation
-4. Update `zip` (0.6.6 → 6.0.0)
+4. Update `zip` (0.6.6 → 9.0.0)
 5. Test backup/restore functionality
+6. Remove RUSTSEC-2026-0367/0368/0369 from `.cargo/audit.toml` and the `zip::...::extract`
+   entries from `clippy.toml` (both exist only because `zip` is pinned at 0.6; Humidor never
+   calls `extract()`)
 
 **Effort**: 12-16 hours
 

@@ -154,8 +154,9 @@ Test Command(s):
 - `cargo test --tests --verbose` (integration tests — requires a running Postgres instance;
   start one with `docker compose up -d humidor_db` and set `TEST_DATABASE_URL` /
   `DATABASE_URL` / `JWT_SECRET`, matching `.github/workflows/ci.yml`)
-- `cargo audit` (governed by `audit.toml`; one advisory, RUSTSEC-2025-0057, is intentionally
-  ignored — see the comment in `audit.toml` before treating it as a new finding)
+- `cargo audit` (governed by `.cargo/audit.toml`; a few advisories (RUSTSEC-2025-0057,
+  RUSTSEC-2026-0258, RUSTSEC-2026-0367/0368/0369) are intentionally ignored — see the comments
+  in `.cargo/audit.toml` before treating any of them as a new finding)
 
 Package Manager(s): **Cargo (crates.io)**
 
@@ -438,8 +439,8 @@ Review the implemented code against all of the following:
         `migrations/`): `docker compose up -d humidor_db`, then `cargo test --tests --verbose`
         with `TEST_DATABASE_URL`, `DATABASE_URL`, and `JWT_SECRET` set as in
         `.github/workflows/ci.yml`
-     6. `cargo audit` when dependencies changed (expect `RUSTSEC-2025-0057` to be pre-ignored
-        via `audit.toml`)
+     6. `cargo audit` when dependencies changed (expect the advisories listed in
+        `.cargo/audit.toml` to be pre-ignored)
 
 ### Output
 

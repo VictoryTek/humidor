@@ -2,6 +2,20 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <script>
+        // Redirect logged-out visitors before any of the app is painted.
+        // Public share links (/shared/humidors/...) are served this page and need no login.
+        // On any error, leave the page visible; app.js still runs its own auth check.
+        try {
+            if (!window.location.pathname.startsWith('/shared/humidors/') &&
+                (!localStorage.getItem('humidor_token') || !localStorage.getItem('humidor_user'))) {
+                document.documentElement.style.visibility = 'hidden';
+                window.location.replace('/login.html');
+            }
+        } catch (error) {
+            document.documentElement.style.visibility = '';
+        }
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Humidor - Premium Cigar Collection Management</title>
     

@@ -644,35 +644,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn serve_index() -> Result<impl Reply, warp::Rejection> {
     match tokio::fs::read_to_string("static/index.html").await {
-        Ok(content) => {
-            // Inject setup check script into the HTML
-            let setup_script = r#"
-<script>
-// Check if setup is needed and redirect to setup page
-// Skip check if user is already authenticated
-const hasToken = localStorage.getItem('humidor_token');
-if (!hasToken) {
-    fetch('/api/v1/setup/status')
-        .then(response => response.json())
-        .then(data => {
-            if (data.needs_setup) {
-                // Only redirect if we're not already on the setup page
-                if (!window.location.pathname.includes('setup.html')) {
-                    window.location.href = '/setup.html';
-                }
-            }
-        })
-        .catch(error => {
-            console.error('Failed to check setup status:', error);
-        });
-}
-</script>
-"#;
-
-            // Insert the script before the closing </body> tag
-            let modified_content = content.replace("</body>", &format!("{}</body>", setup_script));
-            Ok(warp::reply::html(modified_content))
-        }
+        // Logged-out visitors are redirected to /login.html by a script in index.html's <head>;
+        // login.js then sends them on to /setup.html on first run.
+        Ok(content) => Ok(warp::reply::html(content)),
         Err(_) => {
             // Fallback content with setup check
             let fallback_html = r#"

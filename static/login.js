@@ -81,7 +81,20 @@ document.addEventListener('DOMContentLoaded', function() {
         if (token && user) {
             // User is already logged in, redirect to main app
             window.location.href = '/';
+            return;
         }
+
+        // First run: no admin exists yet, so send the visitor to setup instead
+        fetch('/api/v1/setup/status')
+            .then(response => response.json())
+            .then(data => {
+                if (data.needs_setup) {
+                    window.location.replace('/setup.html');
+                }
+            })
+            .catch(error => {
+                console.error('Failed to check setup status:', error);
+            });
     }
 
     function showToast(message, type = 'info') {
