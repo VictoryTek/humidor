@@ -62,7 +62,7 @@ RUN echo "Cache bust: $CACHEBUST"
 COPY src ./src
 COPY static ./static
 COPY migrations ./migrations
-RUN touch src/main.rs && cargo build --release && strip target/release/humidor
+RUN find src -name '*.rs' -exec touch {} + && cargo build --release && strip target/release/humidor
 
 # Runtime stage - Alpine
 FROM alpine:3.21
